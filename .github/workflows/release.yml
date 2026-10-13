@@ -1,0 +1,186 @@
+# Releases KUI. See "Releasing" in CONTRIBUTING.md.
+#
+# Push to main: release-please keeps a "chore(main): release X.Y.Z" PR up to
+# date (versions + release notes). Merging that PR creates the vX.Y.Z tag and a
+# draft release, and the build job attaches the installers to it. You then
+# smoke-test the draft and click Publish.
+#
+# Manual run (Actions -> Release -> Run workflow): builds the installers as
+# workflow artifacts only, without releasing anything.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # Optional. PRs opened with the default GITHUB_TOKEN don't trigger CI, so
+      # checks won't run on the release PR. A GitHub App token fixes that.
+      - name: GitHub App token
+        id: app-token
+        if: vars.RELEASE_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+  build:
+    name: ${{ matrix.name }}
+    needs: release-please
+    # always() lets manual runs through, where release-please is skipped.
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.created == 'true')
+    permissions:
+      contents: write
+      id-token: write # build provenance
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Intel Macs aren't supported for now. To add them, build target
+          # x86_64-apple-darwin on macos-latest and smoke-test it under Rosetta.
+          - name: macOS (Apple Silicon)
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - name: Windows (x64)
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+    runs-on: ${{ matrix.runner }}
+    env:
+      TAG: ${{ needs.release-please.outputs.tag }}
+      BUNDLE: src-tauri/target/${{ matrix.target }}/release/bundle
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Bump prefix-key when a C dependency changes where it comes from (e.g.
+      # OpenSSL vcpkg -> preinstalled): the cache keeps librdkafka's CMake
+      # cache, which remembers absolute library paths from the old source.
+      - uses: swatinem/rust-cache@v2
+        with:
+          prefix-key: v1-rust
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - uses: ./.github/actions/windows-openssl
+        if: runner.os == 'Windows'
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      # Code signing is optional; see CONTRIBUTING.md. Missing secrets arrive as
+      # empty strings, which Tauri would treat as "sign with an empty
+      # certificate", so only export the ones that are set.
+      - name: Configure macOS signing
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No Apple certificate configured; using ad-hoc signing."
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!v}" ] && echo "$v=${!v}" >> "$GITHUB_ENV"
+          done
+
+      - name: Configure Windows signing
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE) {
+            Write-Host "No Windows certificate configured; installers will be unsigned."
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          Remove-Item $pfx
+          # Hand the thumbprint to Tauri through a config overlay so the base
+          # config stays unsigned for local builds.
+          $overlay = @{ bundle = @{ windows = @{
+            certificateThumbprint = $cert.Thumbprint
+            timestampUrl = "http://timestamp.digicert.com"
+          } } } | ConvertTo-Json -Depth 5
+          Set-Content -Path src-tauri/tauri.signing.conf.json -Value $overlay
+          "TAURI_SIGNING_ARGS=--config src-tauri/tauri.signing.conf.json" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build installers
+        shell: bash
+        run: |
+          # TAURI_SIGNING_ARGS is unquoted on purpose: it holds two arguments.
+          # shellcheck disable=SC2086
+          bun run tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} $TAURI_SIGNING_ARGS
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kui-${{ matrix.target }}
+          path: |
+            ${{ env.BUNDLE }}/dmg/*.dmg
+            ${{ env.BUNDLE }}/nsis/*.exe
+            ${{ env.BUNDLE }}/msi/*.msi
+          if-no-files-found: error
+
+      # Signed SLSA provenance, verifiable with `gh attestation verify`.
+      # Private repos only get attestations on GitHub Enterprise Cloud.
+      - name: Attest build provenance
+        if: env.TAG != '' && !github.event.repository.private
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            ${{ env.BUNDLE }}/dmg/*.dmg
+            ${{ env.BUNDLE }}/nsis/*.exe
+            ${{ env.BUNDLE }}/msi/*.msi
+
+      # --clobber makes a re-run of a failed job replace partial uploads.
+      - name: Attach installers to the draft release
+        if: env.TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          gh release upload "$TAG" "$BUNDLE"/dmg/*.dmg "$BUNDLE"/nsis/*.exe "$BUNDLE"/msi/*.msi \
+            --clobber --repo "$GITHUB_REPOSITORY"

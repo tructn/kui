@@ -1,0 +1,7 @@
+node_modules
+e2e/node_modules
+e2e/artifacts
+dist
+src-tauri/target
+src-tauri/gen
+.git
