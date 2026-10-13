@@ -1,0 +1,86 @@
+# Pull request checks that complement security.yml (which lints and tests on
+# Linux):
+# - the PR title must be a Conventional Commit, because squash-merging makes it
+#   the commit on main that the release notes are built from;
+# - the app must compile on macOS and Windows, the platforms we ship, so that
+#   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
+#   release rather than during one.
+#
+# It also builds on pushes to main, which is the only place the Rust cache is
+# saved: PRs can restore caches from main but not from each other, so this
+# keeps PR builds warm without filling the cache quota with per-PR copies.
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Edits to the PR title or description (by people or bots) get their own
+# group, so they only re-check the title and never cancel a running build.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    name: Conventional PR title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Default Conventional Commit types; the same rules as
+          # scripts/git-hooks/commit-msg.sh: lowercase start
+          # (acronyms like "API" are fine) and no trailing period.
+          subjectPattern: ^(?![A-Z][a-z]).+[^.]$
+          subjectPatternError: |
+            The summary "{subject}" in "{title}" should start in lowercase and
+            not end with a period, e.g. "feat(messages): add live mode filter".
+
+  build:
+    name: Build (${{ matrix.os }})
+    # Title edits don't change code; skip the slow builds for them.
+    if: github.event.action != 'edited'
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS runners bill 10x on private repos; while KUI is private, macOS
+        # is covered by the local pre-push hook (developers work on Macs).
+        os: ${{ github.event.repository.private && fromJSON('["windows-latest"]') || fromJSON('["macos-latest", "windows-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Bump prefix-key when a C dependency changes where it comes from (e.g.
+      # OpenSSL vcpkg -> preinstalled): the cache keeps librdkafka's CMake
+      # cache, which remembers absolute library paths from the old source.
+      - uses: swatinem/rust-cache@v2
+        with:
+          prefix-key: v1-rust
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - uses: ./.github/actions/windows-openssl
+        if: runner.os == 'Windows'
+
+      - run: bun install --frozen-lockfile
+
+      # `generate_context!` embeds dist/, so the UI must be built first.
+      - run: bun run build
+
+      - name: Compile and test
+        working-directory: src-tauri
+        run: cargo test --locked --lib
