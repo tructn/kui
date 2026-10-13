@@ -49,7 +49,7 @@ KUI uses **trunk-based development**: `main` is always releasable, and every cha
 short-lived branch and a pull request. There are no long-lived `develop` or feature branches.
 
 ```text
-main ──●───────────────●──────────────●──►     (squash merges only; release-please tags releases here)
+main ──●───────────────●──────────────●──►     (squash merges only; releases are tagged here)
         \             /                \
          feat/live-filter                fix/empty-topic-crash
 ```
@@ -67,26 +67,21 @@ main ──●───────────────●──────
 <type>/<short-description>      feat/live-filter, fix/empty-topic-crash, docs/release-guide
 ```
 
-Use the same types as commits (below), and lowercase letters, digits, `.`, `_` and `-` in the description. Also
-allowed:
-
-| Branch | Used for |
-| --- | --- |
-| `release-please--*` | created by release-please |
+Use the same types as commits (below), and lowercase letters, digits, `.`, `_` and `-` in the description.
 
 Committing directly on `main` is blocked locally (merge commits from `git pull` are fine), and branch protection
 blocks it on GitHub.
 
 ## Commit and PR title format
 
-KUI uses [Conventional Commits](https://www.conventionalcommits.org). Releases, version numbers and
-release notes are generated from them (see [Releasing](#releasing)), so the type matters:
+KUI uses [Conventional Commits](https://www.conventionalcommits.org). The type decides the next version
+(see [Releasing](#releasing)) and PR titles become the release notes, so the type matters:
 
 ```text
 <type>(<optional scope>)<optional !>: <summary in the imperative>
 ```
 
-| Type | Use for | Release |
+| Type | Use for | Version bump |
 | --- | --- | --- |
 | `feat` | a user-visible feature | minor |
 | `fix` | a user-visible bug fix | patch |
@@ -94,7 +89,7 @@ release notes are generated from them (see [Releasing](#releasing)), so the type
 | `revert` | reverting an earlier commit | patch |
 | `docs`, `style`, `refactor`, `test`, `build`, `ci`, `chore` | everything users don't see | none |
 
-Use a scope for security fixes and app dependency updates, so they ship in a patch release: `fix(security): …`,
+Use a scope for security fixes and app dependency updates, so they count as a patch: `fix(security): …`,
 `fix(deps): bump rdkafka to 0.40`. Use `chore(deps):` for dev-only tooling.
 
 Add `!` after the type (`feat!:`), or a `BREAKING CHANGE:` footer, for changes that break existing users, such as
@@ -112,7 +107,7 @@ Also:
 
 - Start the summary in lowercase, use the imperative ("add", not "added"), and don't end it with a period.
 - Keep the first line to 72 characters. Explain *why* in the body, after a blank line.
-- Footers such as `BREAKING CHANGE: …`, `Release-As: 0.3.0` or `Refs: #42` go at the end.
+- Footers such as `BREAKING CHANGE: …`, `Refs: #42` go at the end.
 
 ## Git hooks
 
@@ -130,15 +125,32 @@ only the title has to be perfect. Squash merging replaces the individual commits
 
 ## Releasing
 
-[release-please](https://github.com/googleapis/release-please) ([release.yml](.github/workflows/release.yml)) keeps a
-`chore(main): release X.Y.Z` PR open. Merging it tags `vX.Y.Z` and creates a draft release; the macOS `.dmg` and
-Windows `.exe`/`.msi` are built and attached in about 20–30 minutes. Install one, smoke-test it, then click
-**Publish release** (tick **Set as a pre-release** for betas).
+Releases are manual: nothing ships until you push a version tag.
+[release.yml](.github/workflows/release.yml) then builds the macOS `.dmg` and the Windows `.exe`/`.msi`, and attaches
+them to a **draft** release with notes generated from the merged PRs.
 
-Don't use suffixes like `-beta.1`: the Windows MSI format only accepts numeric versions. To force a version, put
-`Release-As: 1.0.0` on the last line of the squash-merge commit message. **Actions → Release → Run workflow**
-builds installers as workflow artifacts without releasing.
+1. Pick the version from the commit types since the last release (table above; before 1.0, breaking changes bump
+   the minor). Use plain `X.Y.Z`: the Windows MSI format rejects suffixes like `-beta.1`.
+2. Bump it in a PR, e.g. `chore: release 0.2.0`:
+
+   ```bash
+   scripts/set-version.sh 0.2.0   # package.json, Cargo.toml and Cargo.lock
+   ```
+
+3. After it's merged, tag the merge commit on `main`:
+
+   ```bash
+   git switch main && git pull
+   git tag v0.2.0 && git push origin v0.2.0
+   ```
+
+   The workflow refuses tags that don't match the version in the files or aren't on `main`.
+4. When the build finishes (about 20–30 minutes), install from the draft, smoke-test it against
+   `bun run kafka:up`, and click **Publish release**. `0.x` releases are marked as pre-releases (beta).
+
+**Actions → Release → Run workflow** builds the installers as workflow artifacts from any branch, without releasing.
 
 Code signing is optional. Add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` (plus
 `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` for notarization) or `WINDOWS_CERTIFICATE`,
-`WINDOWS_CERTIFICATE_PASSWORD` as repository secrets and the workflow signs automatically.
+`WINDOWS_CERTIFICATE_PASSWORD` as repository secrets and the workflow signs automatically. On a public repo each
+installer also gets signed build provenance: `gh attestation verify <file> --repo tructn/kui`.

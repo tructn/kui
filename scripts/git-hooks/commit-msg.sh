@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Checks a commit message against the Conventional Commits rules in
-# CONTRIBUTING.md (release-please turns them into versions and release notes).
+# CONTRIBUTING.md (they become the release notes).
 # Run by lefthook's commit-msg hook: scripts/git-hooks/commit-msg.sh <msg-file>
 # Skip once with `git commit --no-verify`.
 set -euo pipefail
 
-# The standard Conventional Commit types, which release-please and the CI
+# The standard Conventional Commit types, which the CI
 # PR-title check also use by default. Keep in sync with CONTRIBUTING.md.
 TYPES='feat|fix|perf|revert|docs|style|refactor|test|build|ci|chore'
 MAX_HEADER=72

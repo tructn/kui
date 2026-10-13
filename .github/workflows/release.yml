@@ -1,57 +1,54 @@
-# Releases KUI. See "Releasing" in CONTRIBUTING.md.
+# Builds KUI's installers. See "Releasing" in CONTRIBUTING.md.
 #
-# Push to main: release-please keeps a "chore(main): release X.Y.Z" PR up to
-# date (versions + release notes). Merging that PR creates the vX.Y.Z tag and a
-# draft release, and the build job attaches the installers to it. You then
-# smoke-test the draft and click Publish.
+# Push a vX.Y.Z tag on main: the macOS and Windows installers are built and
+# attached to a draft release with generated notes. You smoke-test the draft
+# and click Publish; nothing is published automatically.
 #
-# Manual run (Actions -> Release -> Run workflow): builds the installers as
-# workflow artifacts only, without releasing anything.
+# Manual run (Actions -> Release -> Run workflow): builds the installers from
+# any branch as workflow artifacts only, without releasing anything.
 name: Release
 
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release-please:
-    if: github.event_name == 'push'
+  # Fails fast, before 20+ minutes of builds, on a tag that doesn't match the
+  # version in the files or a tag pushed on an unmerged commit.
+  verify:
     runs-on: ubuntu-24.04
-    outputs:
-      created: ${{ steps.release.outputs.release_created }}
-      tag: ${{ steps.release.outputs.tag_name }}
     steps:
-      # Optional. PRs opened with the default GITHUB_TOKEN don't trigger CI, so
-      # checks won't run on the release PR. A GitHub App token fixes that.
-      - name: GitHub App token
-        id: app-token
-        if: vars.RELEASE_APP_ID != ''
-        uses: actions/create-github-app-token@v2
+      - uses: actions/checkout@v4
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: googleapis/release-please-action@v4
-        id: release
-        with:
-          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+      - name: Check version
+        shell: bash
+        run: |
+          pkg=$(jq -r .version package.json)
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)
+          echo "package.json: $pkg, Cargo.toml: $cargo"
+          [ "$pkg" = "$cargo" ] || { echo "::error::Versions differ; run scripts/set-version.sh"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [ "$GITHUB_REF_NAME" = "v$pkg" ] || { echo "::error::Tag $GITHUB_REF_NAME doesn't match version $pkg"; exit 1; }
+            [[ "$pkg" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Use a plain X.Y.Z version (MSI rejects suffixes)"; exit 1; }
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
+          fi
 
   build:
     name: ${{ matrix.name }}
-    needs: release-please
-    # always() lets manual runs through, where release-please is skipped.
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.created == 'true')
+    needs: verify
     permissions:
-      contents: write
+      contents: read
       id-token: write # build provenance
       attestations: write
     strategy:
@@ -70,12 +67,11 @@ jobs:
             bundles: nsis,msi
     runs-on: ${{ matrix.runner }}
     env:
-      TAG: ${{ needs.release-please.outputs.tag }}
       BUNDLE: src-tauri/target/${{ matrix.target }}/release/bundle
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG || github.ref }}
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
 
@@ -166,7 +162,7 @@ jobs:
       # Signed SLSA provenance, verifiable with `gh attestation verify`.
       # Private repos only get attestations on GitHub Enterprise Cloud.
       - name: Attest build provenance
-        if: env.TAG != '' && !github.event.repository.private
+        if: github.ref_type == 'tag' && !github.event.repository.private
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
@@ -174,13 +170,27 @@ jobs:
             ${{ env.BUNDLE }}/nsis/*.exe
             ${{ env.BUNDLE }}/msi/*.msi
 
-      # --clobber makes a re-run of a failed job replace partial uploads.
-      - name: Attach installers to the draft release
-        if: env.TAG != ''
-        shell: bash
+  # One job creates the release once every installer is built, so a failed
+  # platform never leaves a half-filled draft behind. Only this job can write.
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+
+      # 0.x versions are betas, so they're marked as pre-releases.
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
-          shopt -s nullglob
-          gh release upload "$TAG" "$BUNDLE"/dmg/*.dmg "$BUNDLE"/nsis/*.exe "$BUNDLE"/msi/*.msi \
-            --clobber --repo "$GITHUB_REPOSITORY"
+          prerelease=()
+          [[ "$TAG" == v0.* ]] && prerelease=(--prerelease)
+          gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" \
+            --draft --verify-tag --generate-notes --title "KUI $TAG" "${prerelease[@]}"

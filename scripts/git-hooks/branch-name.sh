@@ -24,7 +24,6 @@ case "$branch" in
     } >&2
     exit 1
     ;;
-  release-please--*) exit 0 ;;          # created by release-please
 esac
 
 if ! printf '%s' "$branch" | grep -Eq "^($TYPES)/[a-z0-9][a-z0-9._-]*$"; then

@@ -1,7 +1,7 @@
 # Pull request checks that complement security.yml (which lints and tests on
 # Linux):
 # - the PR title must be a Conventional Commit, because squash-merging makes it
-#   the commit on main that release-please reads;
+#   the commit on main that the release notes are built from;
 # - the app must compile on macOS and Windows, the platforms we ship, so that
 #   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
 #   release rather than during one.

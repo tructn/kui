@@ -23,7 +23,7 @@ pre-commit:
       run: bunx tsc --noEmit
 
 # Commit messages follow Conventional Commits (CONTRIBUTING.md), which
-# release-please turns into versions and release notes.
+# become the release notes.
 commit-msg:
   jobs:
     - name: commit message
