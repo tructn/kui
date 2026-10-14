@@ -11,6 +11,7 @@ mod kafka;
 mod settings;
 mod state;
 mod tasks;
+mod updates;
 
 #[cfg(test)]
 mod integration_tests;
@@ -25,6 +26,8 @@ use state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::PendingUpdate::default())
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
             let store = clusters::store::ClusterStore::load(config_dir.join("clusters.json"))?;
@@ -39,6 +42,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
             settings::save_setting,
+            updates::check_for_update,
+            updates::install_update,
             clusters::commands::list_clusters,
             clusters::commands::save_cluster,
             clusters::commands::delete_cluster,

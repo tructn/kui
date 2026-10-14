@@ -6,6 +6,10 @@
 # SemVer: a pre-release suffix (v0.2.0-beta.1) makes a GitHub pre-release, and
 # a plain vX.Y.Z (v0.1.0 included) a normal release.
 #
+# Every release also carries latest.json, the manifest the app's updater reads
+# (src-tauri/src/updates.rs), pointing at installers signed with the updater
+# key (TAURI_SIGNING_PRIVATE_KEY secret; public key in tauri.conf.json).
+#
 # Manual run (Actions -> Release -> Run workflow): builds the installers from
 # any branch as workflow artifacts only, without releasing anything.
 name: Release
@@ -35,6 +39,8 @@ jobs:
 
       - name: Check version
         shell: bash
+        env:
+          HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: |
           pkg=$(jq -r .version package.json)
           cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)
@@ -48,6 +54,8 @@ jobs:
             [ "$GITHUB_REF_NAME" = "v$pkg" ] || { echo "::error::Tag $GITHUB_REF_NAME doesn't match version $pkg"; exit 1; }
             grep -qF "## [$pkg] - " CHANGELOG.md || { echo "::error::CHANGELOG.md has no $pkg section; run scripts/set-version.sh $pkg"; exit 1; }
             git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
+            # Without it the release has no signed update and installed apps never see it.
+            [ "$HAS_UPDATER_KEY" = true ] || { echo "::error::Add the TAURI_SIGNING_PRIVATE_KEY secret; see CONTRIBUTING.md"; exit 1; }
           fi
 
   build:
@@ -63,10 +71,11 @@ jobs:
         include:
           # Intel Macs aren't supported for now. To add them, build target
           # x86_64-apple-darwin on macos-latest and smoke-test it under Rosetta.
+          # The app bundle is what the updater installs (as .app.tar.gz).
           - name: macOS (Apple Silicon)
             runner: macos-latest
             target: aarch64-apple-darwin
-            bundles: dmg
+            bundles: app,dmg
           - name: Windows (x64)
             runner: windows-latest
             target: x86_64-pc-windows-msvc
@@ -150,15 +159,23 @@ jobs:
 
       - name: Build installers
         shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           # MSI versions must be numeric, so a pre-release like 0.2.0-beta.1
           # is installed as 0.2.0; the app and other installers keep the full
           # version. MSI compares only the first three fields anyway.
           core=$(jq -r .version package.json | sed 's/-.*//')
+          # Signed update packages (.app.tar.gz and a .sig per installer) need
+          # the updater key, so a manual run without it builds installers only.
+          # verify makes sure a tag always has it.
+          updater=false
+          [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && updater=true
           # TAURI_SIGNING_ARGS is unquoted on purpose: it holds two arguments.
           # shellcheck disable=SC2086
           bun run tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} \
-            --config "{\"bundle\":{\"windows\":{\"wix\":{\"version\":\"$core\"}}}}" $TAURI_SIGNING_ARGS
+            --config "{\"bundle\":{\"createUpdaterArtifacts\":$updater,\"windows\":{\"wix\":{\"version\":\"$core\"}}}}" $TAURI_SIGNING_ARGS
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -166,8 +183,9 @@ jobs:
           name: kui-${{ matrix.target }}
           path: |
             ${{ env.BUNDLE }}/dmg/*.dmg
-            ${{ env.BUNDLE }}/nsis/*.exe
-            ${{ env.BUNDLE }}/msi/*.msi
+            ${{ env.BUNDLE }}/macos/*.app.tar.gz*
+            ${{ env.BUNDLE }}/nsis/*.exe*
+            ${{ env.BUNDLE }}/msi/*.msi*
           if-no-files-found: error
 
       # Signed SLSA provenance, verifiable with `gh attestation verify`.
@@ -212,6 +230,29 @@ jobs:
           path: installers
           merge-multiple: true
 
+      # The updater manifest: one entry per platform, with the update package's
+      # signature. A bundle-specific key (windows-x86_64-msi) wins over the
+      # plain one, so an MSI install is updated by the MSI, not by NSIS.
+      - name: Update manifest
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          entry() {
+            [ -f "$1" ] && [ -f "$1.sig" ] || { echo "::error::Missing update package or signature: ${1:-(none)}"; exit 1; }
+            jq -n --arg sig "$(cat "$1.sig")" --arg url "$base/$(basename "$1")" '{signature: $sig, url: $url}'
+          }
+          app=$(entry "$(find installers -name '*.app.tar.gz')")
+          nsis=$(entry "$(find installers -name '*-setup.exe')")
+          msi=$(entry "$(find installers -name '*.msi')")
+          jq -n --arg version "${TAG#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --rawfile notes "$RUNNER_TEMP/notes.md" --argjson app "$app" --argjson nsis "$nsis" --argjson msi "$msi" \
+            '{version: $version, notes: $notes, pub_date: $date, platforms: {
+              "darwin-aarch64": $app, "darwin-aarch64-app": $app,
+              "windows-x86_64": $nsis, "windows-x86_64-nsis": $nsis, "windows-x86_64-msi": $msi}}' \
+            > "$RUNNER_TEMP/latest.json"
+          cat "$RUNNER_TEMP/latest.json"
+
       # Only SemVer pre-releases (a "-" suffix) are marked as pre-releases. The Windows
       # artifact keeps its nsis/ and msi/ subfolders (upload-artifact preserves
       # paths below the common ancestor), so collect files rather than globbing.
@@ -222,7 +263,9 @@ jobs:
         run: |
           prerelease=()
           [[ "$TAG" == *-* ]] && prerelease=(--prerelease)
-          mapfile -t files < <(find installers -type f)
+          # Signatures are already in latest.json; don't attach them separately.
+          mapfile -t files < <(find installers -type f ! -name '*.sig')
+          files+=("$RUNNER_TEMP/latest.json")
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
             --verify-tag --notes-file "$RUNNER_TEMP/notes.md" --title "KUI $TAG" "${prerelease[@]}"

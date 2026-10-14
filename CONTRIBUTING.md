@@ -153,9 +153,27 @@ starting with `v` is pushed.
    a CHANGELOG.md section and is on `main`. It then builds the macOS `.dmg` and Windows `.exe`/`.msi` and
    publishes the release with that version's changelog section as its notes. Tags with a pre-release suffix
    (`v0.2.0-beta.1`) are marked as GitHub pre-releases; plain `vX.Y.Z` tags are normal releases.
+   Installed apps find the release through the in-app updater (below); pre-releases only reach users who turned on
+   **Settings → Updates → Include release candidates**.
 
 To build the installers without releasing, run the workflow by hand (**Actions → Release → Run workflow**); they
 are attached to the run as artifacts.
+
+### In-app updates
+
+Each release carries `latest.json`, the manifest KUI's updater reads ([src-tauri/src/updates.rs](src-tauri/src/updates.rs)),
+and update packages signed with the **updater key**. This key is separate from code signing and is required: a tag
+build fails without it. The public key is `plugins.updater.pubkey` in [tauri.conf.json](src-tauri/tauri.conf.json); the
+private key goes in the `TAURI_SIGNING_PRIVATE_KEY` secret (and its password, if it has one, in
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`):
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/kui-updater.key
+```
+
+Keep a backup of the private key. Installed apps only accept updates signed with it: if it's lost, generate a new
+pair (`bunx tauri signer generate -w ~/.tauri/kui-updater.key`), and users must reinstall by hand once to get an
+app that trusts the new public key.
 
 Code signing is optional. Add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` (plus
 `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` for notarization) or `WINDOWS_CERTIFICATE`,
