@@ -129,7 +129,8 @@ Releases are built and published by [.github/workflows/release.yml](.github/work
 starting with `v` is pushed.
 
 1. Pick the version from the commit types since the last release (table above; before 1.0, breaking changes bump
-   the minor). Use plain `X.Y.Z`: the Windows MSI format rejects suffixes like `-beta.1`.
+   the minor). Versions follow [SemVer](https://semver.org): `X.Y.Z` for a release, or add a pre-release suffix
+   such as `-beta.1` or `-rc.1` to publish a pre-release first.
 2. Bump it in a PR, e.g. `chore: release 0.2.0`:
 
    ```bash
@@ -143,9 +144,9 @@ starting with `v` is pushed.
    git tag v0.2.0 && git push origin v0.2.0
    ```
 
-4. The workflow checks that the tag is `vX.Y.Z`, matches the version in the files and is on `main`, builds the
-   macOS `.dmg` and Windows `.exe`/`.msi`, and publishes the release with generated notes. `0.x` versions (beta)
-   are published as pre-releases.
+4. The workflow checks that the tag is a SemVer version prefixed with `v`, matches the version in the files and is on `main`, builds the
+   macOS `.dmg` and Windows `.exe`/`.msi`, and publishes the release with generated notes. Tags with a pre-release
+   suffix (`v0.2.0-beta.1`) are marked as GitHub pre-releases; plain `vX.Y.Z` tags are normal releases.
 
 To build the installers without releasing, run the workflow by hand (**Actions → Release → Run workflow**); they
 are attached to the run as artifacts.

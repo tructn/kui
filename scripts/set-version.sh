@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Sets the app version everywhere it's stored: package.json (which Tauri reads),
 # src-tauri/Cargo.toml and src-tauri/Cargo.lock. See "Releasing" in CONTRIBUTING.md.
-# Usage: scripts/set-version.sh 0.2.0
+# Usage: scripts/set-version.sh 0.2.0 (or a SemVer pre-release, e.g. 0.2.0-beta.1)
 set -euo pipefail
 
 version=${1:-}
-# Numeric only: the Windows MSI format rejects pre-release suffixes like -beta.1.
-if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-  echo "Usage: $0 X.Y.Z" >&2
+# SemVer 2.0.0 without build metadata; release.yml checks tags the same way.
+id='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+if ! printf '%s' "$version" | grep -Eq "^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-$id(\.$id)*)?$"; then
+  echo "Usage: $0 X.Y.Z[-pre-release], e.g. 0.2.0 or 0.2.0-beta.1" >&2
   exit 1
 fi
 
