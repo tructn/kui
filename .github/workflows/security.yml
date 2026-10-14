@@ -1,0 +1,56 @@
+# Security checks: guard tests for the OWASP controls,
+# behavioural tests, and dependency advisories (rustsec, GitHub advisories).
+# Runs weekly too, because new advisories appear without any code change.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Tauri's Linux webview, and CMake + headers for the bundled librdkafka
+      # (its OAuth code includes curl.h even when built without curl).
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config libcurl4-openssl-dev zlib1g-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - run: bun install --frozen-lockfile
+
+      # The Rust tests read the built UI's config only, but `generate_context!` needs dist/.
+      - run: bun run build
+
+      # Same checks as the pre-commit / pre-push hooks (lefthook.yml), for commits made with --no-verify.
+      - name: Format and lint
+        run: bun run lint
+
+      - name: Guard tests, unit tests and dependency audits
+        run: bun run security

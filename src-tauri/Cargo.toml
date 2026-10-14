@@ -1,0 +1,58 @@
+[package]
+name = "kui"
+version = "0.1.0"
+description = "A desktop GUI for Apache Kafka"
+authors = ["Truc Nguyen"]
+license = "MIT"
+repository = "https://github.com/tructn/kui"
+edition = "2024"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "kui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+tokio = { version = "1", features = ["time"] }
+fake = { version = "5.1.0", features = ["uuid", "chrono", "random_color"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+
+# librdkafka and OpenSSL are linked statically, so the app has no runtime
+# dependency on system Kafka/SSL libraries. OpenSSL is compiled from source
+# except on Windows, where building it needs Perl. There it is linked from a
+# prebuilt static OpenSSL found through the OPENSSL_* variables (the CI
+# runner's preinstalled copy or vcpkg; see .github/actions/windows-openssl).
+[target.'cfg(not(windows))'.dependencies]
+rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored", "zstd"] }
+
+[target.'cfg(windows)'.dependencies]
+rdkafka = { version = "0.39", features = ["cmake-build", "ssl", "zstd"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

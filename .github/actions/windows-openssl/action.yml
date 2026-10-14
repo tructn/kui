@@ -1,0 +1,62 @@
+# Static OpenSSL for Windows builds. Cargo doesn't compile OpenSSL on Windows
+# (that needs Perl; see Cargo.toml), so openssl-sys (OPENSSL_*) and
+# librdkafka's CMake (OPENSSL_ROOT_DIR) link a prebuilt copy instead.
+#
+# GitHub's Windows runners ship the full Shining Light OpenSSL build, which
+# includes static libraries, so normally this takes no time. If a runner image
+# ever lacks them, it falls back to building OpenSSL with vcpkg (about 6 min,
+# then cached for the month).
+name: Windows OpenSSL
+description: Point the build at a static OpenSSL (preinstalled, or from vcpkg).
+runs:
+  using: composite
+  steps:
+    - name: Use preinstalled OpenSSL
+      id: preinstalled
+      shell: pwsh
+      run: |
+        $root = "$env:ProgramFiles\OpenSSL"
+        $lib = "$root\lib\VC\x64\MD"
+        if ((Test-Path "$lib\libssl_static.lib") -and (Test-Path "$lib\libcrypto_static.lib")) {
+          & "$root\bin\openssl.exe" version
+          "OPENSSL_LIB_DIR=$lib", "OPENSSL_INCLUDE_DIR=$root\include",
+          "OPENSSL_LIBS=libssl_static:libcrypto_static", "OPENSSL_STATIC=1",
+          "OPENSSL_ROOT_DIR=$root" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "found=true" >> $env:GITHUB_OUTPUT
+        } else {
+          Write-Host "No static OpenSSL in $lib; falling back to vcpkg. Found:"
+          Get-ChildItem $root -Recurse -Filter *.lib -ErrorAction SilentlyContinue | ForEach-Object FullName
+        }
+
+    - name: Cache key
+      id: key
+      if: steps.preinstalled.outputs.found != 'true'
+      shell: pwsh
+      run: '"key=vcpkg-openssl-x64-windows-static-md-release-$(Get-Date -Format yyyy-MM)" >> $env:GITHUB_OUTPUT'
+
+    - name: Restore vcpkg OpenSSL
+      id: cache
+      if: steps.preinstalled.outputs.found != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: C:\vcpkg\installed
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Install OpenSSL (vcpkg)
+      if: steps.preinstalled.outputs.found != 'true'
+      shell: pwsh
+      run: |
+        # A no-op when the cache was restored.
+        vcpkg install openssl:x64-windows-static-md-release
+        $root = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md-release"
+        "OPENSSL_DIR=$root", "OPENSSL_ROOT_DIR=$root", "OPENSSL_STATIC=1" |
+          Out-File -FilePath $env:GITHUB_ENV -Append
+
+    # Saved right away rather than at the end of the job, so a later build
+    # failure doesn't throw the OpenSSL build away.
+    - name: Save vcpkg OpenSSL
+      if: steps.preinstalled.outputs.found != 'true' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: C:\vcpkg\installed
+        key: ${{ steps.key.outputs.key }}
