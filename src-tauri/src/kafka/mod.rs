@@ -5,9 +5,11 @@ mod client;
 mod cluster;
 pub mod metadata;
 pub mod offsets;
+mod probes;
 
 pub use client::{KafkaClients, client_config, new_consumer};
 pub use cluster::ClusterConfig;
+pub use probes::Probes;
 
 use std::time::Duration;
 
