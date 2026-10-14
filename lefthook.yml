@@ -1,0 +1,47 @@
+# Git hooks, installed by `bun install` (the `prepare` script runs `lefthook install`).
+# Skip once with `git commit --no-verify` / `git push --no-verify`, or LEFTHOOK=0.
+#
+# pre-commit stays fast (formatting + type check on staged files only);
+# the slower compile-and-test checks run on pre-push, mirroring CI.
+
+pre-commit:
+  parallel: true
+  jobs:
+    # Work happens on <type>/<description> branches, never on main directly.
+    - name: branch name
+      run: bash scripts/git-hooks/branch-name.sh
+
+    - name: rustfmt
+      root: src-tauri/
+      glob: "**/*.rs"
+      # Formats only the staged files and re-stages them.
+      run: rustfmt {staged_files}
+      stage_fixed: true
+
+    - name: typecheck
+      glob: "src/**/*.{ts,tsx}"
+      run: bunx tsc --noEmit
+
+# Commit messages follow Conventional Commits (CONTRIBUTING.md), which
+# become the release notes.
+commit-msg:
+  jobs:
+    - name: commit message
+      run: bash scripts/git-hooks/commit-msg.sh {1}
+
+    # Repeats the pre-commit check, which lefthook skips for empty commits.
+    - name: branch name
+      run: bash scripts/git-hooks/branch-name.sh
+
+pre-push:
+  jobs:
+    - name: clippy
+      root: src-tauri/
+      run: cargo clippy --all-targets --locked -- -D warnings
+
+    - name: rust tests
+      root: src-tauri/
+      run: cargo test --locked
+
+    - name: ui tests
+      run: bun test src
