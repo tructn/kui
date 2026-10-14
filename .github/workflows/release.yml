@@ -184,7 +184,9 @@ jobs:
           path: installers
           merge-multiple: true
 
-      # 0.x versions are betas, so they're marked as pre-releases.
+      # 0.x versions are betas, so they're marked as pre-releases. The Windows
+      # artifact keeps its nsis/ and msi/ subfolders (upload-artifact preserves
+      # paths below the common ancestor), so collect files rather than globbing.
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -192,5 +194,7 @@ jobs:
         run: |
           prerelease=()
           [[ "$TAG" == v0.* ]] && prerelease=(--prerelease)
-          gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" \
+          mapfile -t files < <(find installers -type f)
+          printf '%s\n' "${files[@]}"
+          gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
             --draft --verify-tag --generate-notes --title "KUI $TAG" "${prerelease[@]}"
