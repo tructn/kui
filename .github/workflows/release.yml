@@ -1,9 +1,10 @@
 # Builds KUI's installers. See "Releasing" in CONTRIBUTING.md.
 #
 # Push a vX.Y.Z tag on main (tags must start with "v"): the macOS and Windows
-# installers are built and published as a GitHub release with generated
-# notes. Versions follow SemVer: a pre-release suffix (v0.2.0-beta.1) makes a
-# GitHub pre-release, and a plain vX.Y.Z (v0.1.0 included) a normal release.
+# installers are built and published as a GitHub release whose notes are the
+# version's CHANGELOG.md section (git-cliff, see cliff.toml). Versions follow
+# SemVer: a pre-release suffix (v0.2.0-beta.1) makes a GitHub pre-release, and
+# a plain vX.Y.Z (v0.1.0 included) a normal release.
 #
 # Manual run (Actions -> Release -> Run workflow): builds the installers from
 # any branch as workflow artifacts only, without releasing anything.
@@ -45,6 +46,7 @@ jobs:
             semver="^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-$id(\.$id)*)?$"
             [[ "$GITHUB_REF_NAME" =~ $semver ]] || { echo "::error::Tag $GITHUB_REF_NAME isn't vX.Y.Z or vX.Y.Z-pre.N"; exit 1; }
             [ "$GITHUB_REF_NAME" = "v$pkg" ] || { echo "::error::Tag $GITHUB_REF_NAME doesn't match version $pkg"; exit 1; }
+            grep -qF "## [$pkg] - " CHANGELOG.md || { echo "::error::CHANGELOG.md has no $pkg section; run scripts/set-version.sh $pkg"; exit 1; }
             git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
           fi
 
@@ -188,6 +190,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Full history and tags, for git-cliff to find the previous release.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      # The changes since the previous tag, as in CHANGELOG.md, minus the
+      # version heading (the release has its own title).
+      - name: Release notes
+        run: |
+          bunx git-cliff --current --strip all | sed -e '1{/^## /d;}' -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
       - uses: actions/download-artifact@v4
         with:
           path: installers
@@ -206,4 +225,4 @@ jobs:
           mapfile -t files < <(find installers -type f)
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --generate-notes --title "KUI $TAG" "${prerelease[@]}"
+            --verify-tag --notes-file "$RUNNER_TEMP/notes.md" --title "KUI $TAG" "${prerelease[@]}"
