@@ -1,8 +1,8 @@
 # Builds KUI's installers. See "Releasing" in CONTRIBUTING.md.
 #
-# Push a vX.Y.Z tag on main: the macOS and Windows installers are built and
-# attached to a draft release with generated notes. You smoke-test the draft
-# and click Publish; nothing is published automatically.
+# Push a vX.Y.Z tag on main (tags must start with "v"): the macOS and Windows
+# installers are built and published as a GitHub release with generated
+# notes. 0.x versions (e.g. v0.1.0) are betas and published as pre-releases.
 #
 # Manual run (Actions -> Release -> Run workflow): builds the installers from
 # any branch as workflow artifacts only, without releasing anything.
@@ -39,6 +39,7 @@ jobs:
           echo "package.json: $pkg, Cargo.toml: $cargo"
           [ "$pkg" = "$cargo" ] || { echo "::error::Versions differ; run scripts/set-version.sh"; exit 1; }
           if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Tag $GITHUB_REF_NAME isn't vX.Y.Z"; exit 1; }
             [ "$GITHUB_REF_NAME" = "v$pkg" ] || { echo "::error::Tag $GITHUB_REF_NAME doesn't match version $pkg"; exit 1; }
             [[ "$pkg" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Use a plain X.Y.Z version (MSI rejects suffixes)"; exit 1; }
             git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
@@ -171,7 +172,7 @@ jobs:
             ${{ env.BUNDLE }}/msi/*.msi
 
   # One job creates the release once every installer is built, so a failed
-  # platform never leaves a half-filled draft behind. Only this job can write.
+  # platform never leaves a half-filled release behind. Only this job can write.
   release:
     needs: build
     if: github.ref_type == 'tag'
@@ -187,7 +188,7 @@ jobs:
       # 0.x versions are betas, so they're marked as pre-releases. The Windows
       # artifact keeps its nsis/ and msi/ subfolders (upload-artifact preserves
       # paths below the common ancestor), so collect files rather than globbing.
-      - name: Create draft release
+      - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
@@ -197,4 +198,4 @@ jobs:
           mapfile -t files < <(find installers -type f)
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
-            --draft --verify-tag --generate-notes --title "KUI $TAG" "${prerelease[@]}"
+            --verify-tag --generate-notes --title "KUI $TAG" "${prerelease[@]}"

@@ -125,9 +125,8 @@ only the title has to be perfect. Squash merging replaces the individual commits
 
 ## Releasing
 
-Releases are manual: nothing ships until you push a version tag.
-[release.yml](.github/workflows/release.yml) then builds the macOS `.dmg` and the Windows `.exe`/`.msi`, and attaches
-them to a **draft** release with notes generated from the merged PRs.
+Releases are built and published by [.github/workflows/release.yml](.github/workflows/release.yml) when a tag
+starting with `v` is pushed.
 
 1. Pick the version from the commit types since the last release (table above; before 1.0, breaking changes bump
    the minor). Use plain `X.Y.Z`: the Windows MSI format rejects suffixes like `-beta.1`.
@@ -137,18 +136,19 @@ them to a **draft** release with notes generated from the merged PRs.
    scripts/set-version.sh 0.2.0   # package.json, Cargo.toml and Cargo.lock
    ```
 
-3. After it's merged, tag the merge commit on `main`:
+3. After it's merged, tag `main` with the version prefixed by `v` and push the tag:
 
    ```bash
    git switch main && git pull
    git tag v0.2.0 && git push origin v0.2.0
    ```
 
-   The workflow refuses tags that don't match the version in the files or aren't on `main`.
-4. When the build finishes (about 20–30 minutes), install from the draft, smoke-test it against
-   `bun run kafka:up`, and click **Publish release**. `0.x` releases are marked as pre-releases (beta).
+4. The workflow checks that the tag is `vX.Y.Z`, matches the version in the files and is on `main`, builds the
+   macOS `.dmg` and Windows `.exe`/`.msi`, and publishes the release with generated notes. `0.x` versions (beta)
+   are published as pre-releases.
 
-**Actions → Release → Run workflow** builds the installers as workflow artifacts from any branch, without releasing.
+To build the installers without releasing, run the workflow by hand (**Actions → Release → Run workflow**); they
+are attached to the run as artifacts.
 
 Code signing is optional. Add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` (plus
 `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` for notarization) or `WINDOWS_CERTIFICATE`,
