@@ -2,7 +2,8 @@
 #
 # Push a vX.Y.Z tag on main (tags must start with "v"): the macOS and Windows
 # installers are built and published as a GitHub release with generated
-# notes. 0.x versions (e.g. v0.1.0) are betas and published as pre-releases.
+# notes. Versions follow SemVer: a pre-release suffix (v0.2.0-beta.1) makes a
+# GitHub pre-release, and a plain vX.Y.Z (v0.1.0 included) a normal release.
 #
 # Manual run (Actions -> Release -> Run workflow): builds the installers from
 # any branch as workflow artifacts only, without releasing anything.
@@ -39,9 +40,11 @@ jobs:
           echo "package.json: $pkg, Cargo.toml: $cargo"
           [ "$pkg" = "$cargo" ] || { echo "::error::Versions differ; run scripts/set-version.sh"; exit 1; }
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Tag $GITHUB_REF_NAME isn't vX.Y.Z"; exit 1; }
+            # SemVer 2.0.0 without build metadata: vX.Y.Z or vX.Y.Z-<pre-release>.
+            id='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+            semver="^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-$id(\.$id)*)?$"
+            [[ "$GITHUB_REF_NAME" =~ $semver ]] || { echo "::error::Tag $GITHUB_REF_NAME isn't vX.Y.Z or vX.Y.Z-pre.N"; exit 1; }
             [ "$GITHUB_REF_NAME" = "v$pkg" ] || { echo "::error::Tag $GITHUB_REF_NAME doesn't match version $pkg"; exit 1; }
-            [[ "$pkg" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Use a plain X.Y.Z version (MSI rejects suffixes)"; exit 1; }
             git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
           fi
 
@@ -146,9 +149,14 @@ jobs:
       - name: Build installers
         shell: bash
         run: |
+          # MSI versions must be numeric, so a pre-release like 0.2.0-beta.1
+          # is installed as 0.2.0; the app and other installers keep the full
+          # version. MSI compares only the first three fields anyway.
+          core=$(jq -r .version package.json | sed 's/-.*//')
           # TAURI_SIGNING_ARGS is unquoted on purpose: it holds two arguments.
           # shellcheck disable=SC2086
-          bun run tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} $TAURI_SIGNING_ARGS
+          bun run tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} \
+            --config "{\"bundle\":{\"windows\":{\"wix\":{\"version\":\"$core\"}}}}" $TAURI_SIGNING_ARGS
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -185,7 +193,7 @@ jobs:
           path: installers
           merge-multiple: true
 
-      # 0.x versions are betas, so they're marked as pre-releases. The Windows
+      # Only SemVer pre-releases (a "-" suffix) are marked as pre-releases. The Windows
       # artifact keeps its nsis/ and msi/ subfolders (upload-artifact preserves
       # paths below the common ancestor), so collect files rather than globbing.
       - name: Create release
@@ -194,7 +202,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           prerelease=()
-          [[ "$TAG" == v0.* ]] && prerelease=(--prerelease)
+          [[ "$TAG" == *-* ]] && prerelease=(--prerelease)
           mapfile -t files < <(find installers -type f)
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
