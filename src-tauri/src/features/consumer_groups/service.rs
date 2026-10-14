@@ -36,7 +36,7 @@ pub fn detail(clients: &KafkaClients, group: &str) -> Result<GroupDetail> {
     // Ask for the group's committed offset on every partition, then report
     // every partition of the topics it touched, so untouched ones show up too.
     let all = all_partitions(clients)?;
-    let committed = committed(&clients.cluster, group, &all)?;
+    let committed = committed(&clients.probes, group, &all)?;
     let owners = owners(&members);
     let keys = partitions_of_touched_topics(&all, &committed, &owners);
     let marks = watermarks(&clients.metadata, &keys)?;
@@ -58,7 +58,7 @@ pub fn lags(clients: &KafkaClients) -> Result<Vec<GroupLag>> {
     let list = clients.metadata.fetch_group_list(None, TIMEOUT)?;
     let all = all_partitions(clients)?;
     let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
-    let committed = committed_by_group(&clients.cluster, &names, &all);
+    let committed = committed_by_group(&clients.probes, &names, &all);
 
     // One watermark request for every partition any group has committed to.
     let committed_keys: BTreeSet<&PartitionKey> =
@@ -88,14 +88,17 @@ pub fn lags(clients: &KafkaClients) -> Result<Vec<GroupLag>> {
 pub fn topic_consumers(clients: &KafkaClients, topic: &str) -> Result<Vec<TopicConsumer>> {
     let keys: Vec<PartitionKey> =
         partition_ids(&clients.metadata, topic)?.into_iter().map(|p| (topic.to_string(), p)).collect();
-    let marks = watermarks(&clients.metadata, &keys)?;
-    let list = clients.metadata.fetch_group_list(None, TIMEOUT)?;
-    let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
+    // The topic's watermarks don't depend on the groups, so fetch them while
+    // the groups are probed.
+    let (marks, list, committed) = std::thread::scope(|s| {
+        let marks = s.spawn(|| watermarks(&clients.metadata, &keys));
+        let list = clients.metadata.fetch_group_list(None, TIMEOUT)?;
+        let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
+        let committed = committed_by_group(&clients.probes, &names, &keys);
+        Ok::<_, Error>((marks.join().expect("watermark lookup panicked")?, list, committed))
+    })?;
     let mut committed: HashMap<String, HashMap<PartitionKey, i64>> =
-        committed_by_group(&clients.cluster, &names, &keys)
-            .into_iter()
-            .filter_map(|(name, result)| Some((name, result.ok()?)))
-            .collect();
+        committed.into_iter().filter_map(|(name, result)| Some((name, result.ok()?))).collect();
 
     let mut consumers: Vec<TopicConsumer> = list
         .groups()

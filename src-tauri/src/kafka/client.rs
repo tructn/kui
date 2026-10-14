@@ -4,7 +4,7 @@ use rdkafka::client::DefaultClientContext;
 use rdkafka::consumer::BaseConsumer;
 use rdkafka::producer::FutureProducer;
 
-use super::ClusterConfig;
+use super::{ClusterConfig, Probes};
 use crate::error::Result;
 
 /// Long-lived clients for one cluster, cached in `AppState` so we don't
@@ -15,6 +15,8 @@ pub struct KafkaClients {
     /// Used for metadata, offsets and group listing. Never subscribes to topics.
     pub metadata: BaseConsumer,
     pub producer: FutureProducer,
+    /// One consumer per group, for reading its committed offsets.
+    pub probes: Probes,
 }
 
 impl KafkaClients {
@@ -24,6 +26,7 @@ impl KafkaClients {
             admin: base.create()?,
             metadata: new_consumer(&cluster, "kui-metadata")?,
             producer: base.clone().set("message.timeout.ms", "10000").create()?,
+            probes: Probes::new(cluster.clone()),
             cluster,
         })
     }

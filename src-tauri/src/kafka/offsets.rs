@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{Offset, TopicPartitionList};
 
-use super::{TIMEOUT, new_consumer};
+use super::TIMEOUT;
+use super::probes::Probes;
 use crate::error::Result;
-use crate::kafka::ClusterConfig;
 
 /// (topic, partition)
 pub type PartitionKey = (String, i32);
@@ -24,13 +24,18 @@ impl Watermarks {
 }
 
 /// Watermarks for many partitions in two batched ListOffsets requests
-/// (timestamp -2 = earliest, -1 = latest) instead of one round trip per partition.
+/// (timestamp -2 = earliest, -1 = latest) instead of one round trip per
+/// partition. The two run in parallel, so it costs one round trip, not two.
 pub fn watermarks(consumer: &BaseConsumer, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, Watermarks>> {
     if partitions.is_empty() {
         return Ok(HashMap::new());
     }
-    let lows = offsets_at(consumer, partitions, Offset::Beginning)?;
-    let highs = offsets_at(consumer, partitions, Offset::End)?;
+    let (lows, highs) = std::thread::scope(|s| {
+        let lows = s.spawn(|| offsets_at(consumer, partitions, Offset::Beginning));
+        let highs = offsets_at(consumer, partitions, Offset::End);
+        (lows.join().expect("watermark lookup panicked"), highs)
+    });
+    let (lows, highs) = (lows?, highs?);
 
     Ok(partitions
         .iter()
@@ -70,17 +75,12 @@ pub fn offsets_at(
 const COMMITTED_CHUNK: usize = 500;
 
 /// Offsets `group` has committed on `partitions`. Partitions the group never
-/// committed to are omitted. The probe consumer carries the group id but never
-/// subscribes, so it does not join the group or trigger a rebalance.
-pub fn committed(
-    cluster: &ClusterConfig,
-    group: &str,
-    partitions: &[PartitionKey],
-) -> Result<HashMap<PartitionKey, i64>> {
+/// committed to are omitted.
+pub fn committed(probes: &Probes, group: &str, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, i64>> {
     if partitions.is_empty() {
         return Ok(HashMap::new());
     }
-    let probe = new_consumer(cluster, group)?;
+    let probe = probes.get(group)?;
     let mut offsets = HashMap::new();
     for chunk in partitions.chunks(COMMITTED_CHUNK) {
         let mut tpl = TopicPartitionList::new();
@@ -95,13 +95,12 @@ pub fn committed(
     Ok(offsets)
 }
 
-/// `committed` for many groups at once. Each group needs its own probe
-/// consumer, and connecting plus the coordinator lookup (~65 ms locally) is
-/// most of a group's cost, so they run on several threads in parallel. 16
-/// halved the time of 8 for 61 groups; 32 gained little more for twice the
-/// connections.
+/// `committed` for many groups at once. Each group needs its own probe, and a
+/// new one's connection and coordinator lookup (~65 ms locally) is most of a
+/// group's cost, so they run on several threads in parallel. 16 halved the
+/// time of 8 for 61 groups; 32 gained little more for twice the connections.
 pub fn committed_by_group(
-    cluster: &ClusterConfig,
+    probes: &Probes,
     groups: &[String],
     partitions: &[PartitionKey],
 ) -> Vec<(String, Result<HashMap<PartitionKey, i64>>)> {
@@ -114,9 +113,7 @@ pub fn committed_by_group(
         let handles: Vec<_> = groups
             .chunks(chunk)
             .map(|chunk| {
-                s.spawn(move || {
-                    chunk.iter().map(|g| (g.clone(), committed(cluster, g, partitions))).collect::<Vec<_>>()
-                })
+                s.spawn(move || chunk.iter().map(|g| (g.clone(), committed(probes, g, partitions))).collect::<Vec<_>>())
             })
             .collect();
         handles.into_iter().flat_map(|h| h.join().expect("offset probe panicked")).collect()
