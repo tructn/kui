@@ -19,10 +19,12 @@
 
 ## Why KUI
 
-Kafka's command-line tools are powerful but slow to work with. Web consoles need a server and an install. KUI is a
-native app you just open: point it at a cluster and everything is a click (or a keystroke) away.
+The Kafka CLI can do almost anything, as long as you remember the flags. Web consoles are friendlier, but someone has
+to deploy and run them first. KUI is a desktop app instead: open it, add your cluster, and every topic, message and
+consumer group is a click or a keystroke away.
 
-- **Native and light.** Small installer, quick startup, no JVM, no Docker, no server to run.
+- **Small and fast.** Built in Rust with [Tauri](https://tauri.app), using your system's built-in webview instead of
+  bundling a browser. Quick startup, no JVM, no Docker, no server to run.
 - **Your data stays local.** Connection settings live on your machine. Nothing is sent anywhere else.
 - **Built for daily use.** Keyboard shortcuts everywhere, a topic search on <kbd>⌘</kbd> <kbd>K</kbd>, and light and
   dark themes.
@@ -65,7 +67,7 @@ unusual setups. Test the connection before you save it, and switch between clust
   <img src="docs/add-cluster.png" alt="The Add cluster dialog" width="900" />
 </p>
 
-## Everything else
+## And more
 
 - Create and delete topics; inspect partitions, watermarks, replicas and configuration
 - Consumer group members and assignments; delete groups
