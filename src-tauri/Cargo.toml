@@ -27,6 +27,14 @@ tokio = { version = "1", features = ["time"] }
 fake = { version = "5.1.0", features = ["uuid", "chrono", "random_color"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 
+# In-app updates from GitHub releases. reqwest and rustls are the versions and
+# TLS setup the updater already uses, so finding the newest release adds no
+# second HTTP stack.
+tauri-plugin-updater = "2.13.3"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+semver = "1"
+
 # librdkafka and OpenSSL are linked statically, so the app has no runtime
 # dependency on system Kafka/SSL libraries. OpenSSL is compiled from source
 # except on Windows, where building it needs Perl. There it is linked from a
@@ -37,6 +45,7 @@ rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored", "zstd"]
 
 [target.'cfg(windows)'.dependencies]
 rdkafka = { version = "0.39", features = ["cmake-build", "ssl", "zstd"] }
+
 
 [lints.rust]
 unsafe_code = "forbid"

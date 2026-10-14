@@ -1,10 +1,12 @@
-import { RotateCcwIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { RefreshCwIcon, RotateCcwIcon } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
 import {
@@ -20,6 +22,7 @@ import { useShortcut } from "@/hooks/use-shortcut";
 
 import { useSettingsDialog } from "./stores/settings-dialog-store";
 import { useTheme, type Theme } from "./stores/theme-store";
+import { useUpdates } from "./stores/update-store";
 
 /** The app's one Settings dialog. Open it from anywhere with `useSettingsDialog().show()`, or ⌘,. */
 export function SettingsDialog() {
@@ -33,9 +36,10 @@ export function SettingsDialog() {
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription className="sr-only">App appearance.</DialogDescription>
+          <DialogDescription className="sr-only">App appearance and updates.</DialogDescription>
         </DialogHeader>
         <AppearanceSettings />
+        <UpdateSettings />
         <KeyboardShortcuts />
       </DialogContent>
     </Dialog>
@@ -130,6 +134,77 @@ function AppearanceSettings() {
         <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-[length:var(--app-code-size)] leading-relaxed">
           {`{ "orderId": "o-1001", "total": 129.90, "status": "PAID" } // => 0O1lI`}
         </pre>
+      </FieldGroup>
+    </FieldSet>
+  );
+}
+
+type CheckState = { step: "idle" } | { step: "checking" } | { step: "done"; message: string; failed?: boolean };
+
+function UpdateSettings() {
+  const { checkAutomatically, includeReleaseCandidates, setPrefs, check, setDialogOpen } = useUpdates();
+  const [version, setVersion] = useState<string>();
+  const [state, setState] = useState<CheckState>({ step: "idle" });
+
+  useEffect(() => {
+    getVersion().then(setVersion, () => undefined);
+  }, []);
+
+  async function checkNow() {
+    setState({ step: "checking" });
+    try {
+      const available = await check();
+      if (available) {
+        setState({ step: "idle" });
+        setDialogOpen(true);
+      } else {
+        setState({ step: "done", message: "You have the latest version." });
+      }
+    } catch (error) {
+      setState({ step: "done", message: `Could not check: ${(error as Error).message}`, failed: true });
+    }
+  }
+
+  return (
+    <FieldSet className="mt-8">
+      <FieldLegend>Updates</FieldLegend>
+      <FieldGroup>
+        <Field orientation="horizontal" className="justify-between">
+          <div className="flex flex-col gap-1">
+            <FieldLabel>Version</FieldLabel>
+            <FieldDescription className={state.step === "done" && state.failed ? "text-destructive" : undefined}>
+              {state.step === "done" ? state.message : `KUI ${version ?? ""}`}
+            </FieldDescription>
+          </div>
+          <Button variant="outline" size="sm" disabled={state.step === "checking"} onClick={checkNow}>
+            {state.step === "checking" ? <Spinner /> : <RefreshCwIcon />} Check now
+          </Button>
+        </Field>
+
+        <SettingRow label="Check for updates automatically" htmlFor="check-updates">
+          <Switch
+            id="check-updates"
+            checked={checkAutomatically}
+            onCheckedChange={(checked) => setPrefs({ checkAutomatically: checked })}
+          />
+        </SettingRow>
+
+        <Field orientation="horizontal" className="justify-between">
+          <div className="flex flex-col gap-1">
+            <FieldLabel htmlFor="release-candidates">Include release candidates</FieldLabel>
+            <FieldDescription>
+              Get versions such as 0.3.0-rc.1 before their release, to try new features early. They may have bugs.
+            </FieldDescription>
+          </div>
+          <Switch
+            id="release-candidates"
+            checked={includeReleaseCandidates}
+            onCheckedChange={(checked) => {
+              setPrefs({ includeReleaseCandidates: checked });
+              setState({ step: "idle" });
+            }}
+          />
+        </Field>
       </FieldGroup>
     </FieldSet>
   );

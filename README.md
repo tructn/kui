@@ -90,6 +90,10 @@ Grab the latest installer from the [Releases](https://github.com/tructn/kui/rele
 **Windows:** run the installer. No admin rights are needed. If SmartScreen appears, click **More info** →
 **Run anyway**.
 
+**Updates:** KUI checks for new versions at startup and offers to install them; it restarts to finish. To try
+new features early, turn on **Settings → Updates → Include release candidates**. You can also turn automatic
+checks off there and use **Check now** instead.
+
 ## Contributing
 
 Bug reports and ideas are welcome in [Issues](https://github.com/tructn/kui/issues). To build KUI yourself, see

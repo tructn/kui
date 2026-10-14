@@ -8,6 +8,10 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Http(#[from] reqwest::Error),
+    #[error(transparent)]
+    Updater(#[from] tauri_plugin_updater::Error),
     #[error("{0}")]
     Msg(String),
 }
