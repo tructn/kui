@@ -125,8 +125,8 @@ only the title has to be perfect. Squash merging replaces the individual commits
 
 ## Releasing
 
-Releases are built and published by [.github/workflows/release.yml](.github/workflows/release.yml) when a tag
-starting with `v` is pushed.
+Releases are built and published by [.github/workflows/release.yml](.github/workflows/release.yml) when a PR that
+changes the version is merged into `main`. Other merges don't build installers.
 
 1. Pick the version from the commit types since the last release (table above; before 1.0, breaking changes bump
    the minor). Versions follow [SemVer](https://semver.org): `X.Y.Z` for a release, or add a pre-release suffix
@@ -142,17 +142,17 @@ starting with `v` is pushed.
    new version. Don't edit it by hand: entries come from PR titles, so get the title right before merging.
    Preview the unreleased changes any time with `bunx git-cliff --unreleased`.
 
-3. After it's merged, tag `main` with the version prefixed by `v` and push the tag:
+3. Merge it. The workflow sees the new version and checks that it's SemVer, matches in package.json and
+   Cargo.toml, and has a CHANGELOG.md section. It then builds the macOS `.dmg` and Windows `.exe`/`.msi` and
+   publishes the release, tagged `v0.2.0` on the merge commit, with that version's changelog section as its notes.
+   If a build fails, nothing is tagged: **Re-run failed jobs** for a flaky failure, or release a new version
+   (e.g. the next `-rc.N`) for one that needs a code fix.
 
-   ```bash
-   git switch main && git pull
-   git tag v0.2.0 && git push origin v0.2.0
-   ```
+   Pushing a `v` tag on `main` by hand (`git tag v0.2.0 && git push origin v0.2.0`) also releases, for a version
+   whose automatic run didn't publish it.
 
-4. The workflow checks that the tag is a SemVer version prefixed with `v`, matches the version in the files, has
-   a CHANGELOG.md section and is on `main`. It then builds the macOS `.dmg` and Windows `.exe`/`.msi` and
-   publishes the release with that version's changelog section as its notes. Tags with a pre-release suffix
-   (`v0.2.0-beta.1`) are marked as GitHub pre-releases; plain `vX.Y.Z` tags are normal releases.
+4. Versions with a pre-release suffix (`v0.2.0-beta.1`) are marked as GitHub pre-releases; plain `vX.Y.Z` ones
+   are normal releases.
    Installed apps find the release through the in-app updater (below); pre-releases only reach users who turned on
    **Settings → Updates → Include release candidates**.
 
