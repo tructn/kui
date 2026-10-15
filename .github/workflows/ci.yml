@@ -6,16 +6,13 @@
 #   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
 #   release rather than during one.
 #
-# It also builds on pushes to main, which is the only place the Rust cache is
-# saved: PRs can restore caches from main but not from each other, so this
-# keeps PR builds warm without filling the cache quota with per-PR copies.
+# Merges to main don't rebuild here: the code was built on its PR, and the
+# installers are only built when a release PR is merged (release.yml).
 name: CI
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -23,13 +20,12 @@ permissions:
 # Edits to the PR title or description (by people or bots) get their own
 # group, so they only re-check the title and never cancel a running build.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
+  group: ci-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
   cancel-in-progress: true
 
 jobs:
   pr-title:
     name: Conventional PR title
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
@@ -67,11 +63,11 @@ jobs:
       # Bump prefix-key when a C dependency changes where it comes from (e.g.
       # OpenSSL vcpkg -> preinstalled): the cache keeps librdkafka's CMake
       # cache, which remembers absolute library paths from the old source.
+      # The cache is saved per PR, so later pushes to the same PR build warm.
       - uses: swatinem/rust-cache@v2
         with:
           prefix-key: v1-rust
           workspaces: src-tauri
-          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: ./.github/actions/windows-openssl
         if: runner.os == 'Windows'

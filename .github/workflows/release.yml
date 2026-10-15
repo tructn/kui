@@ -1,10 +1,13 @@
 # Builds KUI's installers. See "Releasing" in CONTRIBUTING.md.
 #
-# Push a vX.Y.Z tag on main (tags must start with "v"): the macOS and Windows
-# installers are built and published as a GitHub release whose notes are the
-# version's CHANGELOG.md section (git-cliff, see cliff.toml). Versions follow
-# SemVer: a pre-release suffix (v0.2.0-beta.1) makes a GitHub pre-release, and
-# a plain vX.Y.Z (v0.1.0 included) a normal release.
+# Merging a release PR (one that changes the version in package.json) into main
+# releases that version: the macOS and Windows installers are built and
+# published as a GitHub release, tagged vX.Y.Z on the merge commit, whose notes
+# are the version's CHANGELOG.md section (git-cliff, see cliff.toml). Other
+# pushes to main stop after the version check and build nothing. Pushing a v*
+# tag by hand still works, for a release the automatic run didn't make.
+# Versions follow SemVer: a pre-release suffix (v0.2.0-beta.1) makes a GitHub
+# pre-release, and a plain vX.Y.Z (v0.1.0 included) a normal release.
 #
 # Every release also carries latest.json, the manifest the app's updater reads
 # (src-tauri/src/updates.rs), pointing at installers signed with the updater
@@ -16,21 +19,30 @@ name: Release
 
 on:
   push:
+    branches: [main]
+    # Only version bumps can release; tag pushes ignore this filter.
+    paths: [package.json]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Per commit, so a hand-pushed tag waits for the automatic run on the same
+# commit (and then finds the release made), and a queued release on main is
+# never replaced by a later push.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
-  # Fails fast, before 20+ minutes of builds, on a tag that doesn't match the
-  # version in the files or a tag pushed on an unmerged commit.
+  # Decides what to release (the tag output; empty for none) and fails fast,
+  # before 20+ minutes of builds, on a tag that doesn't match the version in
+  # the files or a tag pushed on an unmerged commit.
   verify:
     runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,29 +50,47 @@ jobs:
           persist-credentials: false
 
       - name: Check version
+        id: version
         shell: bash
         env:
           HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          BEFORE: ${{ github.event.before }}
         run: |
           pkg=$(jq -r .version package.json)
           cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)
           echo "package.json: $pkg, Cargo.toml: $cargo"
           [ "$pkg" = "$cargo" ] || { echo "::error::Versions differ; run scripts/set-version.sh"; exit 1; }
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            # SemVer 2.0.0 without build metadata: vX.Y.Z or vX.Y.Z-<pre-release>.
-            id='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
-            semver="^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-$id(\.$id)*)?$"
-            [[ "$GITHUB_REF_NAME" =~ $semver ]] || { echo "::error::Tag $GITHUB_REF_NAME isn't vX.Y.Z or vX.Y.Z-pre.N"; exit 1; }
-            [ "$GITHUB_REF_NAME" = "v$pkg" ] || { echo "::error::Tag $GITHUB_REF_NAME doesn't match version $pkg"; exit 1; }
-            grep -qF "## [$pkg] - " CHANGELOG.md || { echo "::error::CHANGELOG.md has no $pkg section; run scripts/set-version.sh $pkg"; exit 1; }
-            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
-            # Without it the release has no signed update and installed apps never see it.
-            [ "$HAS_UPDATER_KEY" = true ] || { echo "::error::Add the TAURI_SIGNING_PRIVATE_KEY secret; see CONTRIBUTING.md"; exit 1; }
+            tag=$GITHUB_REF_NAME
+          elif [ "$GITHUB_EVENT_NAME" = push ]; then
+            # A push to main releases only when it changed the version, and
+            # only once: a hand-pushed tag may have released it already.
+            prev=$(git show "$BEFORE:package.json" 2>/dev/null | jq -r .version || true)
+            [ "$prev" != "$pkg" ] || { echo "Version unchanged ($pkg); nothing to release."; exit 0; }
+            tag="v$pkg"
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "$tag already exists; nothing to release."
+              exit 0
+            fi
+          else
+            exit 0 # manual run: installers only
           fi
+          # SemVer 2.0.0 without build metadata: vX.Y.Z or vX.Y.Z-<pre-release>.
+          id='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+          semver="^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-$id(\.$id)*)?$"
+          [[ "$tag" =~ $semver ]] || { echo "::error::Tag $tag isn't vX.Y.Z or vX.Y.Z-pre.N"; exit 1; }
+          [ "$tag" = "v$pkg" ] || { echo "::error::Tag $tag doesn't match version $pkg"; exit 1; }
+          grep -qF "## [$pkg] - " CHANGELOG.md || { echo "::error::CHANGELOG.md has no $pkg section; run scripts/set-version.sh $pkg"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag a commit on main"; exit 1; }
+          # Without it the release has no signed update and installed apps never see it.
+          [ "$HAS_UPDATER_KEY" = true ] || { echo "::error::Add the TAURI_SIGNING_PRIVATE_KEY secret; see CONTRIBUTING.md"; exit 1; }
+          echo "Releasing $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   build:
     name: ${{ matrix.name }}
     needs: verify
+    if: needs.verify.outputs.tag != '' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       id-token: write # build provenance
@@ -191,7 +221,7 @@ jobs:
       # Signed SLSA provenance, verifiable with `gh attestation verify`.
       # Private repos only get attestations on GitHub Enterprise Cloud.
       - name: Attest build provenance
-        if: github.ref_type == 'tag' && !github.event.repository.private
+        if: needs.verify.outputs.tag != '' && !github.event.repository.private
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
@@ -202,11 +232,13 @@ jobs:
   # One job creates the release once every installer is built, so a failed
   # platform never leaves a half-filled release behind. Only this job can write.
   release:
-    needs: build
-    if: github.ref_type == 'tag'
+    needs: [verify, build]
+    if: needs.verify.outputs.tag != ''
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
     steps:
       # Full history and tags, for git-cliff to find the previous release.
       - uses: actions/checkout@v4
@@ -219,9 +251,11 @@ jobs:
       - run: bun install --frozen-lockfile
 
       # The changes since the previous tag, as in CHANGELOG.md, minus the
-      # version heading (the release has its own title).
+      # version heading (the release has its own title). On a merge to main the
+      # tag doesn't exist yet: tag the commit locally so git-cliff sees it.
       - name: Release notes
         run: |
+          git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git tag "$TAG" "$GITHUB_SHA"
           bunx git-cliff --current --strip all | sed -e '1{/^## /d;}' -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
@@ -234,8 +268,6 @@ jobs:
       # signature. A bundle-specific key (windows-x86_64-msi) wins over the
       # plain one, so an MSI install is updated by the MSI, not by NSIS.
       - name: Update manifest
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
           entry() {
@@ -256,10 +288,11 @@ jobs:
       # Only SemVer pre-releases (a "-" suffix) are marked as pre-releases. The Windows
       # artifact keeps its nsis/ and msi/ subfolders (upload-artifact preserves
       # paths below the common ancestor), so collect files rather than globbing.
+      # --target creates the tag on the built commit when it doesn't exist yet;
+      # a tag made with GITHUB_TOKEN doesn't trigger this workflow again.
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
         run: |
           prerelease=()
           [[ "$TAG" == *-* ]] && prerelease=(--prerelease)
@@ -268,4 +301,4 @@ jobs:
           files+=("$RUNNER_TEMP/latest.json")
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --notes-file "$RUNNER_TEMP/notes.md" --title "KUI $TAG" "${prerelease[@]}"
+            --target "$GITHUB_SHA" --notes-file "$RUNNER_TEMP/notes.md" --title "KUI $TAG" "${prerelease[@]}"
