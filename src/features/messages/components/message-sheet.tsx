@@ -1,4 +1,5 @@
 import { CopyIcon } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ResizableSheetContent } from "@/components/resizable-sheet-content";
 import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatBytes, formatTimestamp, prettyJson } from "@/lib/format";
+import { formatBytes, formatTimestamp } from "@/lib/format";
 
+import { type PayloadView as View, payloadViews, renderPayload } from "../payload-view";
 import type { CopyTarget, KafkaMessage, Payload } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
 
@@ -77,14 +79,29 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
   );
 }
 
+const VIEW_LABELS: Record<View, string> = { text: "Text", hex: "Hex", base64: "Base64" };
+
 function PayloadView({ payload }: { payload: Payload | null }) {
+  // Kept while moving between messages; "text" on a binary payload shows hex.
+  const [view, setView] = useState<View>("text");
+  const text = useMemo(() => (payload ? renderPayload(payload, view) : ""), [payload, view]);
   if (!payload) return <p className="text-sm text-muted-foreground">null</p>;
 
-  const text = payload.encoding === "utf8" ? prettyJson(payload.text) : payload.text;
+  const views = payloadViews(payload);
+  const shown = views.includes(view) ? view : "hex";
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex items-center gap-2">
-        <Badge variant="outline">{payload.encoding === "utf8" ? "UTF-8" : "Binary (hex)"}</Badge>
+        <Tabs value={shown} onValueChange={(v) => setView(v as View)}>
+          <TabsList aria-label="Show as">
+            {views.map((v) => (
+              <TabsTrigger key={v} value={v}>
+                {VIEW_LABELS[v]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Badge variant="outline">{payload.encoding === "utf8" ? "UTF-8" : "Binary"}</Badge>
         <Badge variant="outline">{formatBytes(payload.size)}</Badge>
         <div className="flex-1" />
         <Button
