@@ -1,11 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use rdkafka::admin::AdminClient;
+use rdkafka::client::DefaultClientContext;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{Offset, TopicPartitionList};
 
-use super::TIMEOUT;
-use super::probes::Probes;
+use super::{TIMEOUT, group_offsets};
 use crate::error::Result;
+
+type Admin = AdminClient<DefaultClientContext>;
 
 /// (topic, partition)
 pub type PartitionKey = (String, i32);
@@ -69,53 +72,25 @@ pub fn offsets_at(
         .collect())
 }
 
-/// Partitions per committed-offsets request. librdkafka's handling of the
-/// response grows quadratically with the list size: 6,054 partitions took
-/// 207 ms in one request but 31 ms as 13 requests of up to 500.
-const COMMITTED_CHUNK: usize = 500;
-
 /// Offsets `group` has committed on `partitions`. Partitions the group never
 /// committed to are omitted.
-pub fn committed(probes: &Probes, group: &str, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, i64>> {
-    if partitions.is_empty() {
-        return Ok(HashMap::new());
-    }
-    let probe = probes.get(group)?;
-    let mut offsets = HashMap::new();
-    for chunk in partitions.chunks(COMMITTED_CHUNK) {
-        let mut tpl = TopicPartitionList::new();
-        for (topic, partition) in chunk {
-            tpl.add_partition(topic, *partition);
-        }
-        offsets.extend(probe.committed_offsets(tpl, TIMEOUT)?.elements().iter().filter_map(|e| match e.offset() {
-            Offset::Offset(o) => Some(((e.topic().to_string(), e.partition()), o)),
-            _ => None, // never committed
-        }));
-    }
-    Ok(offsets)
+pub fn committed(admin: &Admin, group: &str, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, i64>> {
+    let (_, result) = committed_by_group(admin, &[group.to_string()], partitions).pop().expect("one result per group");
+    result
 }
 
-/// `committed` for many groups at once. Each group needs its own probe, and a
-/// new one's connection and coordinator lookup (~65 ms locally) is most of a
-/// group's cost, so they run on several threads in parallel. 16 halved the
-/// time of 8 for 61 groups; 32 gained little more for twice the connections.
+/// `committed` for many groups at once, all requests in flight together.
 pub fn committed_by_group(
-    probes: &Probes,
+    admin: &Admin,
     groups: &[String],
     partitions: &[PartitionKey],
 ) -> Vec<(String, Result<HashMap<PartitionKey, i64>>)> {
-    const THREADS: usize = 16;
-    if groups.is_empty() {
-        return Vec::new();
-    }
-    let chunk = groups.len().div_ceil(THREADS);
-    std::thread::scope(|s| {
-        let handles: Vec<_> = groups
-            .chunks(chunk)
-            .map(|chunk| {
-                s.spawn(move || chunk.iter().map(|g| (g.clone(), committed(probes, g, partitions))).collect::<Vec<_>>())
-            })
-            .collect();
-        handles.into_iter().flat_map(|h| h.join().expect("offset probe panicked")).collect()
-    })
+    let wanted: HashSet<&PartitionKey> = partitions.iter().collect();
+    let results = group_offsets::list(admin, groups);
+    groups
+        .iter()
+        .cloned()
+        .zip(results)
+        .map(|(group, result)| (group, result.map(|all| all.into_iter().filter(|(k, _)| wanted.contains(k)).collect())))
+        .collect()
 }
