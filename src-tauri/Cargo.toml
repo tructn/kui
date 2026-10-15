@@ -1,6 +1,6 @@
 [package]
 name = "kui"
-version = "0.2.0-rc.1"
+version = "0.2.0-rc.2"
 description = "A desktop GUI for Apache Kafka"
 authors = ["Truc Nguyen"]
 license = "MIT"
