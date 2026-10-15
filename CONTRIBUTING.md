@@ -177,5 +177,17 @@ app that trusts the new public key.
 
 Code signing is optional. Add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` (plus
 `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` for notarization) or `WINDOWS_CERTIFICATE`,
-`WINDOWS_CERTIFICATE_PASSWORD` as repository secrets and the workflow signs automatically. On a public repo each
-installer also gets signed build provenance: `gh attestation verify <file> --repo tructn/kui`.
+`WINDOWS_CERTIFICATE_PASSWORD` as repository secrets and the workflow signs automatically. Without them, macOS
+Gatekeeper blocks the first launch ("Apple could not verify…"), and Windows SmartScreen and antivirus scanners
+warn about the installer; README.md tells users how to get past both. Getting rid of the warnings takes:
+
+- **macOS:** an Apple Developer Program membership, a *Developer ID Application* certificate exported as a
+  base64 `.p12` (`APPLE_CERTIFICATE`), and an app-specific password for notarization (`APPLE_PASSWORD`). A signed
+  but un-notarized app is still blocked, so set all six secrets.
+- **Windows:** a code-signing certificate. CAs no longer issue new OV/EV certificates as exportable `.pfx`
+  files (the keys must stay on a hardware token or a cloud HSM), so the `WINDOWS_CERTIFICATE` route only works
+  with an older certificate. New setups need a cloud signer such as Azure Trusted Signing or SignPath (free for
+  open-source projects), hooked in through Tauri's `bundle.windows.signCommand`. SmartScreen reputation builds
+  up as signed downloads accumulate.
+
+On a public repo each installer also gets signed build provenance: `gh attestation verify <file> --repo tructn/kui`.

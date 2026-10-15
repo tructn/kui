@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tructn/kui/releases/latest"><strong>Download for macOS &amp; Windows</strong></a>
+  <a href="https://github.com/tructn/kui/releases"><strong>Download for macOS &amp; Windows</strong></a>
 </p>
 
 <p align="center">
@@ -76,19 +76,29 @@ unusual setups. Test the connection before you save it, and switch between clust
 
 ## Install
 
-Grab the latest installer from the [Releases](https://github.com/tructn/kui/releases/latest) page.
+Grab the latest installer from the [Releases](https://github.com/tructn/kui/releases) page.
 
 | Platform | Download |
 | --- | --- |
 | macOS (Apple Silicon) | `KUI_<version>_aarch64.dmg` |
 | Windows 10/11 (x64) | `KUI_<version>_x64-setup.exe` |
 
-**macOS:** open the `.dmg` and drag KUI into Applications. The first time, right-click KUI and choose
-**Open** (builds aren't notarized yet). If macOS says the app is damaged, run
-`xattr -dr com.apple.quarantine /Applications/KUI.app`.
+**macOS:** open the `.dmg` and drag KUI into Applications. Builds aren't notarized yet, so the first launch shows
+*"Apple could not verify “KUI” is free of malware"*. Click **Done**, then open **System Settings → Privacy &
+Security**, scroll to *"KUI" was blocked*, click **Open Anyway** and confirm. (On macOS 15 and later, right-click →
+Open no longer works for this.) Or remove the download quarantine from a terminal:
 
-**Windows:** run the installer. No admin rights are needed. If SmartScreen appears, click **More info** →
-**Run anyway**.
+```bash
+xattr -dr com.apple.quarantine /Applications/KUI.app
+```
+
+**Windows:** run the installer. No admin rights are needed. The installer isn't code-signed yet, so SmartScreen may
+show *"Windows protected your PC"*: click **More info** → **Run anyway**. If Microsoft Defender or another antivirus
+flags or removes the file, it's a false positive on an unsigned download. Check the file came from this repo's
+Releases page (`gh attestation verify <file> --repo tructn/kui`), then restore it from quarantine, and please
+[open an issue](https://github.com/tructn/kui/issues) so it can be reported to the vendor.
+
+Updates installed from inside the app don't show these prompts.
 
 **Updates:** KUI checks for new versions at startup and offers to install them; it restarts to finish. To try
 new features early, turn on **Settings → Updates → Include release candidates**. You can also turn automatic
