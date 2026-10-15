@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatNumber } from "@/lib/format";
+import { matchByName } from "@/lib/name-search";
 
 import type { CopyTarget } from "../types";
 
@@ -25,19 +26,7 @@ export function TopicPicker({ id, value, options, currentTopic, onChange }: Topi
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  // Names starting with the query first, then names containing it; list order otherwise.
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return options;
-    const starts: CopyTarget[] = [];
-    const contains: CopyTarget[] = [];
-    for (const option of options) {
-      const name = option.name.toLowerCase();
-      if (name.startsWith(q)) starts.push(option);
-      else if (name.includes(q)) contains.push(option);
-    }
-    return [...starts, ...contains];
-  }, [options, query]);
+  const matches = useMemo(() => matchByName(options, query), [options, query]);
   const shown = matches.slice(0, MAX_SHOWN);
 
   function choose(topic: string) {

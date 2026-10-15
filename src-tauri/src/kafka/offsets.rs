@@ -26,9 +26,10 @@ impl Watermarks {
     }
 }
 
-/// Watermarks for many partitions in two batched ListOffsets requests
+/// Watermarks for many partitions in batched ListOffsets requests
 /// (timestamp -2 = earliest, -1 = latest) instead of one round trip per
-/// partition. The two run in parallel, so it costs one round trip, not two.
+/// partition. Earliest and latest run in parallel, so it costs one round trip
+/// per `OFFSETS_CHUNK` partitions, not two.
 pub fn watermarks(consumer: &BaseConsumer, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, Watermarks>> {
     if partitions.is_empty() {
         return Ok(HashMap::new());
@@ -50,6 +51,11 @@ pub fn watermarks(consumer: &BaseConsumer, partitions: &[PartitionKey]) -> Resul
         .collect())
 }
 
+/// Partitions per ListOffsets request. librdkafka matches the response to the
+/// request partition by partition with a linear search, so one request costs
+/// O(n²): 40,000 partitions took 13 s, the same in chunks of 1,000 under 1 s.
+const OFFSETS_CHUNK: usize = 1000;
+
 /// Resolves a logical offset or a timestamp (`Offset::Offset(epoch_ms)`) to a
 /// concrete offset for each partition. Partitions without an answer are omitted.
 pub fn offsets_at(
@@ -57,19 +63,19 @@ pub fn offsets_at(
     partitions: &[PartitionKey],
     at: Offset,
 ) -> Result<HashMap<PartitionKey, i64>> {
-    let mut tpl = TopicPartitionList::new();
-    for (topic, partition) in partitions {
-        tpl.add_partition_offset(topic, *partition, at)?;
-    }
-    let resolved = consumer.offsets_for_times(tpl, TIMEOUT)?;
-    Ok(resolved
-        .elements()
-        .iter()
-        .filter_map(|e| match e.offset() {
+    let mut offsets = HashMap::with_capacity(partitions.len());
+    for chunk in partitions.chunks(OFFSETS_CHUNK) {
+        let mut tpl = TopicPartitionList::new();
+        for (topic, partition) in chunk {
+            tpl.add_partition_offset(topic, *partition, at)?;
+        }
+        let resolved = consumer.offsets_for_times(tpl, TIMEOUT)?;
+        offsets.extend(resolved.elements().iter().filter_map(|e| match e.offset() {
             Offset::Offset(o) => Some(((e.topic().to_string(), e.partition()), o)),
             _ => None,
-        })
-        .collect())
+        }));
+    }
+    Ok(offsets)
 }
 
 /// Offsets `group` has committed on `partitions`. Partitions the group never
