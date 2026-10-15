@@ -140,4 +140,28 @@
   .font-mono, .cm-scroller {
     font-variant-ligatures: var(--app-code-ligatures);
     }
+
+  /*
+   * Thin, rounded scrollbars in the theme's colors. WebKit (macOS, Linux) and
+   * WebView2 (Windows) both read these. Don't add `scrollbar-width` or
+   * `scrollbar-color`: Chromium ignores these rules once either is set.
+   */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+    }
+  /* The transparent border insets the thumb, so it floats clear of the edge. */
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+    background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--muted-foreground) 65%, transparent);
+    }
 }
