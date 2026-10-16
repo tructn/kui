@@ -20,6 +20,7 @@ import { formatNumber } from "@/lib/format";
 import { matchByName } from "@/lib/name-search";
 
 import { useTopics } from "../queries";
+import { useTopicListFilters } from "../store";
 
 /** Lets the sidebar button and ⌘K open the same dialog. */
 export const useTopicSearch = create<{ open: boolean; setOpen: (open: boolean) => void }>()((set) => ({
@@ -58,7 +59,12 @@ function TopicResults({ onSelect }: { onSelect: (topic: string) => void }) {
   // Only fetched while open; the topics page shares the same cached list.
   const topics = useTopics(useClusterId());
   const [query, setQuery] = useState("");
-  const matches = useMemo(() => matchByName(topics.data ?? [], query), [topics.data, query]);
+  // Internal topics stay hidden here too unless the topic list's "Show internal" is on.
+  const showInternal = useTopicListFilters((s) => s.showInternal);
+  const matches = useMemo(
+    () => matchByName((topics.data ?? []).filter((t) => showInternal || !t.internal), query),
+    [topics.data, query, showInternal],
+  );
   const shown = matches.slice(0, MAX_SHOWN);
 
   return (
