@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { SparklesIcon, SquareIcon } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,11 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
   const [error, setError] = useState<string | null>(null);
   const valueRef = useRef<HTMLTextAreaElement>(null);
 
+  // ⌘1/⌘K still navigate while the dialog is open, unmounting it mid-run. Stop
+  // the Rust producer then, or it keeps writing with no Stop button left.
+  const cancelRun = useRef<(() => void) | null>(null);
+  useEffect(() => () => cancelRun.current?.(), []);
+
   const template: RecordTemplate = {
     key: key || null,
     value,
@@ -98,7 +103,9 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
       },
       (progress) => setRun((r) => r && { ...r, progress }),
     );
-    setRun({ progress: null, cancel: () => void task.cancel() });
+    const cancel = () => void task.cancel();
+    cancelRun.current = cancel;
+    setRun({ progress: null, cancel });
     try {
       const done = await task.result;
       const took = done.elapsedMs < 1000 ? `${done.elapsedMs}ms` : `${(done.elapsedMs / 1000).toFixed(1)}s`;
@@ -115,6 +122,7 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      cancelRun.current = null;
       setRun(null);
     }
   }
