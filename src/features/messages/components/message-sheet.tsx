@@ -16,9 +16,9 @@ import { CopyMessageDialog } from "./copy-message-dialog";
 interface MessageSheetProps {
   clusterId: string;
   topic: string;
-  /** Topics the message can be copied or moved to. */
+  /** Topics the message can be copied to. */
   targets: CopyTarget[];
-  /** Hides copy/move for internal topics. */
+  /** Hides copy for internal topics. */
   readOnly?: boolean;
   message: KafkaMessage | null;
   onClose: () => void;
@@ -45,7 +45,6 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
                     topic={topic}
                     message={message}
                     targets={targets}
-                    onMoved={onClose}
                   />
                 </div>
               )}

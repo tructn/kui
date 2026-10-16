@@ -38,7 +38,7 @@ and new messages stream in as they arrive.
   <img src="docs/messages.png" alt="Messages of a topic, with partition, offset, timestamp, key and value" width="900" />
 </p>
 
-Open any message to see its value as pretty-printed JSON, plus its key and headers. Then **copy, duplicate or move**
+Open any message to see its value as pretty-printed JSON, plus its key and headers. Then **copy or duplicate**
 it to another topic, byte for byte, headers included.
 
 <p align="center">

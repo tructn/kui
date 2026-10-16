@@ -14,7 +14,7 @@ pub fn is_internal(topic: &str) -> bool {
     topic.starts_with('_')
 }
 
-/// Refuses writes (produce, copy, move, delete) to an internal topic.
+/// Refuses writes (produce, copy, generate) to an internal topic.
 pub fn ensure_writable(topic: &str) -> Result<()> {
     if is_internal(topic) {
         return Err(Error::msg(format!(

@@ -17,7 +17,7 @@ use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
 use crate::kafka::metadata::{ensure_writable, partition_ids};
 use crate::kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
-use crate::kafka::{KafkaClients, TIMEOUT, admin_options, client_config};
+use crate::kafka::{KafkaClients, TIMEOUT, client_config};
 use crate::tasks::CancelToken;
 
 const MAX_PAGE_SIZE: usize = 1000;
@@ -234,26 +234,13 @@ pub async fn produce(clients: &KafkaClients, request: &ProduceRequest) -> Result
 }
 
 /// Copies one message to `target_topic`, keeping its key, value and headers as raw bytes.
-/// With `delete_source` it then deletes the original, which completes a move.
-///
-/// Kafka can only delete a partition's prefix (everything below an offset). A move is
-/// therefore checked up front and refused unless the message is the oldest in its
-/// partition. That way a refused move never leaves a stray copy behind.
+/// The original is never touched: a Kafka log is append-only, so KUI only adds a copy,
+/// appended as a new message stamped "now" like any other.
 pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<Delivered> {
     ensure_writable(&request.target_topic)?;
-    if request.delete_source {
-        ensure_writable(&request.topic)?;
-    }
-    let (topic, partition, offset, delete_source) =
-        (request.topic.clone(), request.partition, request.offset, request.delete_source);
+    let (topic, partition, offset) = (request.topic.clone(), request.partition, request.offset);
     let reader = clients.clone();
-    let original = run_blocking(move || {
-        if delete_source {
-            ensure_oldest(&reader, &topic, partition, offset)?;
-        }
-        fetch_one(&reader, &topic, partition, offset)
-    })
-    .await?;
+    let original = run_blocking(move || fetch_one(&reader, &topic, partition, offset)).await?;
 
     let mut record: FutureRecord<'_, [u8], [u8]> = FutureRecord::to(&request.target_topic);
     if let Some(key) = original.key() {
@@ -268,37 +255,9 @@ pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<D
     if let Some(partition) = request.target_partition {
         record = record.partition(partition);
     }
-    if request.keep_timestamp
-        && let Some(ts) = original.timestamp().to_millis()
-    {
-        record = record.timestamp(ts);
-    }
 
     let delivery = clients.producer.send(record, TIMEOUT).await.map_err(|(e, _)| Error::from(e))?;
-    let delivered = Delivered { partition: delivery.partition, offset: delivery.offset };
-
-    if request.delete_source {
-        delete_through(&clients, &request.topic, partition, offset).await.map_err(|e| {
-            Error::msg(format!(
-                "Copied to {} (partition {}, offset {}), but deleting the original failed: {e}",
-                request.target_topic, delivered.partition, delivered.offset
-            ))
-        })?;
-    }
-    Ok(delivered)
-}
-
-/// Refuses unless `offset` is the first message still stored in the partition.
-fn ensure_oldest(clients: &KafkaClients, topic: &str, partition: i32, offset: i64) -> Result<()> {
-    let key = (topic.to_string(), partition);
-    let low = watermarks(&clients.metadata, std::slice::from_ref(&key))?.get(&key).map_or(0, |m| m.low);
-    if offset != low {
-        return Err(Error::msg(format!(
-            "Only the oldest message in a partition can be moved (partition {partition} starts at offset {low}). \
-             Kafka can't delete a single message from the middle of a log, so copy it instead."
-        )));
-    }
-    Ok(())
+    Ok(Delivered { partition: delivery.partition, offset: delivery.offset })
 }
 
 /// Reads exactly one message, or fails if it was deleted or compacted away.
@@ -319,15 +278,4 @@ fn fetch_one(clients: &KafkaClients, topic: &str, partition: i32, offset: i64) -
         }
     }
     Err(Error::msg(format!("Message at partition {partition}, offset {offset} no longer exists")))
-}
-
-/// Deletes every record up to and including `offset`.
-async fn delete_through(clients: &KafkaClients, topic: &str, partition: i32, offset: i64) -> Result<()> {
-    let mut tpl = TopicPartitionList::new();
-    tpl.add_partition_offset(topic, partition, Offset::Offset(offset + 1))?;
-    let result = clients.admin.delete_records(&tpl, &admin_options()).await?;
-    for element in result.elements() {
-        element.error()?;
-    }
-    Ok(())
 }

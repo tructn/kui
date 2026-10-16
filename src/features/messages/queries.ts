@@ -36,12 +36,8 @@ export function useCopyMessage(clusterId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: CopyRequest) => messagesApi.copy(clusterId, request),
-    // The target gained a message; after a move the source lost one too.
+    // The target gained a message.
     onSuccess: (_, request) =>
-      Promise.all(
-        [request.topic, request.targetTopic].map((topic) =>
-          queryClient.invalidateQueries({ queryKey: messageKeys.topic(clusterId, topic) }),
-        ),
-      ),
+      queryClient.invalidateQueries({ queryKey: messageKeys.topic(clusterId, request.targetTopic) }),
   });
 }

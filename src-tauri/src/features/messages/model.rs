@@ -114,11 +114,4 @@ pub struct CopyRequest {
     pub target_topic: String,
     /// `None` lets the partitioner decide (by key hash).
     pub target_partition: Option<i32>,
-    /// Keep the original timestamp instead of stamping the copy with "now".
-    #[serde(default)]
-    pub keep_timestamp: bool,
-    /// Delete the original afterwards, making this a move. Kafka can only delete
-    /// a partition's prefix, so this is allowed only for the oldest message.
-    #[serde(default)]
-    pub delete_source: bool,
 }
