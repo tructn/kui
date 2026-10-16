@@ -13,6 +13,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandShortcut,
 } from "@/components/ui/command";
 import { useShortcut } from "@/hooks/use-shortcut";
 import { formatNumber } from "@/lib/format";
@@ -72,11 +73,12 @@ function TopicResults({ onSelect }: { onSelect: (topic: string) => void }) {
             {shown.map((t) => (
               <CommandItem key={t.name} value={t.name} onSelect={onSelect}>
                 <ListTreeIcon />
-                <span className="truncate font-mono">{t.name}</span>
+                <span className="min-w-0 truncate font-mono">{t.name}</span>
                 {t.internal && <Badge variant="outline">internal</Badge>}
-                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                {/* A shortcut slot hides CommandItem's trailing check icon, which would otherwise split the ml-auto space. */}
+                <CommandShortcut className="shrink-0 pl-2 tracking-normal whitespace-nowrap tabular-nums">
                   {formatNumber(t.messageCount)} msgs
-                </span>
+                </CommandShortcut>
               </CommandItem>
             ))}
           </CommandGroup>
