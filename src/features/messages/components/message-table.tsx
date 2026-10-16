@@ -33,7 +33,7 @@ const COLUMNS: SortColumns<KafkaMessage, Column> = {
 export function MessageTable({ messages, onSelect, emptyText, animate, pager: serverPager }: MessageTableProps) {
   // With server-side paging only the loaded page is here, so sorting reorders
   // that page; otherwise it sorts every message before paging.
-  const sorter = useSort(serverPager ? serverPager.items : messages, COLUMNS);
+  const sorter = useSort("messages", serverPager ? serverPager.items : messages, COLUMNS);
   const localPager = usePagination(sorter.rows, sorter.key);
   const pager = serverPager ?? localPager;
   const items = serverPager ? sorter.rows : localPager.items;

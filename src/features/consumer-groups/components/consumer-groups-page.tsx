@@ -15,6 +15,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
+import { useViewState } from "@/hooks/use-view-state";
 import { formatNumber } from "@/lib/format";
 
 import { useConsumerGroupLags, useConsumerGroups } from "../queries";
@@ -27,7 +28,7 @@ export function ConsumerGroupsPage() {
   const groups = useConsumerGroups(clusterId);
   const lags = useConsumerGroupLags(clusterId);
   const lagByGroup = useMemo(() => new Map((lags.data ?? []).map((l) => [l.name, l])), [lags.data]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useViewState("consumer-groups.search", "");
   const [selected, setSelected] = useState<string | null>(null);
 
   const visible = useMemo(
@@ -46,7 +47,7 @@ export function ConsumerGroupsPage() {
     }),
     [lagByGroup]
   );
-  const sorter = useSort(visible, columns);
+  const sorter = useSort("consumer-groups", visible, columns);
   const pager = usePagination(sorter.rows, `${search}|${sorter.key}`);
   const resize = useColumnResize("consumer-groups", 6);
   const rowProps = useRowNavigation(pager.items.length);

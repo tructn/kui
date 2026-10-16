@@ -77,7 +77,7 @@ function GroupDetailBody({
 }) {
   const deleteGroup = useDeleteConsumerGroup(clusterId);
   const navigate = useNavigation((s) => s.navigate);
-  const memberSort = useSort(detail.members, MEMBER_COLUMNS);
+  const memberSort = useSort("group-members", detail.members, MEMBER_COLUMNS);
   const members = usePagination(memberSort.rows, memberSort.key);
   const memberResize = useColumnResize("group-members", 3);
 

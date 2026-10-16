@@ -6,6 +6,7 @@ import {
   PaletteIcon,
   RefreshCwIcon,
   RotateCcwIcon,
+  SlidersHorizontalIcon,
   SunIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -34,6 +35,7 @@ import { useShortcut } from "@/hooks/use-shortcut";
 import { useSettingsDialog } from "./stores/settings-dialog-store";
 import { useTheme, type Theme } from "./stores/theme-store";
 import { useUpdates } from "./stores/update-store";
+import { useViewStateStore } from "./stores/view-state-store";
 
 interface Section {
   id: string;
@@ -44,6 +46,13 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
+  {
+    id: "general",
+    label: "General",
+    icon: SlidersHorizontalIcon,
+    description: "How KUI behaves as you move around it.",
+    content: () => <GeneralSettings />,
+  },
   {
     id: "appearance",
     label: "Appearance",
@@ -81,7 +90,7 @@ export function SettingsDialog() {
         <Tabs orientation="vertical" defaultValue={SECTIONS[0].id} className="min-h-0 min-w-0 flex-1 gap-0">
           <div className="flex w-48 shrink-0 flex-col gap-3 border-r bg-muted/40 p-3">
             <DialogTitle className="px-2 pt-1.5 text-base">Settings</DialogTitle>
-            <DialogDescription className="sr-only">App appearance, updates and keyboard shortcuts.</DialogDescription>
+            <DialogDescription className="sr-only">General behavior, appearance, updates and keyboard shortcuts.</DialogDescription>
             <TabsList className="w-full items-stretch gap-0.5 bg-transparent p-0">
               {SECTIONS.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger key={id} value={id} className="h-8 flex-none px-2 font-normal data-active:font-medium">
@@ -103,6 +112,23 @@ export function SettingsDialog() {
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function GeneralSettings() {
+  const remember = useViewStateStore((s) => s.remember);
+  const setRemember = useViewStateStore((s) => s.setRemember);
+
+  return (
+    <SettingsGroup>
+      <SettingRow
+        label="Remember sorting and filters"
+        description="Each table keeps its sort order, and lists keep their search and filters, when you switch pages or restart KUI. Off, every page opens fresh and nothing is saved."
+        htmlFor="remember-view-state"
+      >
+        <Switch id="remember-view-state" checked={remember} onCheckedChange={setRemember} />
+      </SettingRow>
+    </SettingsGroup>
   );
 }
 
