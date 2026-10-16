@@ -1,4 +1,4 @@
-import { CopyIcon, MoveRightIcon } from "lucide-react";
+import { CopyIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -12,11 +12,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
 
 import { useCopyMessage } from "../queries";
 import type { CopyTarget, KafkaMessage } from "../types";
@@ -29,17 +27,13 @@ interface CopyMessageDialogProps {
   topic: string;
   message: KafkaMessage;
   targets: CopyTarget[];
-  /** Called after a successful move, since the original no longer exists. */
-  onMoved: () => void;
 }
 
-/** Duplicates a message (same topic), copies it elsewhere, or moves it. */
-export function CopyMessageDialog({ clusterId, topic, message, targets, onMoved }: CopyMessageDialogProps) {
+/** Duplicates a message (same topic) or copies it elsewhere. The original is never touched. */
+export function CopyMessageDialog({ clusterId, topic, message, targets }: CopyMessageDialogProps) {
   const [open, setOpen] = useState(false);
   const [targetTopic, setTargetTopic] = useState(topic);
   const [partition, setPartition] = useState(AUTO_PARTITION);
-  const [keepTimestamp, setKeepTimestamp] = useState(false);
-  const [move, setMove] = useState(false);
   const copy = useCopyMessage(clusterId);
 
   // Fall back to the current topic until the topic list loads.
@@ -60,14 +54,11 @@ export function CopyMessageDialog({ clusterId, topic, message, targets, onMoved 
         offset: message.offset,
         targetTopic,
         targetPartition: partition === AUTO_PARTITION ? null : Number(partition),
-        keepTimestamp,
-        deleteSource: move,
       },
       {
         onSuccess: (d) => {
-          toast.success(`${move ? "Moved" : "Copied"} to ${targetTopic} · partition ${d.partition}, offset ${d.offset}`);
+          toast.success(`Copied to ${targetTopic} · partition ${d.partition}, offset ${d.offset}`);
           setOpen(false);
-          if (move) onMoved();
         },
       },
     );
@@ -83,12 +74,12 @@ export function CopyMessageDialog({ clusterId, topic, message, targets, onMoved 
     >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <CopyIcon /> Copy / Move
+          <CopyIcon /> Copy
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Copy or move message</DialogTitle>
+          <DialogTitle>Copy message</DialogTitle>
           <DialogDescription className="font-mono [overflow-wrap:anywhere]">
             {topic} · partition {message.partition} · offset {message.offset}
           </DialogDescription>
@@ -125,26 +116,12 @@ export function CopyMessageDialog({ clusterId, topic, message, targets, onMoved 
                 </Select>
               </Field>
             </div>
-            <Field orientation="horizontal">
-              <Switch id="copy-keep-ts" checked={keepTimestamp} onCheckedChange={setKeepTimestamp} />
-              <Label htmlFor="copy-keep-ts">Keep original timestamp</Label>
-            </Field>
-            <Field>
-              <div className="flex items-center gap-3">
-                <Switch id="copy-move" checked={move} onCheckedChange={setMove} />
-                <Label htmlFor="copy-move">Delete the original (move)</Label>
-              </div>
-              <FieldDescription>
-                Kafka can only delete the start of a partition, so only the oldest message in its partition can be
-                moved.
-              </FieldDescription>
-            </Field>
             {copy.error && <FieldError>{copy.error.message}</FieldError>}
           </FieldGroup>
           <DialogFooter>
-            <Button type="submit" variant={move ? "destructive" : "default"} disabled={copy.isPending}>
-              {copy.isPending ? <Spinner /> : move ? <MoveRightIcon /> : <CopyIcon />}
-              {move ? "Move" : targetTopic === topic ? "Duplicate" : "Copy"}
+            <Button type="submit" disabled={copy.isPending}>
+              {copy.isPending ? <Spinner /> : <CopyIcon />}
+              {targetTopic === topic ? "Duplicate" : "Copy"}
             </Button>
           </DialogFooter>
         </form>

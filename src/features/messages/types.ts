@@ -76,12 +76,9 @@ export interface CopyRequest {
   targetTopic: string;
   /** null = partitioner decides (by key) */
   targetPartition: number | null;
-  keepTimestamp: boolean;
-  /** Delete the original afterwards (a move). Only the oldest message in a partition qualifies. */
-  deleteSource: boolean;
 }
 
-/** A topic a message can be copied or moved to. */
+/** A topic a message can be copied to. */
 export interface CopyTarget {
   name: string;
   partitions: number;

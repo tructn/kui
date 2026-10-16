@@ -145,7 +145,7 @@ async fn full_round_trip() {
 
 #[tokio::test]
 #[ignore = "needs a running Kafka broker"]
-async fn copy_and_move_messages() {
+async fn copy_messages() {
     use rdkafka::message::{Header, OwnedHeaders};
     use rdkafka::producer::FutureRecord;
 
@@ -170,14 +170,12 @@ async fn copy_and_move_messages() {
         clients.producer.send(record, Duration::from_secs(5)).await.unwrap();
     }
 
-    let copy = |offset, target_topic: &str, keep_timestamp, delete_source| CopyRequest {
+    let copy = |offset, target_topic: &str| CopyRequest {
         topic: source.clone(),
         partition: 0,
         offset,
         target_topic: target_topic.to_string(),
         target_partition: None,
-        keep_timestamp,
-        delete_source,
     };
     let read_all = |topic: &str| {
         let request = BrowseRequest {
@@ -191,27 +189,23 @@ async fn copy_and_move_messages() {
         messages::service::browse(&clients, &request).unwrap().messages
     };
 
-    // Duplicate within the same topic, keeping the timestamp.
-    let dup = messages::service::copy(clients.clone(), &copy(1, &source, true, false)).await.unwrap();
+    // Duplicate within the same topic: appended last, stamped now, not with the original's time.
+    let dup = messages::service::copy(clients.clone(), &copy(1, &source)).await.unwrap();
     assert_eq!(dup.offset, 3);
     let copied = read_all(&source).into_iter().find(|m| m.offset == 3).unwrap();
-    assert_eq!(copied.timestamp, Some(1_001));
+    assert!(copied.timestamp.unwrap() > 1_000_000_000_000, "{:?}", copied.timestamp);
     assert_eq!(copied.value.unwrap().text, "00 ff 10");
     assert_eq!(copied.headers[0].value.as_deref(), Some("v"));
 
-    // Moving a message that isn't the oldest is refused before anything is written.
-    let err = messages::service::copy(clients.clone(), &copy(1, &target, false, true)).await;
-    assert!(err.unwrap_err().to_string().contains("oldest"));
-    assert!(read_all(&target).is_empty());
-
-    // Moving the oldest copies it and removes it from the source.
-    messages::service::copy(clients.clone(), &copy(0, &target, false, true)).await.unwrap();
+    // Copying to another topic leaves the source untouched: nothing is ever deleted.
+    let copied = messages::service::copy(clients.clone(), &copy(0, &target)).await.unwrap();
+    assert_eq!(copied.offset, 0);
     assert_eq!(read_all(&target)[0].key.as_ref().unwrap().text, "k");
     let parts = topics::service::partitions(&clients, &source).unwrap();
-    assert_eq!((parts[0].low, parts[0].high), (1, 4));
+    assert_eq!((parts[0].low, parts[0].high), (0, 4));
 
-    // The moved offset is gone now.
-    let gone = messages::service::copy(clients.clone(), &copy(0, &target, false, false)).await;
+    // An offset that doesn't exist is reported, not silently skipped.
+    let gone = messages::service::copy(clients.clone(), &copy(99, &target)).await;
     assert!(gone.unwrap_err().to_string().contains("no longer exists"));
 
     // Both topics in one batch; each reports its own outcome.
