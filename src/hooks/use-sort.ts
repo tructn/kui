@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
+import { useViewState } from "@/hooks/use-view-state";
 import { nextSort, sortRows, type SortState, type SortValue } from "@/lib/sort";
 
 /** How to read each sortable column's value from a row. */
@@ -19,15 +20,18 @@ export interface Sorter<T, K extends string> {
  * Client-side column sorting for a table. Sort before paginating, so the
  * order covers every row rather than just the visible page.
  *
- * `columns` should be a module constant or memoized, since a new object
- * re-sorts the rows.
+ * `tableId` names the table's sort in the view state (see `useViewState`), so
+ * it can be remembered across pages and restarts. `columns` should be a module
+ * constant or memoized, since a new object re-sorts the rows.
  */
 export function useSort<T, K extends string>(
+  tableId: string,
   rows: readonly T[],
   columns: SortColumns<T, K>,
-  initial: SortState<K> | null = null,
 ): Sorter<T, K> {
-  const [sort, setSort] = useState(initial);
+  const [saved, setSort] = useViewState<SortState<K> | null>(`${tableId}.sort`, null);
+  // A remembered column this version no longer has means unsorted.
+  const sort = saved && Object.hasOwn(columns, saved.key) ? saved : null;
   const sorted = useMemo(
     () => (sort ? sortRows(rows, columns[sort.key], sort.direction) : rows),
     [rows, columns, sort],
@@ -35,7 +39,7 @@ export function useSort<T, K extends string>(
   return {
     rows: sorted,
     sort,
-    toggle: (key) => setSort((current) => nextSort(current, key)),
+    toggle: (key) => setSort(nextSort(sort, key)),
     key: sort ? `${sort.key}:${sort.direction}` : "",
   };
 }

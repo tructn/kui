@@ -16,11 +16,11 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { useShortcut } from "@/hooks/use-shortcut";
+import { useViewValue } from "@/hooks/use-view-state";
 import { formatNumber } from "@/lib/format";
 import { matchByName } from "@/lib/name-search";
 
 import { useTopics } from "../queries";
-import { useTopicListFilters } from "../store";
 
 /** Lets the sidebar button and ⌘K open the same dialog. */
 export const useTopicSearch = create<{ open: boolean; setOpen: (open: boolean) => void }>()((set) => ({
@@ -60,7 +60,7 @@ function TopicResults({ onSelect }: { onSelect: (topic: string) => void }) {
   const topics = useTopics(useClusterId());
   const [query, setQuery] = useState("");
   // Internal topics stay hidden here too unless the topic list's "Show internal" is on.
-  const showInternal = useTopicListFilters((s) => s.showInternal);
+  const showInternal = useViewValue("topics.showInternal", false);
   const matches = useMemo(
     () => matchByName((topics.data ?? []).filter((t) => showInternal || !t.internal), query),
     [topics.data, query, showInternal],

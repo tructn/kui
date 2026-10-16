@@ -30,7 +30,7 @@ export function BrokersPage() {
   const clusterId = useClusterId();
   const overview = useClusterOverview(clusterId);
   const data = overview.data;
-  const sorter = useSort(data?.brokers ?? NO_BROKERS, COLUMNS);
+  const sorter = useSort("brokers", data?.brokers ?? NO_BROKERS, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
   const resize = useColumnResize("brokers", 5);
 

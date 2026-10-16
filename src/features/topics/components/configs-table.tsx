@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -9,6 +7,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
+import { useViewState } from "@/hooks/use-view-state";
 
 import type { TopicConfigEntry } from "../types";
 
@@ -19,9 +18,9 @@ const COLUMNS: SortColumns<TopicConfigEntry, "name" | "value" | "source"> = {
 };
 
 export function ConfigsTable({ configs }: { configs: TopicConfigEntry[] }) {
-  const [overridesOnly, setOverridesOnly] = useState(false);
+  const [overridesOnly, setOverridesOnly] = useViewState("topic-configs.overridesOnly", false);
   const visible = overridesOnly ? configs.filter((c) => !c.isDefault) : configs;
-  const sorter = useSort(visible, COLUMNS);
+  const sorter = useSort("topic-configs", visible, COLUMNS);
   const pager = usePagination(sorter.rows, `${overridesOnly}|${sorter.key}`);
   const resize = useColumnResize("topic-configs", 3);
 

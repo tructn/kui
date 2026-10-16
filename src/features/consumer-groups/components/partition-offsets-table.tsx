@@ -40,7 +40,7 @@ export function PartitionOffsetsTable({
 }: {
   offsets: PartitionOffset[];
 }) {
-  const sorter = useSort(offsets, COLUMNS);
+  const sorter = useSort("partition-offsets", offsets, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
   const resize = useColumnResize("partition-offsets", 8);
   return (

@@ -20,7 +20,7 @@ const COLUMNS: SortColumns<Partition, "id" | "leader" | "replicas" | "isr" | "lo
 };
 
 export function PartitionsTable({ partitions }: { partitions: Partition[] }) {
-  const sorter = useSort(partitions, COLUMNS);
+  const sorter = useSort("topic-partitions", partitions, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
   const resize = useColumnResize("partitions", 7);
   return (

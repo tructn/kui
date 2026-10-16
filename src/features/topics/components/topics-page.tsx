@@ -17,10 +17,10 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
+import { useViewState } from "@/hooks/use-view-state";
 import { formatNumber } from "@/lib/format";
 
 import { useTopics } from "../queries";
-import { useTopicListFilters } from "../store";
 import type { TopicSummary } from "../types";
 import { CreateTopicDialog } from "./create-topic-dialog";
 import { DeleteTopicButton } from "./delete-topic-button";
@@ -37,7 +37,8 @@ export function TopicsPage() {
   const clusterId = useClusterId();
   const navigate = useNavigation((s) => s.navigate);
   const topics = useTopics(clusterId);
-  const { search, setSearch, showInternal, setShowInternal } = useTopicListFilters();
+  const [search, setSearch] = useViewState("topics.search", "");
+  const [showInternal, setShowInternal] = useViewState("topics.showInternal", false);
 
   const visible = useMemo(
     () =>
@@ -48,7 +49,7 @@ export function TopicsPage() {
   );
   const openTopic = (topic: string) => navigate({ page: "topic", topic });
 
-  const sorter = useSort(visible, COLUMNS);
+  const sorter = useSort("topics", visible, COLUMNS);
   const pager = usePagination(sorter.rows, `${search}|${showInternal}|${sorter.key}`);
   const resize = useColumnResize("topics", 6);
   const rowProps = useRowNavigation(pager.items.length);
