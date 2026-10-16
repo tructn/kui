@@ -16,6 +16,10 @@ export interface ClusterConfig {
   saslPassword: string | null;
   /** Extra librdkafka properties. */
   properties: Record<string, string>;
+  /** Confluent-compatible Schema Registry; needed to decode Avro and registry-framed Protobuf. */
+  schemaRegistryUrl: string | null;
+  schemaRegistryUsername: string | null;
+  schemaRegistryPassword: string | null;
 }
 
 export function emptyCluster(): ClusterConfig {
@@ -28,5 +32,8 @@ export function emptyCluster(): ClusterConfig {
     saslUsername: null,
     saslPassword: null,
     properties: {},
+    schemaRegistryUrl: null,
+    schemaRegistryUsername: null,
+    schemaRegistryPassword: null,
   };
 }

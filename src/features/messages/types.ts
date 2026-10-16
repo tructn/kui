@@ -36,10 +36,21 @@ export interface TailRequest {
   partition: number | null;
 }
 
+/** What a payload's bytes were recognised as. */
+export type PayloadFormat = "json" | "xml" | "text" | "avro" | "protobuf" | "jsonSchema" | "msgpack" | "binary";
+
 export interface Payload {
+  /** The bytes as they are: text for printable UTF-8, otherwise space-separated hex. */
   text: string;
   encoding: "utf8" | "hex";
   size: number;
+  format: PayloadFormat;
+  /** Compact JSON for formats that aren't readable as they are (Avro, Protobuf, MessagePack, ...). */
+  decoded: string | null;
+  /** Schema Registry id, when the bytes carry the registry's header. */
+  schemaId: number | null;
+  /** Why the bytes couldn't be decoded, or a caveat about how they were. */
+  note: string | null;
 }
 
 export interface MessageHeader {
@@ -62,6 +73,25 @@ export interface ProduceRequest {
   key: string | null;
   value: string | null;
   headers: { key: string; value: string }[];
+  /** Encode `value` (JSON) with a registered schema; null sends it as text. */
+  valueSchema: ValueSchema | null;
+}
+
+export interface ValueSchema {
+  /** The subject's latest version is used. */
+  subject: string;
+  /** Protobuf only: a message's full name; null means the first in the file. */
+  message: string | null;
+}
+
+/** A subject's latest registered schema. */
+export interface SubjectSchema {
+  id: number | null;
+  version: number | null;
+  schemaType: "AVRO" | "PROTOBUF" | "JSON";
+  schema: string;
+  /** Protobuf message names to choose from; empty for other types. */
+  messages: string[];
 }
 
 export interface Delivered {

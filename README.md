@@ -38,8 +38,11 @@ and new messages stream in as they arrive.
   <img src="docs/messages.png" alt="Messages of a topic, with partition, offset, timestamp, key and value" width="900" />
 </p>
 
-Open any message to see its value as pretty-printed JSON, plus its key and headers. Then **copy or duplicate**
-it to another topic, byte for byte, headers included.
+Open any message to see its value, key and headers. KUI detects the format and shows it readably: JSON and
+XML pretty-printed, plain text, MessagePack, and **Avro, Protobuf and JSON Schema** through a Confluent-compatible
+Schema Registry (add its URL to the cluster). Protobuf without a registry is shown field by field. When producing,
+write a value as JSON and pick a subject: KUI encodes it as Avro, Protobuf or JSON Schema with the subject's latest
+version. Then **copy or duplicate** a message to another topic, byte for byte, headers included.
 
 <p align="center">
   <img src="docs/message-value.png" alt="A message opened in a side panel with formatted JSON" width="900" />

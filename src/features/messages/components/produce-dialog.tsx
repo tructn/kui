@@ -17,11 +17,21 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { prettyJson } from "@/lib/format";
 import { parseKeyValueLines } from "@/lib/key-value";
 
-import { useProduceMessage } from "../queries";
+import { useProduceMessage, useSubjectSchema, useSubjects } from "../queries";
+import type { SubjectSchema } from "../types";
 
 const AUTO_PARTITION = "auto";
+
+type ValueFormat = "text" | "schema";
+
+const SCHEMA_TYPE_LABELS: Record<SubjectSchema["schemaType"], string> = {
+  AVRO: "Avro",
+  PROTOBUF: "Protobuf",
+  JSON: "JSON Schema",
+};
 
 interface ProduceDialogProps {
   clusterId: string;
@@ -35,7 +45,18 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
   const [headers, setHeaders] = useState("");
+  const [format, setFormat] = useState<ValueFormat>("text");
+  const [pickedSubject, setSubject] = useState<string | null>(null);
+  const [pickedMessage, setMessage] = useState<string | null>(null);
   const produce = useProduceMessage(clusterId);
+
+  const usesSchema = format === "schema";
+  const subjects = useSubjects(clusterId, open && usesSchema);
+  // Registry serializers name a topic's value subject `<topic>-value`, so start there.
+  const subject = pickedSubject ?? subjects.data?.find((s) => s === `${topic}-value`) ?? null;
+  const schema = useSubjectSchema(clusterId, usesSchema ? subject : null);
+  const messages = schema.data?.messages ?? [];
+  const message = pickedMessage != null && messages.includes(pickedMessage) ? pickedMessage : (messages[0] ?? null);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -46,6 +67,7 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
         key: key || null,
         value,
         headers: parseKeyValueLines(headers).map(([k, v]) => ({ key: k, value: v })),
+        valueSchema: usesSchema && subject ? { subject, message } : null,
       },
       {
         onSuccess: (d) => {
@@ -92,6 +114,67 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
                 <Input id="produce-key" className="font-mono" value={key} onChange={(e) => setKey(e.target.value)} />
               </Field>
             </div>
+            <div className="grid grid-cols-[1fr_2fr] gap-4">
+              <Field>
+                <FieldLabel>Value format</FieldLabel>
+                <Select value={format} onValueChange={(v) => setFormat(v as ValueFormat)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="schema">Schema Registry</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {usesSchema && (
+                <Field>
+                  <FieldLabel>Subject</FieldLabel>
+                  <Select value={subject ?? ""} onValueChange={setSubject} disabled={!subjects.data}>
+                    <SelectTrigger className="w-full font-mono">
+                      <SelectValue placeholder={subjects.isPending ? "Loading…" : "Choose a subject"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.data?.map((s) => (
+                        <SelectItem key={s} value={s} className="font-mono">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+            </div>
+            {usesSchema && subjects.error && <FieldError>{subjects.error.message}</FieldError>}
+            {usesSchema && schema.error && <FieldError>{schema.error.message}</FieldError>}
+            {usesSchema && messages.length > 1 && (
+              <Field>
+                <FieldLabel>Message type</FieldLabel>
+                <Select value={message ?? ""} onValueChange={setMessage}>
+                  <SelectTrigger className="w-full font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {messages.map((m) => (
+                      <SelectItem key={m} value={m} className="font-mono">
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            {usesSchema && schema.data && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">
+                  {SCHEMA_TYPE_LABELS[schema.data.schemaType]} schema · version {schema.data.version} · id{" "}
+                  {schema.data.id}
+                </summary>
+                <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-muted p-3 font-mono whitespace-pre-wrap">
+                  {schema.data.schemaType === "PROTOBUF" ? schema.data.schema : prettyJson(schema.data.schema)}
+                </pre>
+              </details>
+            )}
             <Field>
               <FieldLabel htmlFor="produce-value">Value</FieldLabel>
               <Textarea
@@ -101,6 +184,11 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
               />
+              {usesSchema && (
+                <FieldDescription>
+                  JSON matching the schema; it's encoded with the subject's latest version.
+                </FieldDescription>
+              )}
             </Field>
             <Field>
               <FieldLabel htmlFor="produce-headers">Headers</FieldLabel>
@@ -116,7 +204,7 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
             {produce.error && <FieldError>{produce.error.message}</FieldError>}
           </FieldGroup>
           <DialogFooter>
-            <Button type="submit" disabled={produce.isPending}>
+            <Button type="submit" disabled={produce.isPending || (usesSchema && !schema.data)}>
               {produce.isPending ? <Spinner /> : <SendIcon />} Send
             </Button>
           </DialogFooter>

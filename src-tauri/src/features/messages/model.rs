@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::kafka::schema_registry::SchemaType;
+
 /// Where to start reading from.
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -54,10 +56,35 @@ pub struct TailRequest {
 #[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Payload {
+    /// The bytes as they are: text for printable UTF-8, otherwise space-separated hex.
     pub text: String,
-    /// `utf8` when the bytes were valid UTF-8, otherwise `hex`.
+    /// `utf8` or `hex`, saying which of the two `text` is.
     pub encoding: &'static str,
     pub size: usize,
+    /// What the bytes were recognised as.
+    pub format: Format,
+    /// Compact JSON for formats that aren't readable as they are (Avro,
+    /// Protobuf, MessagePack, registry-framed JSON).
+    pub decoded: Option<String>,
+    /// Schema Registry id, when the bytes start with the registry's header.
+    pub schema_id: Option<u32>,
+    /// Why the bytes couldn't be decoded, or a caveat about how they were.
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Format {
+    Json,
+    Xml,
+    Text,
+    Avro,
+    Protobuf,
+    /// JSON written with a Schema Registry JSON Schema.
+    JsonSchema,
+    Msgpack,
+    /// Not recognised; only the raw bytes are shown.
+    Binary,
 }
 
 #[derive(Serialize)]
@@ -89,6 +116,32 @@ pub struct ProduceRequest {
     pub value: Option<String>,
     #[serde(default)]
     pub headers: Vec<ProduceHeader>,
+    /// Encode `value` (JSON) with a registered schema instead of sending it as text.
+    #[serde(default)]
+    pub value_schema: Option<ValueSchema>,
+}
+
+/// Which registered schema to encode a produced value with.
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ValueSchema {
+    /// The subject's latest version is used, e.g. `orders-value`.
+    pub subject: String,
+    /// Protobuf only: the message's full name; `None` means the first in the file.
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
+/// A subject's latest schema, for writing a message that fits it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubjectSchema {
+    pub id: Option<u32>,
+    pub version: Option<i32>,
+    pub schema_type: SchemaType,
+    pub schema: String,
+    /// Protobuf message names to choose from; empty for Avro and JSON Schema.
+    pub messages: Vec<String>,
 }
 
 #[derive(Deserialize)]

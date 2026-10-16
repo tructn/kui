@@ -10,7 +10,7 @@ bun run kafka:up      # optional: Kafka on localhost:9092 with demo data
 bun run tauri dev     # first build compiles librdkafka; takes a few minutes
 ```
 
-Then add a cluster with bootstrap `localhost:9092`.
+Then add a cluster with bootstrap `localhost:9092`. For Avro/Protobuf messages, set its Schema Registry URL to `http://localhost:8081`.
 
 ### Tests
 

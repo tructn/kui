@@ -1,7 +1,9 @@
 use tauri::State;
 use tauri::ipc::Channel;
 
-use super::model::{BrowsePage, BrowseRequest, CopyRequest, Delivered, Message, ProduceRequest, TailRequest};
+use super::model::{
+    BrowsePage, BrowseRequest, CopyRequest, Delivered, Message, ProduceRequest, SubjectSchema, TailRequest,
+};
 use super::service;
 use crate::blocking::run_blocking;
 use crate::error::Result;
@@ -24,7 +26,21 @@ pub async fn produce_message(
     request: ProduceRequest,
 ) -> Result<Delivered> {
     let clients = state.clients(&cluster_id)?;
-    service::produce(&clients, &request).await
+    service::produce(clients, &request).await
+}
+
+/// Schema Registry subjects, for producing with a schema.
+#[tauri::command]
+pub async fn list_subjects(state: State<'_, AppState>, cluster_id: String) -> Result<Vec<String>> {
+    let clients = state.clients(&cluster_id)?;
+    run_blocking(move || service::subjects(&clients)).await
+}
+
+/// The latest schema registered under `subject`.
+#[tauri::command]
+pub async fn subject_schema(state: State<'_, AppState>, cluster_id: String, subject: String) -> Result<SubjectSchema> {
+    let clients = state.clients(&cluster_id)?;
+    run_blocking(move || service::subject_schema(&clients, &subject)).await
 }
 
 /// Copies one message to another topic, or duplicates it in the same one.

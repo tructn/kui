@@ -8,15 +8,17 @@ use rdkafka::message::{BorrowedMessage, Header, Headers, OwnedHeaders, OwnedMess
 use rdkafka::producer::FutureRecord;
 use rdkafka::{Message as _, Offset, TopicPartitionList};
 
-use super::codec::decode;
+use super::codec::{self, Decoder};
 use super::model::{
-    BrowsePage, BrowseRequest, CopyRequest, Delivered, Message, MessageHeader, ProduceRequest, StartFrom, TailRequest,
+    BrowsePage, BrowseRequest, CopyRequest, Delivered, Message, MessageHeader, ProduceRequest, StartFrom,
+    SubjectSchema, TailRequest, ValueSchema,
 };
 use super::window::{PartitionRead, ReadWindow, merge_page, page_window, remaining, start_position};
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
 use crate::kafka::metadata::{ensure_writable, partition_ids};
 use crate::kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
+use crate::kafka::schema_registry::SchemaRegistry;
 use crate::kafka::{KafkaClients, TIMEOUT, client_config};
 use crate::tasks::CancelToken;
 
@@ -47,7 +49,8 @@ pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowseP
             assignment.add_partition_offset(&request.topic, *partition, Offset::Offset(window.start))?;
         }
         consumer.assign(&assignment)?;
-        for message in read_until_done(&consumer, windows.clone())? {
+        let mut decoder = decoder(clients);
+        for message in read_until_done(&consumer, windows.clone(), &mut decoder)? {
             by_partition.entry(message.partition).or_default().push(message);
         }
     }
@@ -73,6 +76,7 @@ pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowseP
 /// How often a live tail hands new messages to the UI, and the most it sends at once.
 const TAIL_FLUSH_EVERY: Duration = Duration::from_millis(250);
 const TAIL_MAX_BATCH: usize = 500;
+const TAIL_SCHEMA_RETRY: Duration = Duration::from_secs(30);
 
 /// Streams messages as they arrive, starting from the end of each partition.
 ///
@@ -97,12 +101,14 @@ pub fn tail(
     consumer.assign(&assignment)?;
 
     let mut batch = Vec::new();
+    let mut decoder = decoder(clients);
+    let mut decoder_since = Instant::now();
     let mut last_flush = Instant::now();
     while !cancel.is_cancelled() {
         match consumer.poll(Duration::from_millis(100)) {
             None | Some(Err(KafkaError::PartitionEOF(_))) => {}
             Some(Err(e)) => return Err(e.into()),
-            Some(Ok(m)) => batch.push(to_message(&m)),
+            Some(Ok(m)) => batch.push(to_message(&m, &mut decoder)),
         }
         let due = last_flush.elapsed() >= TAIL_FLUSH_EVERY || batch.len() >= TAIL_MAX_BATCH;
         if due && !batch.is_empty() {
@@ -111,8 +117,17 @@ pub fn tail(
             }
             last_flush = Instant::now();
         }
+        // Start over now and then so a schema that failed to load is retried.
+        if decoder_since.elapsed() >= TAIL_SCHEMA_RETRY {
+            decoder = self::decoder(clients);
+            decoder_since = Instant::now();
+        }
     }
     Ok(())
+}
+
+fn decoder(clients: &KafkaClients) -> Decoder<'_> {
+    Decoder::new(clients.schemas.as_ref().map(|r| r as _))
 }
 
 fn browsing_consumer(clients: &KafkaClients) -> Result<BaseConsumer> {
@@ -163,7 +178,11 @@ fn plan_partitions(consumer: &BaseConsumer, request: &BrowseRequest) -> Result<V
 }
 
 /// Polls until every partition has reached the end of its window, or we time out.
-fn read_until_done(consumer: &BaseConsumer, mut pending: HashMap<i32, ReadWindow>) -> Result<Vec<Message>> {
+fn read_until_done(
+    consumer: &BaseConsumer,
+    mut pending: HashMap<i32, ReadWindow>,
+    decoder: &mut Decoder<'_>,
+) -> Result<Vec<Message>> {
     let mut messages = Vec::new();
     let deadline = Instant::now() + TIMEOUT;
 
@@ -179,7 +198,7 @@ fn read_until_done(consumer: &BaseConsumer, mut pending: HashMap<i32, ReadWindow
                     continue;
                 };
                 if m.offset() < window.end {
-                    messages.push(to_message(&m));
+                    messages.push(to_message(&m, decoder));
                 }
                 // Compacted/transactional topics can skip offsets, so compare with `>=`.
                 if m.offset() + 1 >= window.end {
@@ -191,13 +210,11 @@ fn read_until_done(consumer: &BaseConsumer, mut pending: HashMap<i32, ReadWindow
     Ok(messages)
 }
 
-fn to_message(m: &BorrowedMessage<'_>) -> Message {
+fn to_message(m: &BorrowedMessage<'_>, decoder: &mut Decoder<'_>) -> Message {
     let headers = m
         .headers()
         .map(|hs| {
-            hs.iter()
-                .map(|h| MessageHeader { key: h.key.to_string(), value: h.value.map(|v| decode(v).text) })
-                .collect()
+            hs.iter().map(|h| MessageHeader { key: h.key.to_string(), value: h.value.map(codec::display) }).collect()
         })
         .unwrap_or_default();
 
@@ -205,24 +222,32 @@ fn to_message(m: &BorrowedMessage<'_>) -> Message {
         partition: m.partition(),
         offset: m.offset(),
         timestamp: m.timestamp().to_millis(),
-        key: m.key().map(decode),
-        value: m.payload().map(decode),
+        key: m.key().map(|k| decoder.decode(k)),
+        value: m.payload().map(|v| decoder.decode(v)),
         headers,
     }
 }
 
-pub async fn produce(clients: &KafkaClients, request: &ProduceRequest) -> Result<Delivered> {
+pub async fn produce(clients: Arc<KafkaClients>, request: &ProduceRequest) -> Result<Delivered> {
     ensure_writable(&request.topic)?;
     let headers = request
         .headers
         .iter()
         .fold(OwnedHeaders::new(), |hs, h| hs.insert(Header { key: &h.key, value: Some(h.value.as_bytes()) }));
 
-    let mut record: FutureRecord<'_, str, str> = FutureRecord::to(&request.topic).headers(headers);
+    let value = match (&request.value, &request.value_schema) {
+        (Some(json), Some(schema)) => {
+            let (encoder, json, schema) = (clients.clone(), json.clone(), schema.clone());
+            Some(run_blocking(move || encode_value(&encoder, &schema, &json)).await?)
+        }
+        (value, _) => value.as_ref().map(|v| v.as_bytes().to_vec()),
+    };
+
+    let mut record: FutureRecord<'_, str, [u8]> = FutureRecord::to(&request.topic).headers(headers);
     if let Some(key) = request.key.as_deref().filter(|k| !k.is_empty()) {
         record = record.key(key);
     }
-    if let Some(value) = request.value.as_deref() {
+    if let Some(value) = value.as_deref() {
         record = record.payload(value);
     }
     if let Some(partition) = request.partition {
@@ -231,6 +256,39 @@ pub async fn produce(clients: &KafkaClients, request: &ProduceRequest) -> Result
 
     let delivery = clients.producer.send(record, TIMEOUT).await.map_err(|(e, _)| Error::from(e))?;
     Ok(Delivered { partition: delivery.partition, offset: delivery.offset })
+}
+
+fn registry(clients: &KafkaClients) -> Result<&SchemaRegistry> {
+    clients
+        .schemas
+        .as_ref()
+        .ok_or_else(|| Error::msg("This cluster has no Schema Registry. Add its URL in the cluster settings."))
+}
+
+/// Encodes a JSON value with the latest schema of a subject. Blocks on the registry.
+fn encode_value(clients: &KafkaClients, schema: &ValueSchema, json: &str) -> Result<Vec<u8>> {
+    let registry = registry(clients)?;
+    let latest = registry.latest(&schema.subject)?;
+    codec::encode(registry, &latest, schema.message.as_deref(), json).map_err(Error::msg)
+}
+
+/// Registered subjects, for choosing a schema to produce with. Blocks on the registry.
+pub fn subjects(clients: &KafkaClients) -> Result<Vec<String>> {
+    registry(clients)?.subjects()
+}
+
+/// A subject's latest schema. Blocks on the registry.
+pub fn subject_schema(clients: &KafkaClients, subject: &str) -> Result<SubjectSchema> {
+    let registry = registry(clients)?;
+    let latest = registry.latest(subject)?;
+    let messages = codec::message_names(registry, &latest).map_err(Error::msg)?;
+    Ok(SubjectSchema {
+        id: latest.id,
+        version: latest.version,
+        schema_type: latest.schema_type,
+        schema: latest.schema,
+        messages,
+    })
 }
 
 /// Copies one message to `target_topic`, keeping its key, value and headers as raw bytes.

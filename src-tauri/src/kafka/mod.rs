@@ -7,6 +7,7 @@ mod cluster;
 mod group_offsets;
 pub mod metadata;
 pub mod offsets;
+pub mod schema_registry;
 
 pub use client::{KafkaClients, client_config, new_consumer};
 pub use cluster::ClusterConfig;

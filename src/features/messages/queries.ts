@@ -32,6 +32,27 @@ export function useProduceMessage(clusterId: string) {
   });
 }
 
+/** Schema Registry subjects; only fetched while `enabled`. */
+export function useSubjects(clusterId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...clusterKeys.scope(clusterId), "subjects"],
+    queryFn: () => messagesApi.listSubjects(clusterId),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useSubjectSchema(clusterId: string, subject: string | null) {
+  return useQuery({
+    queryKey: [...clusterKeys.scope(clusterId), "subjects", subject],
+    queryFn: () => messagesApi.subjectSchema(clusterId, subject!),
+    enabled: subject != null,
+    retry: false,
+    // A subject can gain versions; re-check each time it's picked.
+    staleTime: 0,
+  });
+}
+
 export function useCopyMessage(clusterId: string) {
   const queryClient = useQueryClient();
   return useMutation({

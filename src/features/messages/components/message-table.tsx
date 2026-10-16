@@ -8,6 +8,7 @@ import { useSort, type SortColumns } from "@/hooks/use-sort";
 import { formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { payloadPreview } from "../payload-view";
 import type { KafkaMessage } from "../types";
 
 interface MessageTableProps {
@@ -26,8 +27,8 @@ const COLUMNS: SortColumns<KafkaMessage, Column> = {
   partition: (m) => m.partition,
   offset: (m) => m.offset,
   timestamp: (m) => m.timestamp,
-  key: (m) => m.key?.text,
-  value: (m) => m.value?.text,
+  key: (m) => (m.key ? payloadPreview(m.key) : undefined),
+  value: (m) => (m.value ? payloadPreview(m.value) : undefined),
 };
 
 export function MessageTable({ messages, onSelect, emptyText, animate, pager: serverPager }: MessageTableProps) {
@@ -75,8 +76,8 @@ export function MessageTable({ messages, onSelect, emptyText, animate, pager: se
               <TableCell className="text-right tabular-nums">{m.partition}</TableCell>
               <TableCell className="text-right tabular-nums">{m.offset}</TableCell>
               <TableCell className="text-muted-foreground tabular-nums">{formatTimestamp(m.timestamp)}</TableCell>
-              <TableCell className="truncate">{m.key?.text ?? <Null />}</TableCell>
-              <TableCell className="truncate">{m.value?.text ?? <Null />}</TableCell>
+              <TableCell className="truncate">{m.key ? payloadPreview(m.key) : <Null />}</TableCell>
+              <TableCell className="truncate">{m.value ? payloadPreview(m.value) : <Null />}</TableCell>
             </TableRow>
             );
           })}

@@ -1,4 +1,4 @@
-import { CopyIcon } from "lucide-react";
+import { CopyIcon, InfoIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,7 +9,13 @@ import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBytes, formatTimestamp } from "@/lib/format";
 
-import { type PayloadView as View, payloadViews, renderPayload } from "../payload-view";
+import {
+  FORMAT_LABELS,
+  type PayloadView as View,
+  payloadViews,
+  renderPayload,
+  textViewLabel,
+} from "../payload-view";
 import type { CopyTarget, KafkaMessage, Payload } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
 
@@ -78,7 +84,7 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
   );
 }
 
-const VIEW_LABELS: Record<View, string> = { text: "Text", hex: "Hex", base64: "Base64" };
+const VIEW_LABELS: Record<Exclude<View, "text">, string> = { hex: "Hex", base64: "Base64" };
 
 function PayloadView({ payload }: { payload: Payload | null }) {
   // Kept while moving between messages; "text" on a binary payload shows hex.
@@ -95,12 +101,13 @@ function PayloadView({ payload }: { payload: Payload | null }) {
           <TabsList aria-label="Show as">
             {views.map((v) => (
               <TabsTrigger key={v} value={v}>
-                {VIEW_LABELS[v]}
+                {v === "text" ? textViewLabel(payload) : VIEW_LABELS[v]}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
-        <Badge variant="outline">{payload.encoding === "utf8" ? "UTF-8" : "Binary"}</Badge>
+        <Badge variant="outline">{FORMAT_LABELS[payload.format]}</Badge>
+        {payload.schemaId != null && <Badge variant="outline">Schema {payload.schemaId}</Badge>}
         <Badge variant="outline">{formatBytes(payload.size)}</Badge>
         <div className="flex-1" />
         <Button
@@ -111,6 +118,12 @@ function PayloadView({ payload }: { payload: Payload | null }) {
           <CopyIcon /> Copy
         </Button>
       </div>
+      {payload.note && (
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+          <InfoIcon className="mt-px size-3.5 shrink-0" />
+          {payload.note}
+        </p>
+      )}
       <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
         {text}
       </pre>

@@ -172,6 +172,43 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
         )}
 
         <Field>
+          <FieldLabel htmlFor="cluster-registry">Schema Registry URL</FieldLabel>
+          <Input
+            id="cluster-registry"
+            className="font-mono"
+            placeholder="http://localhost:8081"
+            value={form.schemaRegistryUrl ?? ""}
+            onChange={(e) => update({ schemaRegistryUrl: e.target.value || null })}
+          />
+          <FieldDescription>Optional. Needed to decode Avro and Protobuf messages.</FieldDescription>
+        </Field>
+
+        {form.schemaRegistryUrl && (
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="cluster-registry-username">Registry username</FieldLabel>
+              <Input
+                id="cluster-registry-username"
+                autoComplete="off"
+                placeholder="Optional"
+                value={form.schemaRegistryUsername ?? ""}
+                onChange={(e) => update({ schemaRegistryUsername: e.target.value || null })}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="cluster-registry-password">Registry password</FieldLabel>
+              <Input
+                id="cluster-registry-password"
+                type="password"
+                autoComplete="off"
+                value={form.schemaRegistryPassword ?? ""}
+                onChange={(e) => update({ schemaRegistryPassword: e.target.value || null })}
+              />
+            </Field>
+          </div>
+        )}
+
+        <Field>
           <FieldLabel htmlFor="cluster-properties">Advanced properties</FieldLabel>
           <Textarea
             id="cluster-properties"

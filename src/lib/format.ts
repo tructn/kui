@@ -35,3 +35,41 @@ export function prettyJson(text: string): string {
     return text;
   }
 }
+
+/**
+ * Indents XML one element per line, keeping short text inline (`<a>text</a>`).
+ * A display aid, not a parser: input that isn't well-formed is indented as best it can be.
+ */
+export function prettyXml(xml: string): string {
+  const tokens = xml.trim().match(/<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<[^>]+>|[^<]+/g);
+  if (!tokens) return xml;
+  const isClose = (t: string | undefined) => t?.startsWith("</") ?? false;
+  const isOpen = (t: string) => /^<[^!?/]/.test(t) && !t.endsWith("/>");
+  const lines: string[] = [];
+  let depth = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const indent = "  ".repeat(depth);
+    if (isClose(token)) {
+      depth = Math.max(0, depth - 1);
+      lines.push("  ".repeat(depth) + token);
+    } else if (isOpen(token)) {
+      const [next, after] = [tokens[i + 1], tokens[i + 2]];
+      if (isClose(next)) {
+        lines.push(indent + token + next);
+        i += 1;
+      } else if (next && !next.startsWith("<") && isClose(after)) {
+        lines.push(indent + token + next.trim() + after);
+        i += 2;
+      } else {
+        lines.push(indent + token);
+        depth++;
+      }
+    } else if (token.startsWith("<")) {
+      lines.push(indent + token); // self-closing, comment, CDATA, declaration
+    } else if (token.trim()) {
+      lines.push(indent + token.trim());
+    }
+  }
+  return lines.join("\n");
+}

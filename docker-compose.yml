@@ -34,6 +34,28 @@ services:
       timeout: 10s
       retries: 20
 
+  # Schema Registry for decoding Avro/Protobuf/JSON Schema messages: in KUI,
+  # set the cluster's Schema Registry URL to http://localhost:8081.
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.9.0
+    container_name: kui-schema-registry
+    # Its first start can lose a race creating the _schemas topic; a restart fixes it.
+    restart: on-failure
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+    healthcheck:
+      test: curl -sf http://localhost:8081/subjects > /dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
   # One-shot: creates demo topics, messages and a consumer group with lag. Safe to re-run.
   kafka-seed:
     image: apache/kafka:latest

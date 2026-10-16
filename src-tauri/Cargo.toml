@@ -34,6 +34,10 @@ tauri-plugin-updater = "2.13.3"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 semver = "1"
+apache-avro = "0.22.0"
+rmpv = "1.3.1"
+protox = "0.10.0"
+prost-reflect = { version = "0.16.5", features = ["serde"] }
 
 # librdkafka and OpenSSL are linked statically, so the app has no runtime
 # dependency on system Kafka/SSL libraries. OpenSSL is compiled from source

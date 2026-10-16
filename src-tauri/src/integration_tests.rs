@@ -34,7 +34,7 @@ fn local_cluster() -> ClusterConfig {
 async fn full_round_trip() {
     let cluster = local_cluster();
     assert!(clusters::service::test_connection(&cluster).unwrap() >= 1);
-    let clients = KafkaClients::connect(cluster.clone()).unwrap();
+    let clients = std::sync::Arc::new(KafkaClients::connect(cluster.clone()).unwrap());
     let topic = format!("kui-it-{}", uuid::Uuid::new_v4());
 
     // Create
@@ -50,13 +50,14 @@ async fn full_round_trip() {
     // Produce 10 messages to partition 0
     for i in 0..10 {
         let delivered = messages::service::produce(
-            &clients,
+            clients.clone(),
             &ProduceRequest {
                 topic: topic.clone(),
                 partition: Some(0),
                 key: Some(format!("k{i}")),
                 value: Some(format!("{{\"n\":{i}}}")),
                 headers: vec![ProduceHeader { key: "source".into(), value: "kui".into() }],
+                value_schema: None,
             },
         )
         .await
