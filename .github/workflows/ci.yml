@@ -1,0 +1,82 @@
+# Pull request checks that complement security.yml (which lints and tests on
+# Linux):
+# - the PR title must be a Conventional Commit, because squash-merging makes it
+#   the commit on main that the release notes are built from;
+# - the app must compile on macOS and Windows, the platforms we ship, so that
+#   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
+#   release rather than during one.
+#
+# Merges to main don't rebuild here: the code was built on its PR, and the
+# installers are only built when a release PR is merged (release.yml).
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+# Edits to the PR title or description (by people or bots) get their own
+# group, so they only re-check the title and never cancel a running build.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    name: Conventional PR title
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Default Conventional Commit types; the same rules as
+          # scripts/git-hooks/commit-msg.sh: lowercase start
+          # (acronyms like "API" are fine) and no trailing period.
+          subjectPattern: ^(?![A-Z][a-z]).+[^.]$
+          subjectPatternError: |
+            The summary "{subject}" in "{title}" should start in lowercase and
+            not end with a period, e.g. "feat(messages): add live mode filter".
+
+  build:
+    name: Build (${{ matrix.os }})
+    # Title edits don't change code; skip the slow builds for them.
+    if: github.event.action != 'edited'
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS runners bill 10x on private repos; while KUI is private, macOS
+        # is covered by the local pre-push hook (developers work on Macs).
+        os: ${{ github.event.repository.private && fromJSON('["windows-latest"]') || fromJSON('["macos-latest", "windows-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Bump prefix-key when a C dependency changes where it comes from (e.g.
+      # OpenSSL vcpkg -> preinstalled): the cache keeps librdkafka's CMake
+      # cache, which remembers absolute library paths from the old source.
+      # The cache is saved per PR, so later pushes to the same PR build warm.
+      - uses: swatinem/rust-cache@v2
+        with:
+          prefix-key: v1-rust
+          workspaces: src-tauri
+
+      - uses: ./.github/actions/windows-openssl
+        if: runner.os == 'Windows'
+
+      - run: bun install --frozen-lockfile
+
+      # `generate_context!` embeds dist/, so the UI must be built first.
+      - run: bun run build
+
+      - name: Compile and test
+        working-directory: src-tauri
+        run: cargo test --locked --lib

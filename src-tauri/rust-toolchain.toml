@@ -1,0 +1,4 @@
+# Latest stable, with the components the commit hooks and CI use.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
