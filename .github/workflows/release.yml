@@ -44,7 +44,7 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -114,7 +114,7 @@ jobs:
     env:
       BUNDLE: src-tauri/target/${{ matrix.target }}/release/bundle
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -204,7 +204,7 @@ jobs:
             --config "{\"bundle\":{\"createUpdaterArtifacts\":$updater}}" $TAURI_SIGNING_ARGS
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kui-${{ matrix.target }}
           path: |
@@ -217,7 +217,7 @@ jobs:
       # Private repos only get attestations on GitHub Enterprise Cloud.
       - name: Attest build provenance
         if: needs.verify.outputs.tag != '' && !github.event.repository.private
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             ${{ env.BUNDLE }}/dmg/*.dmg
@@ -235,7 +235,7 @@ jobs:
       TAG: ${{ needs.verify.outputs.tag }}
     steps:
       # Full history and tags, for git-cliff to find the previous release.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -253,7 +253,7 @@ jobs:
           bunx git-cliff --current --strip all | sed -e '1{/^## /d;}' -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: installers
           merge-multiple: true

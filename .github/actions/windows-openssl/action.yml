@@ -37,7 +37,7 @@ runs:
     - name: Restore vcpkg OpenSSL
       id: cache
       if: steps.preinstalled.outputs.found != 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: C:\vcpkg\installed
         key: ${{ steps.key.outputs.key }}
@@ -56,7 +56,7 @@ runs:
     # failure doesn't throw the OpenSSL build away.
     - name: Save vcpkg OpenSSL
       if: steps.preinstalled.outputs.found != 'true' && steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: C:\vcpkg\installed
         key: ${{ steps.key.outputs.key }}
