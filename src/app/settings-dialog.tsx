@@ -123,7 +123,7 @@ function GeneralSettings() {
     <SettingsGroup>
       <SettingRow
         label="Remember sorting and filters"
-        description="Each table keeps its sort order, and lists keep their search and filters, when you switch pages or restart KUI. Off, every page opens fresh and nothing is saved."
+        description="Keep sorting, search, and filters when you switch pages or restart KUI."
         htmlFor="remember-view-state"
       >
         <Switch id="remember-view-state" checked={remember} onCheckedChange={setRemember} />
