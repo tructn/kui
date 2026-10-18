@@ -34,7 +34,6 @@
         "@types/react": "^19.1.8",
         "@types/react-dom": "^19.1.6",
         "@vitejs/plugin-react": "^6.0.2",
-        "git-cliff": "^2.14.2",
         "lefthook": "^2.2.1",
         "shadcn": "^4.21.4",
         "typescript": "~6.0.3",
@@ -560,20 +559,6 @@
     "get-proto": ["get-proto@1.0.1", "", { "dependencies": { "dunder-proto": "^1.0.1", "es-object-atoms": "^1.0.0" } }, "sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g=="],
 
     "get-stream": ["get-stream@9.0.1", "", { "dependencies": { "@sec-ant/readable-stream": "^0.4.1", "is-stream": "^4.0.1" } }, "sha512-kVCxPF3vQM/N0B1PmoqVUqgHP+EeVjmZSQn+1oCRPxd2P21P2F19lIgbR3HBosbB1PUhOAoctJnfEn2GbN2eZA=="],
-
-    "git-cliff": ["git-cliff@2.14.2", "", { "dependencies": { "execa": "^9.6.0" }, "optionalDependencies": { "git-cliff-darwin-arm64": "2.14.2", "git-cliff-darwin-x64": "2.14.2", "git-cliff-linux-arm64": "2.14.2", "git-cliff-linux-x64": "2.14.2", "git-cliff-windows-arm64": "2.14.2", "git-cliff-windows-x64": "2.14.2" }, "bin": "lib/cli/cli.js" }, "sha512-hlXIq4k2Tdj9C59WsD7FsLE0xRGFDozTUuoeqg9toMyVohaVxXiSiLnhM/IQyCmhOh5M4zuNckr2o8qMeuffbg=="],
-
-    "git-cliff-darwin-arm64": ["git-cliff-darwin-arm64@2.14.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-Ylk39hv5flEUrXeoGvH6M3WjHBNERFH7a9DVEcGU2a8Q7a7fPtVasNk1fMuJ7CVbZCRIzUNyQV0ejRpxBdFnag=="],
-
-    "git-cliff-darwin-x64": ["git-cliff-darwin-x64@2.14.2", "", { "os": "darwin", "cpu": "x64" }, "sha512-3FZNm0BGCIim/3G6uHSWAakrCaGmC47lcI+Cob9CZPMBYHKrenYk0i6B8MlObSXr2Lr7Ve1BpGbd/foQg4NOiA=="],
-
-    "git-cliff-linux-arm64": ["git-cliff-linux-arm64@2.14.2", "", { "os": "linux", "cpu": "arm64" }, "sha512-3oMDpoyfsy2angD9ulcCBtyWCkzZqN3spmmtb0jic8OKAu1p+CALS8oep7J8AdgkDojuLo6bdHiSZIM9PeTxmQ=="],
-
-    "git-cliff-linux-x64": ["git-cliff-linux-x64@2.14.2", "", { "os": "linux", "cpu": "x64" }, "sha512-4EaBYwBiCupECZ2rzC6CelNSGYvkvtJeja4wXLDGtfKnRhCN/WNoqbM+hvrtm32uf5qovfoNoDA906F8itw+oQ=="],
-
-    "git-cliff-windows-arm64": ["git-cliff-windows-arm64@2.14.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-0oc0xD/6A+BvInz8imBJulXVOlR9M0nL+d3ibL0lwJvxUVTMQzvoCnsn9OxpsdzXrEisnTvaf+GExoKVJkUcDw=="],
-
-    "git-cliff-windows-x64": ["git-cliff-windows-x64@2.14.2", "", { "os": "win32", "cpu": "x64" }, "sha512-RFmCMiwGMU8O+rF//wxT7L10ssoDtzI+QFxlbjpA8E1BAEafkmLTQkKalT88ipEweD46P+Sfc20v8RXuE7V/UA=="],
 
     "glob-parent": ["glob-parent@5.1.2", "", { "dependencies": { "is-glob": "^4.0.1" } }, "sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow=="],
 

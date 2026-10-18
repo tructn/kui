@@ -7,7 +7,7 @@
 #   release rather than during one.
 #
 # Merges to main don't rebuild here: the code was built on its PR, and the
-# installers are only built when a release PR is merged (release.yml).
+# installers are only built when the release-please PR is merged (release.yml).
 name: CI
 
 on:
