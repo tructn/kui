@@ -40,12 +40,13 @@ pub fn is_broker_internal(topic: &str) -> bool {
 /// A broker rejecting the credentials or the TLS handshake is not retried.
 pub fn fetch_metadata(clients: &KafkaClients, topic: Option<&str>) -> Result<Metadata> {
     let consumer = &clients.metadata;
-    let deadline = Instant::now() + 2 * TIMEOUT;
+    let deadline = Instant::now() + CONNECT_BUDGET;
+    let time_left = || deadline.saturating_duration_since(Instant::now());
     loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        match consumer.fetch_metadata(topic, remaining.min(TIMEOUT)) {
+        match consumer.fetch_metadata(topic, time_left().min(TIMEOUT)) {
             Ok(md) => return Ok(md),
-            Err(e) if is_unreachable(&e) && remaining > RETRY_PAUSE => {
+            // Measured after the failed attempt, which may have used up the budget.
+            Err(e) if is_unreachable(&e) && time_left() > RETRY_PAUSE + MIN_ATTEMPT => {
                 if let Some(rejected) = rejection(consumer) {
                     return Err(rejected);
                 }
@@ -56,7 +57,12 @@ pub fn fetch_metadata(clients: &KafkaClients, topic: Option<&str>) -> Result<Met
     }
 }
 
+/// How long `fetch_metadata` keeps trying to reach the cluster: two full attempts.
+const CONNECT_BUDGET: Duration = TIMEOUT.saturating_mul(2);
 const RETRY_PAUSE: Duration = Duration::from_millis(500);
+/// The shortest attempt worth retrying with; below it the request can't
+/// even finish a TCP and TLS handshake to a distant broker.
+const MIN_ATTEMPT: Duration = Duration::from_millis(500);
 
 /// Partition ids of one topic, sorted ascending.
 pub fn partition_ids(consumer: &KafkaConsumer, topic: &str) -> Result<Vec<i32>> {
