@@ -1,14 +1,13 @@
 use rdkafka::admin::{NewTopic, ResourceSpecifier, TopicReplication};
-use rdkafka::consumer::Consumer;
 
 use super::model::{DeleteTopicResult, NewTopicRequest, Partition, TopicConfigEntry, TopicSummary};
 use crate::error::{Error, Result};
-use crate::kafka::metadata::{is_internal, single_topic};
+use crate::kafka::metadata::{fetch_metadata, is_internal, single_topic};
 use crate::kafka::offsets::{PartitionKey, watermarks};
-use crate::kafka::{KafkaClients, TIMEOUT, admin_options};
+use crate::kafka::{KafkaClients, admin_options};
 
 pub fn list_topics(clients: &KafkaClients) -> Result<Vec<TopicSummary>> {
-    let md = clients.metadata.fetch_metadata(None, TIMEOUT)?;
+    let md = fetch_metadata(clients, None)?;
     let all_partitions: Vec<PartitionKey> =
         md.topics().iter().flat_map(|t| t.partitions().iter().map(|p| (t.name().to_string(), p.id()))).collect();
     // Message counts are a nice-to-have: show the list even if offsets time out.
@@ -39,7 +38,7 @@ pub fn list_topics(clients: &KafkaClients) -> Result<Vec<TopicSummary>> {
 }
 
 pub fn partitions(clients: &KafkaClients, topic: &str) -> Result<Vec<Partition>> {
-    let md = clients.metadata.fetch_metadata(Some(topic), TIMEOUT)?;
+    let md = fetch_metadata(clients, Some(topic))?;
     let t = single_topic(md.topics(), topic)?;
     let keys: Vec<PartitionKey> = t.partitions().iter().map(|p| (topic.to_string(), p.id())).collect();
     let marks = watermarks(&clients.metadata, &keys)?;

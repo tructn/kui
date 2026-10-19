@@ -7,7 +7,7 @@ use rdkafka::groups::GroupInfo;
 use super::model::{GroupDetail, GroupLag, GroupMember, GroupSummary, TopicConsumer};
 use super::{assignment, progress};
 use crate::error::{Error, Result};
-use crate::kafka::metadata::{is_broker_internal, partition_ids};
+use crate::kafka::metadata::{fetch_metadata, is_broker_internal, partition_ids};
 use crate::kafka::offsets::{PartitionKey, committed, committed_by_group, watermarks};
 use crate::kafka::{KafkaClients, TIMEOUT};
 
@@ -160,7 +160,7 @@ fn owners(members: &[GroupMember]) -> HashMap<PartitionKey, String> {
 /// Every partition of every topic except Kafka's own (ksqlDB's internal
 /// repartition topics are consumed, so their lag matters).
 fn all_partitions(clients: &KafkaClients) -> Result<Vec<PartitionKey>> {
-    let md = clients.metadata.fetch_metadata(None, TIMEOUT)?;
+    let md = fetch_metadata(clients, None)?;
     Ok(md
         .topics()
         .iter()
