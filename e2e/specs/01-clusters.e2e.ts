@@ -35,13 +35,15 @@ describe("Clusters", () => {
     await expect($(`span=${CLUSTER_NAME}`)).toBeDisplayed();
   });
 
-  it("toggles between dark and light theme", async () => {
+  it("switches between light, dark and system theme", async () => {
     const isDark = () => browser.execute(() => document.documentElement.classList.contains("dark"));
-    // The default theme follows the OS, so start from whichever is showing.
-    const startedDark = await isDark();
-    await button(startedDark ? "Light mode" : "Dark mode").click();
-    expect(await isDark()).toBe(!startedDark);
-    await button(startedDark ? "Dark mode" : "Light mode").click();
-    expect(await isDark()).toBe(startedDark);
+    const systemDark = () => browser.execute(() => matchMedia("(prefers-color-scheme: dark)").matches);
+    const theme = (label: string) => $(`button[aria-label="${label}"]`);
+    await theme("Light").click();
+    expect(await isDark()).toBe(false);
+    await theme("Dark").click();
+    expect(await isDark()).toBe(true);
+    await theme("System").click();
+    expect(await isDark()).toBe(await systemDark());
   });
 });

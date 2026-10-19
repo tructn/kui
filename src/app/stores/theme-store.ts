@@ -13,8 +13,6 @@ interface ThemeState {
   /** Live OS preference; not persisted. */
   systemDark: boolean;
   setTheme: (theme: Theme) => void;
-  /** Flips what is shown, leaving "system" for an explicit choice. */
-  toggleTheme: () => void;
 }
 
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -28,7 +26,6 @@ export const useTheme = create<ThemeState>()(
       theme: "system",
       systemDark: darkQuery.matches,
       setTheme: (theme) => set({ theme }),
-      toggleTheme: () => set((s) => ({ theme: resolveTheme(s) === "dark" ? "light" : "dark" })),
     }),
     {
       name: "kui.theme",

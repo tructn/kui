@@ -1,10 +1,8 @@
 import {
   ListTreeIcon,
-  MoonIcon,
   SearchIcon,
   ServerIcon,
   SettingsIcon,
-  SunIcon,
   UsersIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -29,7 +27,7 @@ import { useShortcut } from "@/hooks/use-shortcut";
 
 import { useNavigation, type Route } from "./stores/navigation-store";
 import { useSettingsDialog } from "./stores/settings-dialog-store";
-import { useResolvedTheme, useTheme } from "./stores/theme-store";
+import { ThemePicker } from "./theme-picker";
 
 interface NavItem {
   label: string;
@@ -143,8 +141,6 @@ function SearchButton() {
 }
 
 function FooterMenu() {
-  const isDark = useResolvedTheme() === "dark";
-  const toggleTheme = useTheme((s) => s.toggleTheme);
   const showSettings = useSettingsDialog((s) => s.show);
   return (
     <SidebarMenu>
@@ -160,10 +156,8 @@ function FooterMenu() {
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>
-        <SidebarMenuButton tooltip="Toggle theme" onClick={toggleTheme}>
-          {isDark ? <SunIcon /> : <MoonIcon />}
-          <span>{isDark ? "Light mode" : "Dark mode"}</span>
-        </SidebarMenuButton>
+        {/* Stacks vertically when the sidebar collapses to icons. */}
+        <ThemePicker iconOnly className="flex w-full group-data-[collapsible=icon]:flex-col" />
       </SidebarMenuItem>
     </SidebarMenu>
   );
