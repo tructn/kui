@@ -7,8 +7,9 @@ const utf8 = (text: string): Payload => ({ text, encoding: "utf8", size: new Tex
 const binary: Payload = { text: "00 ff 10", encoding: "hex", size: 3 };
 
 describe("renderPayload", () => {
-  test("text pretty-prints JSON", () => {
-    expect(renderPayload(utf8('{"a":1}'), "text")).toBe('{\n  "a": 1\n}');
+  test("json pretty-prints JSON and leaves other text as is", () => {
+    expect(renderPayload(utf8('{"a":1}'), "json")).toBe('{\n  "a": 1\n}');
+    expect(renderPayload(utf8("plain"), "json")).toBe("plain");
   });
 
   test("base64 encodes the original bytes, not the pretty-printed text", () => {
@@ -17,14 +18,10 @@ describe("renderPayload", () => {
     expect(renderPayload(binary, "base64")).toBe("AP8Q");
   });
 
-  test("hex of UTF-8 text uses its bytes", () => {
-    expect(renderPayload(utf8("hé"), "hex")).toBe("68 c3 a9");
-    expect(renderPayload(binary, "hex")).toBe("00 ff 10");
-  });
-
-  test("binary has no text view and falls back to hex", () => {
-    expect(payloadViews(binary)).toEqual(["hex", "base64"]);
-    expect(renderPayload(binary, "text")).toBe("00 ff 10");
+  test("binary has no json view and falls back to base64", () => {
+    expect(payloadViews(utf8("x"))).toEqual(["json", "base64"]);
+    expect(payloadViews(binary)).toEqual(["base64"]);
+    expect(renderPayload(binary, "json")).toBe("AP8Q");
   });
 
   test("large payloads encode without overflowing the call stack", () => {
