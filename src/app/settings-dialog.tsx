@@ -2,15 +2,12 @@ import { getVersion } from "@tauri-apps/api/app";
 import {
   DownloadIcon,
   KeyboardIcon,
-  MoonIcon,
   PaletteIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
-  SunIcon,
   type LucideIcon,
 } from "lucide-react";
-import { ToggleGroup } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -33,9 +30,9 @@ import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
 import { useShortcut } from "@/hooks/use-shortcut";
 
 import { useSettingsDialog } from "./stores/settings-dialog-store";
-import { useTheme, type Theme } from "./stores/theme-store";
 import { useUpdates } from "./stores/update-store";
 import { useViewStateStore } from "./stores/view-state-store";
+import { ThemePicker } from "./theme-picker";
 
 interface Section {
   id: string;
@@ -132,38 +129,14 @@ function GeneralSettings() {
   );
 }
 
-const THEMES: { value: Theme; label: string; icon: LucideIcon }[] = [
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
-];
-
 function AppearanceSettings() {
-  const theme = useTheme((s) => s.theme);
-  const toggleTheme = useTheme((s) => s.toggleTheme);
   const { uiFont, codeFont, codeFontSize, codeLigatures, update, reset } = useAppearance();
 
   return (
     <div className="flex flex-col gap-6">
       <SettingsGroup>
         <SettingRow label="Theme">
-          <ToggleGroup.Root
-            type="single"
-            aria-label="Theme"
-            value={theme}
-            // Clicking the active option would deselect it (""); a theme is always set.
-            onValueChange={(v) => v && v !== theme && toggleTheme()}
-            className="inline-flex rounded-lg bg-muted p-0.5"
-          >
-            {THEMES.map(({ value, label, icon: Icon }) => (
-              <ToggleGroup.Item
-                key={value}
-                value={value}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm dark:data-[state=on]:bg-input/50 [&_svg]:size-3.5"
-              >
-                <Icon /> {label}
-              </ToggleGroup.Item>
-            ))}
-          </ToggleGroup.Root>
+          <ThemePicker />
         </SettingRow>
       </SettingsGroup>
 
