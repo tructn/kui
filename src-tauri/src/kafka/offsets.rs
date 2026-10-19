@@ -2,10 +2,11 @@ use std::collections::{HashMap, HashSet};
 
 use rdkafka::admin::AdminClient;
 use rdkafka::client::DefaultClientContext;
-use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::consumer::Consumer;
 use rdkafka::{Offset, TopicPartitionList};
 
-use super::{TIMEOUT, group_offsets};
+use super::connection::explain;
+use super::{KafkaConsumer, TIMEOUT, group_offsets};
 use crate::error::Result;
 
 type Admin = AdminClient<DefaultClientContext>;
@@ -30,7 +31,7 @@ impl Watermarks {
 /// (timestamp -2 = earliest, -1 = latest) instead of one round trip per
 /// partition. Earliest and latest run in parallel, so it costs one round trip
 /// per `OFFSETS_CHUNK` partitions, not two.
-pub fn watermarks(consumer: &BaseConsumer, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, Watermarks>> {
+pub fn watermarks(consumer: &KafkaConsumer, partitions: &[PartitionKey]) -> Result<HashMap<PartitionKey, Watermarks>> {
     if partitions.is_empty() {
         return Ok(HashMap::new());
     }
@@ -59,7 +60,7 @@ const OFFSETS_CHUNK: usize = 1000;
 /// Resolves a logical offset or a timestamp (`Offset::Offset(epoch_ms)`) to a
 /// concrete offset for each partition. Partitions without an answer are omitted.
 pub fn offsets_at(
-    consumer: &BaseConsumer,
+    consumer: &KafkaConsumer,
     partitions: &[PartitionKey],
     at: Offset,
 ) -> Result<HashMap<PartitionKey, i64>> {
@@ -69,7 +70,7 @@ pub fn offsets_at(
         for (topic, partition) in chunk {
             tpl.add_partition_offset(topic, *partition, at)?;
         }
-        let resolved = consumer.offsets_for_times(tpl, TIMEOUT)?;
+        let resolved = consumer.offsets_for_times(tpl, TIMEOUT).map_err(|e| explain(consumer, e))?;
         offsets.extend(resolved.elements().iter().filter_map(|e| match e.offset() {
             Offset::Offset(o) => Some(((e.topic().to_string(), e.partition()), o)),
             _ => None,

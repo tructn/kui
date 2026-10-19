@@ -2,7 +2,7 @@ use serde::{Serialize, Serializer};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error(transparent)]
+    #[error("{}", crate::kafka::connection::describe(.0))]
     Kafka(#[from] rdkafka::error::KafkaError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
