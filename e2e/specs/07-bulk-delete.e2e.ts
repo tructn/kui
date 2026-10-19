@@ -18,6 +18,8 @@ describe("Deleting several topics", () => {
 
     await goTo("Topics");
     await $('input[placeholder="Filter topics"]').setValue(prefix);
+    // The filter applies once typing pauses; select all only after it has.
+    await $("p^=2 of ").waitForExist();
     await $('button[aria-label="Select all topics on this page"]').click();
     await button("Delete 2 topics").click();
 
