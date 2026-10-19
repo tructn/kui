@@ -6,6 +6,14 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.4](https://github.com/tructn/kui/compare/v0.1.0-alpha.3...v0.1.0-alpha.4) (2026-10-19)
+
+
+### Added
+
+* **settings:** add a system theme that follows the OS appearance ([#14](https://github.com/tructn/kui/issues/14)) ([8cecd63](https://github.com/tructn/kui/commit/8cecd63d61c283dba3c2160c65709c5577eeb3d0))
+* **topics:** copy the topic name from the topic page ([#13](https://github.com/tructn/kui/issues/13)) ([ec2b109](https://github.com/tructn/kui/commit/ec2b109a1c44fe52990b6c8740172bd3348bba3c))
+
 ## [0.1.0-alpha.3](https://github.com/tructn/kui/compare/v0.1.0-alpha.2...v0.1.0-alpha.3) (2026-10-19)
 
 
