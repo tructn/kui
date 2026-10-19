@@ -29,7 +29,7 @@ import { useShortcut } from "@/hooks/use-shortcut";
 
 import { useNavigation, type Route } from "./stores/navigation-store";
 import { useSettingsDialog } from "./stores/settings-dialog-store";
-import { useTheme } from "./stores/theme-store";
+import { useResolvedTheme, useTheme } from "./stores/theme-store";
 
 interface NavItem {
   label: string;
@@ -143,7 +143,7 @@ function SearchButton() {
 }
 
 function FooterMenu() {
-  const isDark = useTheme((s) => s.theme === "dark");
+  const isDark = useResolvedTheme() === "dark";
   const toggleTheme = useTheme((s) => s.toggleTheme);
   const showSettings = useSettingsDialog((s) => s.show);
   return (

@@ -2,6 +2,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import {
   DownloadIcon,
   KeyboardIcon,
+  MonitorIcon,
   MoonIcon,
   PaletteIcon,
   RefreshCwIcon,
@@ -133,13 +134,14 @@ function GeneralSettings() {
 }
 
 const THEMES: { value: Theme; label: string; icon: LucideIcon }[] = [
+  { value: "system", label: "System", icon: MonitorIcon },
   { value: "light", label: "Light", icon: SunIcon },
   { value: "dark", label: "Dark", icon: MoonIcon },
 ];
 
 function AppearanceSettings() {
   const theme = useTheme((s) => s.theme);
-  const toggleTheme = useTheme((s) => s.toggleTheme);
+  const setTheme = useTheme((s) => s.setTheme);
   const { uiFont, codeFont, codeFontSize, codeLigatures, update, reset } = useAppearance();
 
   return (
@@ -151,7 +153,7 @@ function AppearanceSettings() {
             aria-label="Theme"
             value={theme}
             // Clicking the active option would deselect it (""); a theme is always set.
-            onValueChange={(v) => v && v !== theme && toggleTheme()}
+            onValueChange={(v) => v && setTheme(v as Theme)}
             className="inline-flex rounded-lg bg-muted p-0.5"
           >
             {THEMES.map(({ value, label, icon: Icon }) => (

@@ -37,10 +37,11 @@ describe("Clusters", () => {
 
   it("toggles between dark and light theme", async () => {
     const isDark = () => browser.execute(() => document.documentElement.classList.contains("dark"));
-    expect(await isDark()).toBe(true);
-    await button("Light mode").click();
-    expect(await isDark()).toBe(false);
-    await button("Dark mode").click();
-    expect(await isDark()).toBe(true);
+    // The default theme follows the OS, so start from whichever is showing.
+    const startedDark = await isDark();
+    await button(startedDark ? "Light mode" : "Dark mode").click();
+    expect(await isDark()).toBe(!startedDark);
+    await button(startedDark ? "Dark mode" : "Light mode").click();
+    expect(await isDark()).toBe(startedDark);
   });
 });
