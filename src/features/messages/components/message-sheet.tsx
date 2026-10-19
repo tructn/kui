@@ -78,16 +78,16 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
   );
 }
 
-const VIEW_LABELS: Record<View, string> = { text: "Text", hex: "Hex", base64: "Base64" };
+const VIEW_LABELS: Record<View, string> = { json: "JSON", base64: "Base64" };
 
 function PayloadView({ payload }: { payload: Payload | null }) {
-  // Kept while moving between messages; "text" on a binary payload shows hex.
-  const [view, setView] = useState<View>("text");
+  // Kept while moving between messages; "json" on a binary payload shows base64.
+  const [view, setView] = useState<View>("json");
   const text = useMemo(() => (payload ? renderPayload(payload, view) : ""), [payload, view]);
   if (!payload) return <p className="text-sm text-muted-foreground">null</p>;
 
   const views = payloadViews(payload);
-  const shown = views.includes(view) ? view : "hex";
+  const shown = views.includes(view) ? view : "base64";
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex items-center gap-2">

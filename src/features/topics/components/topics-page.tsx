@@ -17,7 +17,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
-import { useViewState } from "@/hooks/use-view-state";
+import { useViewSearch, useViewState } from "@/hooks/use-view-state";
 import { formatNumber } from "@/lib/format";
 
 import { useTopics } from "../queries";
@@ -37,7 +37,7 @@ export function TopicsPage() {
   const clusterId = useClusterId();
   const navigate = useNavigation((s) => s.navigate);
   const topics = useTopics(clusterId);
-  const [search, setSearch] = useViewState("topics.search", "");
+  const [searchInput, search, setSearchInput] = useViewSearch("topics.search");
   const [showInternal, setShowInternal] = useViewState("topics.showInternal", false);
 
   const visible = useMemo(
@@ -102,8 +102,8 @@ export function TopicsPage() {
             <Input
               className="pl-8"
               placeholder="Filter topics"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">

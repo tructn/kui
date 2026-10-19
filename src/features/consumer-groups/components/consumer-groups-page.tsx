@@ -15,7 +15,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
-import { useViewState } from "@/hooks/use-view-state";
+import { useViewSearch } from "@/hooks/use-view-state";
 import { formatNumber } from "@/lib/format";
 
 import { useConsumerGroupLags, useConsumerGroups } from "../queries";
@@ -28,7 +28,7 @@ export function ConsumerGroupsPage() {
   const groups = useConsumerGroups(clusterId);
   const lags = useConsumerGroupLags(clusterId);
   const lagByGroup = useMemo(() => new Map((lags.data ?? []).map((l) => [l.name, l])), [lags.data]);
-  const [search, setSearch] = useViewState("consumer-groups.search", "");
+  const [searchInput, search, setSearchInput] = useViewSearch("consumer-groups.search");
   const [selected, setSelected] = useState<string | null>(null);
 
   const visible = useMemo(
@@ -74,8 +74,8 @@ export function ConsumerGroupsPage() {
           <Input
             className="pl-8"
             placeholder="Filter groups"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
 

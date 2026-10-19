@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use rdkafka::consumer::Consumer;
-
 use super::model::{Broker, ClusterOverview};
 use crate::error::Result;
-use crate::kafka::{KafkaClients, TIMEOUT};
+use crate::kafka::KafkaClients;
+use crate::kafka::metadata::fetch_metadata;
 
 pub fn cluster_overview(clients: &KafkaClients) -> Result<ClusterOverview> {
-    let md = clients.metadata.fetch_metadata(None, TIMEOUT)?;
+    let md = fetch_metadata(clients, None)?;
 
     let mut leader_count: HashMap<i32, usize> = HashMap::new();
     let mut replica_count: HashMap<i32, usize> = HashMap::new();

@@ -1,6 +1,8 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useViewStateStore } from "@/app/stores/view-state-store";
+
+import { useDebouncedValue } from "./use-debounced-value";
 
 type Update<T> = T | ((current: T) => T);
 
@@ -31,6 +33,24 @@ export function useViewState<T>(id: string, initial: T): [T, (update: Update<T>)
   }, [id, remember]);
 
   return [value, setValue];
+}
+
+/**
+ * `useViewState` for a list's filter box. `input` follows every keystroke;
+ * `search`, which the list filters by, and the saved value follow once typing
+ * pauses. Re-filtering, re-sorting and rewriting settings.json on every key
+ * press made typing in a long list stall.
+ */
+export function useViewSearch(id: string, delayMs = 200): [input: string, search: string, setInput: (value: string) => void] {
+  const [saved, setSaved] = useViewState(id, "");
+  const [input, setInput] = useState(saved);
+  const search = useDebouncedValue(input, delayMs);
+
+  useEffect(() => {
+    if (search !== saved) setSaved(search);
+  }, [search, saved, setSaved]);
+
+  return [input, search, setInput];
 }
 
 /** Reads a view value without owning it, e.g. ⌘K search following the topic list's "Show internal". */
