@@ -3,6 +3,7 @@
 
 mod client;
 mod cluster;
+pub mod connection;
 #[allow(unsafe_code)] // librdkafka call rust-rdkafka does not wrap
 mod group_offsets;
 pub mod metadata;
@@ -10,6 +11,7 @@ pub mod offsets;
 
 pub use client::{KafkaClients, client_config, new_consumer};
 pub use cluster::ClusterConfig;
+pub use connection::KafkaConsumer;
 
 use std::time::Duration;
 

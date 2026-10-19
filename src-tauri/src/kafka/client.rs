@@ -1,10 +1,10 @@
 use rdkafka::ClientConfig;
 use rdkafka::admin::AdminClient;
 use rdkafka::client::DefaultClientContext;
-use rdkafka::consumer::BaseConsumer;
 use rdkafka::producer::FutureProducer;
 
 use super::ClusterConfig;
+use super::connection::{ConnectionErrors, KafkaConsumer};
 use crate::error::Result;
 
 /// Long-lived clients for one cluster, cached in `AppState` so we don't
@@ -13,7 +13,7 @@ pub struct KafkaClients {
     pub cluster: ClusterConfig,
     pub admin: AdminClient<DefaultClientContext>,
     /// Used for metadata, offsets and group listing. Never subscribes to topics.
-    pub metadata: BaseConsumer,
+    pub metadata: KafkaConsumer,
     pub producer: FutureProducer,
 }
 
@@ -60,6 +60,9 @@ pub fn client_config(cluster: &ClusterConfig) -> ClientConfig {
 
 /// A consumer that never auto-commits. Safe for reading data without
 /// affecting any real consumer group's progress.
-pub fn new_consumer(cluster: &ClusterConfig, group_id: &str) -> Result<BaseConsumer> {
-    Ok(client_config(cluster).set("group.id", group_id).set("enable.auto.commit", "false").create()?)
+pub fn new_consumer(cluster: &ClusterConfig, group_id: &str) -> Result<KafkaConsumer> {
+    Ok(client_config(cluster)
+        .set("group.id", group_id)
+        .set("enable.auto.commit", "false")
+        .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers))?)
 }

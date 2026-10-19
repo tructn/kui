@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::consumer::Consumer;
 use rdkafka::error::KafkaError;
 use rdkafka::message::{BorrowedMessage, Header, Headers, OwnedHeaders, OwnedMessage};
 use rdkafka::producer::FutureRecord;
@@ -15,9 +15,10 @@ use super::model::{
 use super::window::{PartitionRead, ReadWindow, merge_page, page_window, remaining, start_position};
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
+use crate::kafka::connection::{ConnectionErrors, explain};
 use crate::kafka::metadata::{ensure_writable, partition_ids};
 use crate::kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
-use crate::kafka::{KafkaClients, TIMEOUT, client_config};
+use crate::kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config};
 use crate::tasks::CancelToken;
 
 const MAX_PAGE_SIZE: usize = 1000;
@@ -101,7 +102,7 @@ pub fn tail(
     while !cancel.is_cancelled() {
         match consumer.poll(Duration::from_millis(100)) {
             None | Some(Err(KafkaError::PartitionEOF(_))) => {}
-            Some(Err(e)) => return Err(e.into()),
+            Some(Err(e)) => return Err(explain(&consumer, e)),
             Some(Ok(m)) => batch.push(to_message(&m)),
         }
         let due = last_flush.elapsed() >= TAIL_FLUSH_EVERY || batch.len() >= TAIL_MAX_BATCH;
@@ -115,12 +116,12 @@ pub fn tail(
     Ok(())
 }
 
-fn browsing_consumer(clients: &KafkaClients) -> Result<BaseConsumer> {
+fn browsing_consumer(clients: &KafkaClients) -> Result<KafkaConsumer> {
     Ok(client_config(&clients.cluster)
         .set("group.id", format!("kui-browser-{}", uuid::Uuid::new_v4()))
         .set("enable.auto.commit", "false")
         .set("enable.partition.eof", "true")
-        .create()?)
+        .create_with_context(ConnectionErrors::new(&clients.cluster.bootstrap_servers))?)
 }
 
 /// A requested partition, its watermarks, and where the first page starts in it.
@@ -130,7 +131,7 @@ struct PartitionPlan {
     start: i64,
 }
 
-fn plan_partitions(consumer: &BaseConsumer, request: &BrowseRequest) -> Result<Vec<PartitionPlan>> {
+fn plan_partitions(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<Vec<PartitionPlan>> {
     let keys: Vec<PartitionKey> = partition_ids(consumer, &request.topic)?
         .into_iter()
         .filter(|id| request.partition.is_none_or(|wanted| wanted == *id))
@@ -163,7 +164,7 @@ fn plan_partitions(consumer: &BaseConsumer, request: &BrowseRequest) -> Result<V
 }
 
 /// Polls until every partition has reached the end of its window, or we time out.
-fn read_until_done(consumer: &BaseConsumer, mut pending: HashMap<i32, ReadWindow>) -> Result<Vec<Message>> {
+fn read_until_done(consumer: &KafkaConsumer, mut pending: HashMap<i32, ReadWindow>) -> Result<Vec<Message>> {
     let mut messages = Vec::new();
     let deadline = Instant::now() + TIMEOUT;
 
@@ -173,7 +174,7 @@ fn read_until_done(consumer: &BaseConsumer, mut pending: HashMap<i32, ReadWindow
             Some(Err(KafkaError::PartitionEOF(partition))) => {
                 pending.remove(&partition);
             }
-            Some(Err(e)) => return Err(e.into()),
+            Some(Err(e)) => return Err(explain(consumer, e)),
             Some(Ok(m)) => {
                 let Some(window) = pending.get(&m.partition()).copied() else {
                     continue;
@@ -274,7 +275,7 @@ fn fetch_one(clients: &KafkaClients, topic: &str, partition: i32, offset: i64) -
             Some(Ok(m)) if m.offset() == offset => return Ok(m.detach()),
             // Landed somewhere else: the offset is gone (retention, compaction, deletion).
             Some(Ok(_)) | Some(Err(KafkaError::PartitionEOF(_))) => break,
-            Some(Err(e)) => return Err(e.into()),
+            Some(Err(e)) => return Err(explain(&consumer, e)),
         }
     }
     Err(Error::msg(format!("Message at partition {partition}, offset {offset} no longer exists")))

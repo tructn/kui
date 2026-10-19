@@ -7,12 +7,13 @@ use rdkafka::groups::GroupInfo;
 use super::model::{GroupDetail, GroupLag, GroupMember, GroupSummary, TopicConsumer};
 use super::{assignment, progress};
 use crate::error::{Error, Result};
+use crate::kafka::connection::explain;
 use crate::kafka::metadata::{fetch_metadata, is_broker_internal, partition_ids};
 use crate::kafka::offsets::{PartitionKey, committed, committed_by_group, watermarks};
 use crate::kafka::{KafkaClients, TIMEOUT};
 
 pub fn list(clients: &KafkaClients) -> Result<Vec<GroupSummary>> {
-    let list = clients.metadata.fetch_group_list(None, TIMEOUT)?;
+    let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
     let mut groups: Vec<GroupSummary> = list
         .groups()
         .iter()
@@ -29,7 +30,7 @@ pub fn list(clients: &KafkaClients) -> Result<Vec<GroupSummary>> {
 }
 
 pub fn detail(clients: &KafkaClients, group: &str) -> Result<GroupDetail> {
-    let list = clients.metadata.fetch_group_list(Some(group), TIMEOUT)?;
+    let list = clients.metadata.fetch_group_list(Some(group), TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
     let info = list.groups().first().ok_or_else(|| Error::msg(format!("Group not found: {group}")))?;
     let members = members(info);
 
@@ -55,7 +56,7 @@ pub fn detail(clients: &KafkaClients, group: &str) -> Result<GroupDetail> {
 
 /// Total lag of every group. Slower than `list`: one offset request per group.
 pub fn lags(clients: &KafkaClients) -> Result<Vec<GroupLag>> {
-    let list = clients.metadata.fetch_group_list(None, TIMEOUT)?;
+    let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
     let all = all_partitions(clients)?;
     let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
     let committed = committed_by_group(&clients.admin, &names, &all);
@@ -92,7 +93,7 @@ pub fn topic_consumers(clients: &KafkaClients, topic: &str) -> Result<Vec<TopicC
     // the groups are probed.
     let (marks, list, committed) = std::thread::scope(|s| {
         let marks = s.spawn(|| watermarks(&clients.metadata, &keys));
-        let list = clients.metadata.fetch_group_list(None, TIMEOUT)?;
+        let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
         let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
         let committed = committed_by_group(&clients.admin, &names, &keys);
         Ok::<_, Error>((marks.join().expect("watermark lookup panicked")?, list, committed))
