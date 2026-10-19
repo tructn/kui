@@ -10,7 +10,7 @@ import { callCommand } from "./invoke";
  * `loadSettings()` must finish before any persisted store is created (see
  * `main.tsx`). After that, reads are synchronous from memory, so stores hydrate
  * immediately and the first render already has the saved theme and fonts.
- * Writes update memory and are sent to Rust right away.
+ * Writes update memory right away and are sent to Rust one at a time, in order.
  *
  *   persist(..., { name: "kui.theme", storage: settingsStorage() })
  */
@@ -33,11 +33,18 @@ export function settingsStorage<S>(): PersistStorage<S> {
   };
 }
 
+/** The last save sent to Rust. */
+let saving: Promise<unknown> = Promise.resolve();
+
 function write(key: string, value: unknown) {
   if (value === null) delete settings[key];
   else settings[key] = value;
-  callCommand("save_setting", { key, value }).catch((error) =>
-    console.error(`Could not save setting ${key}`, error),
+  // `save_setting` is async in Rust, so two saves in flight could finish out
+  // of order and leave an older value on disk. Send the next only after the last.
+  saving = saving.then(() =>
+    callCommand("save_setting", { key, value }).catch((error) =>
+      console.error(`Could not save setting ${key}`, error),
+    ),
   );
 }
 

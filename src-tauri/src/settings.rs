@@ -7,23 +7,27 @@
 //! change is on disk right away and survives quitting or reinstalling the app.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde_json::{Map, Value};
 use tauri::State;
 
+use crate::blocking::run_blocking;
 use crate::error::Result;
 use crate::json_file;
 
+/// Cheap to clone: clones share the same values, so a save can move one onto
+/// a blocking thread.
+#[derive(Clone)]
 pub struct SettingsStore {
     path: PathBuf,
-    values: Mutex<Map<String, Value>>,
+    values: Arc<Mutex<Map<String, Value>>>,
 }
 
 impl SettingsStore {
     pub fn load(path: PathBuf) -> Result<Self> {
         let values = json_file::load(&path)?;
-        Ok(Self { path, values: Mutex::new(values) })
+        Ok(Self { path, values: Arc::new(Mutex::new(values)) })
     }
 
     fn all(&self) -> Map<String, Value> {
@@ -46,9 +50,13 @@ pub fn load_settings(store: State<'_, SettingsStore>) -> Map<String, Value> {
     store.all()
 }
 
+/// Async so writing (and fsyncing) the file never blocks the main thread, which
+/// runs synchronous commands. The UI sends one save at a time, so they reach
+/// the disk in order (see `src/lib/settings-storage.ts`).
 #[tauri::command]
-pub fn save_setting(store: State<'_, SettingsStore>, key: String, value: Option<Value>) -> Result<()> {
-    store.set(key, value)
+pub async fn save_setting(store: State<'_, SettingsStore>, key: String, value: Option<Value>) -> Result<()> {
+    let store = store.inner().clone();
+    run_blocking(move || store.set(key, value)).await
 }
 
 #[cfg(test)]
