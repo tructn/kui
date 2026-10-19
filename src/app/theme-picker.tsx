@@ -12,8 +12,9 @@ const THEMES: { value: Theme; label: string; icon: LucideIcon }[] = [
   { value: "dark", label: "Dark", icon: MoonIcon },
 ];
 
+// Styled on aria-checked, not data-state: a Tooltip trigger wrapping an item overwrites data-state.
 const ITEM =
-  "inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm dark:data-[state=on]:bg-input/50 [&_svg]:size-3.5";
+  "inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm dark:aria-checked:bg-input/50 [&_svg]:size-3.5";
 
 /**
  * System / Light / Dark segmented control. `iconOnly` drops the labels into
