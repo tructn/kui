@@ -1,7 +1,6 @@
-import { CopyIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 
+import { CopyIndicator, useCopy } from "@/components/copy-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ResizableSheetContent } from "@/components/resizable-sheet-content";
@@ -84,6 +83,7 @@ function PayloadView({ payload }: { payload: Payload | null }) {
   // Kept while moving between messages; "json" on a binary payload shows base64.
   const [view, setView] = useState<View>("json");
   const text = useMemo(() => (payload ? renderPayload(payload, view) : ""), [payload, view]);
+  const { copied, copy } = useCopy();
   if (!payload) return <p className="text-sm text-muted-foreground">null</p>;
 
   const views = payloadViews(payload);
@@ -106,9 +106,9 @@ function PayloadView({ payload }: { payload: Payload | null }) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigator.clipboard.writeText(text).then(() => toast.success("Copied"))}
+          onClick={() => copy(text)}
         >
-          <CopyIcon /> Copy
+          <CopyIndicator copied={copied} /> {copied ? "Copied" : "Copy"}
         </Button>
       </div>
       <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">

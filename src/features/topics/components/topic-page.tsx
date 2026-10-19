@@ -1,6 +1,7 @@
 import { ArrowLeftIcon, RotateCwIcon } from "lucide-react";
 
 import { useClusterId, useNavigation } from "@/app/stores/navigation-store";
+import { CopyButton } from "@/components/copy-button";
 import { PageHeader } from "@/components/page-header";
 import { ErrorState, LoadingRows } from "@/components/query-states";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ export function TopicPage({ topic }: { topic: string }) {
               <ArrowLeftIcon />
             </Button>
             <span className="font-mono">{topic}</span>
+            <CopyButton value={topic} label="Copy topic name" />
             {internal && (
               <Badge
                 variant="outline"
