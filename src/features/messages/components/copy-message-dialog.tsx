@@ -1,4 +1,4 @@
-import { CopyIcon } from "lucide-react";
+import { ForwardIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -74,12 +74,12 @@ export function CopyMessageDialog({ clusterId, topic, message, targets }: CopyMe
     >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <CopyIcon /> Copy
+          <ForwardIcon /> Copy to topic
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Copy message</DialogTitle>
+          <DialogTitle>Copy message to topic</DialogTitle>
           <DialogDescription className="font-mono [overflow-wrap:anywhere]">
             {topic} · partition {message.partition} · offset {message.offset}
           </DialogDescription>
@@ -120,7 +120,7 @@ export function CopyMessageDialog({ clusterId, topic, message, targets }: CopyMe
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={copy.isPending}>
-              {copy.isPending ? <Spinner /> : <CopyIcon />}
+              {copy.isPending ? <Spinner /> : <ForwardIcon />}
               {targetTopic === topic ? "Duplicate" : "Copy"}
             </Button>
           </DialogFooter>
