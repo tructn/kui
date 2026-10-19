@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in KUI doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a cluster with bootstrap `localhost:9092`
+        2. Open a topic
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KUI version
+      description: Shown in **Settings → Updates**.
+      placeholder: 0.1.0-alpha.3
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple silicon)
+        - Windows 10
+        - Windows 11
+        - Other (built from source)
+    validations:
+      required: true
+  - type: textarea
+    id: cluster
+    attributes:
+      label: Kafka cluster
+      description: Kafka version or provider (e.g. Apache Kafka 3.7, Confluent Cloud, MSK, Redpanda), and the security setup (plaintext, SSL, SASL). Don't paste passwords or keys.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      render: text
