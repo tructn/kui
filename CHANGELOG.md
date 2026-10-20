@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.7](https://github.com/tructn/kui/compare/v0.1.0-alpha.6...v0.1.0-alpha.7) (2026-10-20)
+
+
+### Added
+
+* **topics:** filter topics by regular expression ([#20](https://github.com/tructn/kui/issues/20)) ([5c52307](https://github.com/tructn/kui/commit/5c52307837fe2f939e1e76b274106bec70edf1b2))
+
 ## [0.1.0-alpha.6](https://github.com/tructn/kui/compare/v0.1.0-alpha.5...v0.1.0-alpha.6) (2026-10-20)
 
 
