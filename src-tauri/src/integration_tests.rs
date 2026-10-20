@@ -12,7 +12,7 @@ use rdkafka::{Offset, TopicPartitionList};
 
 use crate::features::generator::model::{GenerateRequest, HeaderTemplate, RecordTemplate};
 use crate::features::messages::model::{
-    BrowseRequest, CopyRequest, ProduceHeader, ProduceRequest, StartFrom, TailRequest,
+    BrowseRequest, CopyRequest, MessageRef, ProduceHeader, ProduceRequest, StartFrom, TailRequest,
 };
 use crate::features::topics::model::NewTopicRequest;
 use crate::features::{brokers, clusters, consumer_groups, generator, messages, topics};
@@ -170,10 +170,9 @@ async fn copy_messages() {
         clients.producer.send(record, Duration::from_secs(5)).await.unwrap();
     }
 
-    let copy = |offset, target_topic: &str| CopyRequest {
+    let copy = |offsets: &[i64], target_topic: &str| CopyRequest {
         topic: source.clone(),
-        partition: 0,
-        offset,
+        messages: offsets.iter().map(|&offset| MessageRef { partition: 0, offset }).collect(),
         target_topic: target_topic.to_string(),
         target_partition: None,
     };
@@ -190,23 +189,28 @@ async fn copy_messages() {
     };
 
     // Duplicate within the same topic: appended last, stamped now, not with the original's time.
-    let dup = messages::service::copy(clients.clone(), &copy(1, &source)).await.unwrap();
-    assert_eq!(dup.offset, 3);
+    let dup = messages::service::copy(clients.clone(), &copy(&[1], &source)).await.unwrap();
+    assert_eq!(dup[0].offset, 3);
     let copied = read_all(&source).into_iter().find(|m| m.offset == 3).unwrap();
     assert!(copied.timestamp.unwrap() > 1_000_000_000_000, "{:?}", copied.timestamp);
     assert_eq!(copied.value.unwrap().text, "00 ff 10");
     assert_eq!(copied.headers[0].value.as_deref(), Some("v"));
 
     // Copying to another topic leaves the source untouched: nothing is ever deleted.
-    let copied = messages::service::copy(clients.clone(), &copy(0, &target)).await.unwrap();
-    assert_eq!(copied.offset, 0);
+    let copied = messages::service::copy(clients.clone(), &copy(&[0], &target)).await.unwrap();
+    assert_eq!(copied[0].offset, 0);
     assert_eq!(read_all(&target)[0].key.as_ref().unwrap().text, "k");
     let parts = topics::service::partitions(&clients, &source).unwrap();
     assert_eq!((parts[0].low, parts[0].high), (0, 4));
 
-    // An offset that doesn't exist is reported, not silently skipped.
-    let gone = messages::service::copy(clients.clone(), &copy(99, &target)).await;
+    // Several at once land in the order given.
+    let batch = messages::service::copy(clients.clone(), &copy(&[0, 2], &target)).await.unwrap();
+    assert_eq!(batch.iter().map(|d| d.offset).collect::<Vec<_>>(), [1, 2]);
+
+    // An offset that doesn't exist is reported, not silently skipped, and nothing is written.
+    let gone = messages::service::copy(clients.clone(), &copy(&[1, 99], &target)).await;
     assert!(gone.unwrap_err().to_string().contains("no longer exists"));
+    assert_eq!(read_all(&target).len(), 3);
 
     // Both topics in one batch; each reports its own outcome.
     let deleted = topics::service::delete(&clients, &[source.clone(), target.clone()]).await.unwrap();

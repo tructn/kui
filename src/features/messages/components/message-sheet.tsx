@@ -42,7 +42,7 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
                     key={`${message.partition}/${message.offset}`}
                     clusterId={clusterId}
                     topic={topic}
-                    message={message}
+                    messages={[message]}
                     targets={targets}
                   />
                 </div>

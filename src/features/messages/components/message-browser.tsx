@@ -1,7 +1,9 @@
+import { XIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ErrorState, LoadingRows } from "@/components/query-states";
 import { ShortcutHint } from "@/components/shortcut-hint";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +14,8 @@ import { formatNumber } from "@/lib/format";
 
 import { LIVE_LIMIT, useLiveTail } from "../live-tail";
 import { useBrowseMessages } from "../queries";
-import type { BrowseCursor, BrowseFilters, BrowsePage, CopyTarget, KafkaMessage } from "../types";
+import type { BrowseCursor, BrowseFilters, BrowsePage, CopyTarget, KafkaMessage, MessageRef } from "../types";
+import { CopyMessageDialog } from "./copy-message-dialog";
 import { MessageFilters } from "./message-filters";
 import { MessageSheet } from "./message-sheet";
 import { MessageTable } from "./message-table";
@@ -37,6 +40,8 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
   const page = cursors.length - 1;
   const [live, setLive] = useState(false);
   const [selected, setSelected] = useState<KafkaMessage | null>(null);
+  // Checked rows for copying. Kept across pages and filters, like the topics list.
+  const [checked, setChecked] = useState<ReadonlyMap<string, MessageRef>>(new Map());
   const messages = useBrowseMessages(clusterId, { ...filters, pageSize, cursor: cursors[page] });
   const tail = useLiveTail(clusterId, topic, filters.partition, live);
 
@@ -94,6 +99,25 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
         </div>
       </div>
 
+      {checked.size > 0 && !live && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm">
+          <span>
+            <span className="font-medium tabular-nums">{checked.size}</span> selected
+          </span>
+          <Button variant="ghost" size="xs" onClick={() => setChecked(new Map())}>
+            <XIcon /> Clear
+          </Button>
+          <div className="flex-1" />
+          <CopyMessageDialog
+            clusterId={clusterId}
+            topic={topic}
+            messages={[...checked.values()]}
+            targets={copyTargets}
+            onCopied={() => setChecked(new Map())}
+          />
+        </div>
+      )}
+
       {live ? (
         <>
           {tail.error && <ErrorState error={tail.error} onRetry={() => toggleLive(false)} />}
@@ -117,6 +141,8 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
               messages={messages.data.messages}
               pager={pager}
               onSelect={setSelected}
+              checked={readOnly ? undefined : checked}
+              onCheckedChange={setChecked}
               emptyText="No messages in this range."
             />
           )}

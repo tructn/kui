@@ -104,14 +104,21 @@ pub struct Delivered {
     pub offset: i64,
 }
 
-/// Re-produces one existing message, byte for byte, to a topic (the same one = duplicate).
+/// Re-produces existing messages, byte for byte, to a topic (the same one = duplicate).
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopyRequest {
     pub topic: String,
-    pub partition: i32,
-    pub offset: i64,
+    /// Copied in this order.
+    pub messages: Vec<MessageRef>,
     pub target_topic: String,
     /// `None` lets the partitioner decide (by key hash).
     pub target_partition: Option<i32>,
+}
+
+/// Where one message sits in its topic.
+#[derive(Deserialize)]
+pub struct MessageRef {
+    pub partition: i32,
+    pub offset: i64,
 }

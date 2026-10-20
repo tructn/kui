@@ -234,16 +234,44 @@ pub async fn produce(clients: &KafkaClients, request: &ProduceRequest) -> Result
     Ok(Delivered { partition: delivery.partition, offset: delivery.offset })
 }
 
-/// Copies one message to `target_topic`, keeping its key, value and headers as raw bytes.
-/// The original is never touched: a Kafka log is append-only, so KUI only adds a copy,
-/// appended as a new message stamped "now" like any other.
-pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<Delivered> {
+/// Copies messages to `target_topic`, keeping their keys, values and headers as raw bytes.
+/// The originals are never touched: a Kafka log is append-only, so KUI only adds copies,
+/// appended as new messages stamped "now" like any other.
+///
+/// Every message is read before any is written, so a missing one fails the whole copy
+/// instead of leaving it half done. They are sent one at a time to keep their order.
+pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<Vec<Delivered>> {
     ensure_writable(&request.target_topic)?;
-    let (topic, partition, offset) = (request.topic.clone(), request.partition, request.offset);
+    if request.messages.is_empty() {
+        return Err(Error::msg("No messages to copy"));
+    }
+    let topic = request.topic.clone();
+    let refs: Vec<(i32, i64)> = request.messages.iter().map(|m| (m.partition, m.offset)).collect();
     let reader = clients.clone();
-    let original = run_blocking(move || fetch_one(&reader, &topic, partition, offset)).await?;
+    let originals: Vec<OwnedMessage> = run_blocking(move || {
+        let consumer = browsing_consumer(&reader)?;
+        refs.into_iter().map(|(partition, offset)| fetch_one(&consumer, &topic, partition, offset)).collect()
+    })
+    .await?;
 
-    let mut record: FutureRecord<'_, [u8], [u8]> = FutureRecord::to(&request.target_topic);
+    let mut delivered = Vec::with_capacity(originals.len());
+    for original in &originals {
+        let delivery = clients
+            .producer
+            .send(copy_record(original, &request.target_topic, request.target_partition), TIMEOUT)
+            .await
+            .map_err(|(e, _)| Error::from(e))?;
+        delivered.push(Delivered { partition: delivery.partition, offset: delivery.offset });
+    }
+    Ok(delivered)
+}
+
+fn copy_record<'a>(
+    original: &'a OwnedMessage,
+    target_topic: &'a str,
+    target_partition: Option<i32>,
+) -> FutureRecord<'a, [u8], [u8]> {
+    let mut record: FutureRecord<'_, [u8], [u8]> = FutureRecord::to(target_topic);
     if let Some(key) = original.key() {
         record = record.key(key);
     }
@@ -253,17 +281,14 @@ pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<D
     if let Some(headers) = original.headers() {
         record = record.headers(headers.clone());
     }
-    if let Some(partition) = request.target_partition {
+    if let Some(partition) = target_partition {
         record = record.partition(partition);
     }
-
-    let delivery = clients.producer.send(record, TIMEOUT).await.map_err(|(e, _)| Error::from(e))?;
-    Ok(Delivered { partition: delivery.partition, offset: delivery.offset })
+    record
 }
 
 /// Reads exactly one message, or fails if it was deleted or compacted away.
-fn fetch_one(clients: &KafkaClients, topic: &str, partition: i32, offset: i64) -> Result<OwnedMessage> {
-    let consumer = browsing_consumer(clients)?;
+fn fetch_one(consumer: &KafkaConsumer, topic: &str, partition: i32, offset: i64) -> Result<OwnedMessage> {
     let mut assignment = TopicPartitionList::new();
     assignment.add_partition_offset(topic, partition, Offset::Offset(offset))?;
     consumer.assign(&assignment)?;
@@ -272,10 +297,10 @@ fn fetch_one(clients: &KafkaClients, topic: &str, partition: i32, offset: i64) -
     while Instant::now() < deadline {
         match consumer.poll(Duration::from_millis(200)) {
             None => {}
-            Some(Ok(m)) if m.offset() == offset => return Ok(m.detach()),
+            Some(Ok(m)) if m.offset() == offset && m.partition() == partition => return Ok(m.detach()),
             // Landed somewhere else: the offset is gone (retention, compaction, deletion).
             Some(Ok(_)) | Some(Err(KafkaError::PartitionEOF(_))) => break,
-            Some(Err(e)) => return Err(explain(&consumer, e)),
+            Some(Err(e)) => return Err(explain(consumer, e)),
         }
     }
     Err(Error::msg(format!("Message at partition {partition}, offset {offset} no longer exists")))

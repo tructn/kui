@@ -27,9 +27,13 @@ pub async fn produce_message(
     service::produce(&clients, &request).await
 }
 
-/// Copies one message to another topic, or duplicates it in the same one.
+/// Copies messages to another topic, or duplicates them in the same one.
 #[tauri::command]
-pub async fn copy_message(state: State<'_, AppState>, cluster_id: String, request: CopyRequest) -> Result<Delivered> {
+pub async fn copy_messages(
+    state: State<'_, AppState>,
+    cluster_id: String,
+    request: CopyRequest,
+) -> Result<Vec<Delivered>> {
     let clients = state.clients(&cluster_id)?;
     service::copy(clients, &request).await
 }
