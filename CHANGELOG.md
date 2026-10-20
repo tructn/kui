@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.6](https://github.com/tructn/kui/compare/v0.1.0-alpha.5...v0.1.0-alpha.6) (2026-10-20)
+
+
+### Added
+
+* **messages:** copy several messages to a topic at once ([#18](https://github.com/tructn/kui/issues/18)) ([2550c8c](https://github.com/tructn/kui/commit/2550c8cbd6346ce53dcae0eff1667ed84308c790))
+
 ## [0.1.0-alpha.5](https://github.com/tructn/kui/compare/v0.1.0-alpha.4...v0.1.0-alpha.5) (2026-10-19)
 
 
