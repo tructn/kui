@@ -18,23 +18,22 @@ import type { PartitionOffset } from "../types";
 import {
   PartitionStatusBadge,
   PartitionStatusInfo,
+  STATUS_META,
 } from "./partition-status-badge";
 import { partitionSegments, ProgressBar } from "./progress-bar";
 
 const COLUMNS: SortColumns<
   PartitionOffset,
-  "partition" | "owner" | "low" | "committed" | "high" | "lag" | "status"
+  "partition" | "owner" | "consumed" | "remaining" | "status"
 > = {
   partition: (o) => o.partition,
   owner: (o) => o.owner,
-  low: (o) => o.low,
-  committed: (o) => o.committed,
-  high: (o) => o.high,
-  lag: (o) => o.lag,
+  consumed: (o) => partitionSegments(o).consumed,
+  remaining: (o) => o.lag,
   status: (o) => o.status,
 };
 
-/** Where a group stands on each partition of one topic: log start, committed, end, lag. */
+/** Where a group stands on each partition of one topic: consumed and remaining messages. */
 export function PartitionOffsetsTable({
   offsets,
 }: {
@@ -42,7 +41,7 @@ export function PartitionOffsetsTable({
 }) {
   const sorter = useSort("partition-offsets", offsets, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("partition-offsets", 8);
+  const resize = useColumnResize("partition-offsets", 6);
   return (
     // Sits inside a bordered section, so no border of its own.
     <TableFrame pager={pager} fill={false} className="rounded-none border-0">
@@ -67,36 +66,20 @@ export function PartitionOffsetsTable({
             </SortableTableHead>
             <TableHead className="w-28">Progress</TableHead>
             <SortableTableHead
-              column="low"
+              column="consumed"
               sort={sorter.sort}
               onSort={sorter.toggle}
               align="right"
             >
-              Start
+              Consumed
             </SortableTableHead>
             <SortableTableHead
-              column="committed"
+              column="remaining"
               sort={sorter.sort}
               onSort={sorter.toggle}
               align="right"
             >
-              Committed
-            </SortableTableHead>
-            <SortableTableHead
-              column="high"
-              sort={sorter.sort}
-              onSort={sorter.toggle}
-              align="right"
-            >
-              End
-            </SortableTableHead>
-            <SortableTableHead
-              column="lag"
-              sort={sorter.sort}
-              onSort={sorter.toggle}
-              align="right"
-            >
-              Lag
+              Remaining
             </SortableTableHead>
             <SortableTableHead
               column="status"
@@ -114,45 +97,58 @@ export function PartitionOffsetsTable({
           </TableRow>
         </TableHeader>
         <TableBody className="font-mono text-xs tabular-nums">
-          {pager.items.map((o) => (
-            <TableRow key={`${o.topic}/${o.partition}`}>
-              <TableCell className="text-right">{o.partition}</TableCell>
-              <TableCell
-                className="max-w-40 truncate"
-                title={o.owner ?? undefined}
-              >
-                {o.owner ?? (
-                  <span className="font-sans text-muted-foreground">
-                    unassigned
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <ProgressBar segments={partitionSegments(o)} />
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatNumber(o.low)}
-              </TableCell>
-              <TableCell className="text-right">
-                {o.committed == null ? "—" : formatNumber(o.committed)}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatNumber(o.high)}
-              </TableCell>
-              <TableCell
-                className={
-                  o.lag
-                    ? "text-right text-amber-600 dark:text-amber-400"
-                    : "text-right"
-                }
-              >
-                {o.lag == null ? "—" : formatNumber(o.lag)}
-              </TableCell>
-              <TableCell className="font-sans">
-                <PartitionStatusBadge status={o.status} />
-              </TableCell>
-            </TableRow>
-          ))}
+          {pager.items.map((o) => {
+            const segments = partitionSegments(o);
+            return (
+              <TableRow key={`${o.topic}/${o.partition}`}>
+                <TableCell className="text-right">{o.partition}</TableCell>
+                <TableCell
+                  className="max-w-40 truncate"
+                  title={o.owner ?? undefined}
+                >
+                  {o.owner ?? (
+                    <span className="font-sans text-muted-foreground">
+                      unassigned
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <ProgressBar
+                    segments={segments}
+                    emptyText={
+                      segments.consumed == null
+                        ? STATUS_META[o.status].label
+                        : undefined
+                    }
+                  />
+                </TableCell>
+                <TableCell
+                  className="text-right"
+                  title={
+                    o.committed == null
+                      ? undefined
+                      : `Committed offset ${formatNumber(o.committed)}`
+                  }
+                >
+                  {segments.consumed == null
+                    ? "—"
+                    : formatNumber(segments.consumed)}
+                </TableCell>
+                <TableCell
+                  className={
+                    o.lag
+                      ? "text-right text-amber-600 dark:text-amber-400"
+                      : "text-right"
+                  }
+                >
+                  {o.lag == null ? "—" : formatNumber(o.lag)}
+                </TableCell>
+                <TableCell className="font-sans">
+                  <PartitionStatusBadge status={o.status} />
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableFrame>
