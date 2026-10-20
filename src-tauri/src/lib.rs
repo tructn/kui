@@ -55,7 +55,7 @@ pub fn run() {
             topics::commands::delete_topics,
             messages::commands::browse_messages,
             messages::commands::produce_message,
-            messages::commands::copy_message,
+            messages::commands::copy_messages,
             messages::commands::tail_messages,
             generator::commands::list_generators,
             generator::commands::preview_records,

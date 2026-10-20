@@ -12,64 +12,50 @@ import type { PartitionOffset, TopicProgress } from "../types";
 /** One color per kind of message, shared by bars, legends and badges. */
 export const SEGMENT_COLORS = {
   consumed: "bg-emerald-500",
-  lag: "bg-amber-500",
-  untouched: "bg-muted-foreground/25",
-  lost: "bg-destructive",
+  remaining: "bg-amber-500",
 } as const;
 
 type SegmentKind = keyof typeof SEGMENT_COLORS;
+const KINDS = Object.keys(SEGMENT_COLORS) as SegmentKind[];
 
-/**
- * Each color is a kind of message, and matches the partition status of the same color
- * (Caught up / Behind / Not started / Out of range in `STATUS_META`).
- */
+/** "Remaining" is Kafka's consumer lag, in plainer words. */
 const SEGMENT_LABELS: Record<SegmentKind, string> = {
   consumed: "Consumed",
-  lag: "Lag",
-  untouched: "Not started",
-  lost: "Out of range",
+  remaining: "Remaining",
 };
 
 const SEGMENT_DESCRIPTIONS: Record<SegmentKind, string> = {
-  consumed:
-    "Messages the group has read: everything before its committed offset.",
-  lag: "Messages after the committed offset, waiting to be read.",
-  untouched:
-    "Messages in partitions where the group has never committed an offset.",
-  lost: "Messages in partitions whose committed offset was deleted by retention. The group has read none of them.",
+  consumed: "Messages the group has already read.",
+  remaining: "Messages waiting for the group to read them (also called lag).",
 };
 
 type Segments = Partial<Record<SegmentKind, number>>;
 
 export function topicSegments(t: TopicProgress): Segments {
-  return { consumed: t.consumed, lag: t.lag, untouched: t.untouched };
+  return { consumed: t.consumed, remaining: t.lag };
 }
 
+/** Partitions the group never read, or whose offset retention deleted, have no segments. */
 export function partitionSegments(o: PartitionOffset): Segments {
-  const retained = o.high - o.low;
-  switch (o.status) {
-    case "notStarted":
-      return { untouched: retained };
-    case "outOfRange":
-      // The committed offset is gone; everything still retained is unread.
-      return { lost: retained };
-    default:
-      return {
-        consumed: Math.min(Math.max(o.committed! - o.low, 0), retained),
-        lag: o.lag ?? 0,
-      };
-  }
+  if (o.status === "notStarted" || o.status === "outOfRange") return {};
+  return {
+    consumed: Math.min(Math.max(o.committed! - o.low, 0), o.high - o.low),
+    remaining: o.lag ?? 0,
+  };
 }
 
-/** Stacked bar of consumed / lag / not-started / out-of-range messages, with the numbers in a tooltip. */
+/** Stacked bar of consumed / remaining messages, with the numbers in a tooltip. */
 export function ProgressBar({
   segments,
+  emptyText = "No messages on the broker",
   className,
 }: {
   segments: Segments;
+  /** Tooltip when there is nothing to draw. */
+  emptyText?: string;
   className?: string;
 }) {
-  const entries = (Object.keys(SEGMENT_COLORS) as SegmentKind[])
+  const entries = KINDS
     .map((kind) => [kind, segments[kind] ?? 0] as const)
     .filter(([, value]) => value > 0);
   const total = entries.reduce((sum, [, value]) => sum + value, 0);
@@ -96,7 +82,7 @@ export function ProgressBar({
       </TooltipTrigger>
       <TooltipContent>
         {total === 0 ? (
-          "No messages on the broker"
+          emptyText
         ) : (
           <div className="flex flex-col gap-0.5">
             {entries.map(([kind, value]) => (
@@ -117,13 +103,11 @@ export function ProgressBar({
   );
 }
 
-const LEGEND_ORDER = ["consumed", "lag", "untouched", "lost"] as const;
-
 /** Color key for the bars, shown once above them, with what each color means on hover. */
 export function ProgressLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {LEGEND_ORDER.map((kind) => (
+      {KINDS.map((kind) => (
         <span key={kind} className="flex items-center gap-1.5">
           <span className={cn("size-2 rounded-full", SEGMENT_COLORS[kind])} />
           {SEGMENT_LABELS[kind]}
@@ -131,7 +115,7 @@ export function ProgressLegend() {
       ))}
       <InfoTip label="What the colors mean">
         <InfoList
-          items={LEGEND_ORDER.map((kind) => ({
+          items={KINDS.map((kind) => ({
             term: (
               <span className="flex items-center gap-1.5">
                 <span

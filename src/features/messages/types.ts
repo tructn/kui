@@ -69,10 +69,16 @@ export interface Delivered {
   offset: number;
 }
 
-export interface CopyRequest {
-  topic: string;
+/** Where one message sits in its topic. */
+export interface MessageRef {
   partition: number;
   offset: number;
+}
+
+export interface CopyRequest {
+  topic: string;
+  /** Copied in this order. */
+  messages: MessageRef[];
   targetTopic: string;
   /** null = partitioner decides (by key) */
   targetPartition: number | null;

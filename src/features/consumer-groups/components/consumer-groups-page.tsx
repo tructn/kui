@@ -102,7 +102,7 @@ export function ConsumerGroupsPage() {
                     Members
                   </SortableTableHead>
                   <SortableTableHead column="lag" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-32">
-                    Lag
+                    Remaining
                   </SortableTableHead>
                 </TableRow>
               </TableHeader>

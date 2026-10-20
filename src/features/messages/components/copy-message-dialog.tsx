@@ -16,8 +16,8 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
-import { useCopyMessage } from "../queries";
-import type { CopyTarget, KafkaMessage } from "../types";
+import { useCopyMessages } from "../queries";
+import type { CopyTarget, MessageRef } from "../types";
 import { TopicPicker } from "./topic-picker";
 
 const AUTO_PARTITION = "auto";
@@ -25,16 +25,19 @@ const AUTO_PARTITION = "auto";
 interface CopyMessageDialogProps {
   clusterId: string;
   topic: string;
-  message: KafkaMessage;
+  /** One message (from its detail panel) or a selection from the table. */
+  messages: MessageRef[];
   targets: CopyTarget[];
+  onCopied?: () => void;
 }
 
-/** Duplicates a message (same topic) or copies it elsewhere. The original is never touched. */
-export function CopyMessageDialog({ clusterId, topic, message, targets }: CopyMessageDialogProps) {
+/** Duplicates messages (same topic) or copies them elsewhere. The originals are never touched. */
+export function CopyMessageDialog({ clusterId, topic, messages, targets, onCopied }: CopyMessageDialogProps) {
   const [open, setOpen] = useState(false);
   const [targetTopic, setTargetTopic] = useState(topic);
   const [partition, setPartition] = useState(AUTO_PARTITION);
-  const copy = useCopyMessage(clusterId);
+  const copy = useCopyMessages(clusterId);
+  const single = messages.length === 1 ? messages[0] : null;
 
   // Fall back to the current topic until the topic list loads.
   const options = targets.some((t) => t.name === topic) ? targets : [{ name: topic, partitions: 0 }, ...targets];
@@ -50,15 +53,21 @@ export function CopyMessageDialog({ clusterId, topic, message, targets }: CopyMe
     copy.mutate(
       {
         topic,
-        partition: message.partition,
-        offset: message.offset,
+        // Oldest first within each partition, so copies keep their relative order.
+        messages: [...messages].sort((a, b) => a.partition - b.partition || a.offset - b.offset),
         targetTopic,
         targetPartition: partition === AUTO_PARTITION ? null : Number(partition),
       },
       {
-        onSuccess: (d) => {
-          toast.success(`Copied to ${targetTopic} · partition ${d.partition}, offset ${d.offset}`);
+        onSuccess: (delivered) => {
+          const [d] = delivered;
+          toast.success(
+            delivered.length === 1
+              ? `Copied to ${targetTopic} · partition ${d.partition}, offset ${d.offset}`
+              : `Copied ${delivered.length} messages to ${targetTopic}`,
+          );
           setOpen(false);
+          onCopied?.();
         },
       },
     );
@@ -74,14 +83,14 @@ export function CopyMessageDialog({ clusterId, topic, message, targets }: CopyMe
     >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <ForwardIcon /> Copy to topic
+          <ForwardIcon /> {single ? "Copy to topic" : `Copy ${messages.length} to topic`}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Copy message to topic</DialogTitle>
+          <DialogTitle>{single ? "Copy message to topic" : `Copy ${messages.length} messages to topic`}</DialogTitle>
           <DialogDescription className="font-mono [overflow-wrap:anywhere]">
-            {topic} · partition {message.partition} · offset {message.offset}
+            {single ? `${topic} · partition ${single.partition} · offset ${single.offset}` : `from ${topic}`}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">

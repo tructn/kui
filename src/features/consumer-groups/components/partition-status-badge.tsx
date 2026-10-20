@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 import type { PartitionStatus } from "../types";
 
-/** Labels match the progress bar segment of the same color (see `SEGMENT_LABELS`). */
+/** Caught up and Behind share their colors with the progress bar's Consumed and Remaining. */
 export const STATUS_META: Record<PartitionStatus, { label: string; className: string; description: string }> = {
   caughtUp: {
     label: "Caught up",
@@ -14,7 +14,7 @@ export const STATUS_META: Record<PartitionStatus, { label: string; className: st
   behind: {
     label: "Behind",
     className: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    description: "Messages are waiting after the committed offset. Lag is how many.",
+    description: "Messages are waiting after the committed offset. Remaining is how many.",
   },
   notStarted: {
     label: "Not started",

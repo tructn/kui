@@ -96,7 +96,7 @@ function GroupDetailBody({
       <div className="flex items-center gap-3">
         <GroupStateBadge state={detail.state} />
         <span className="text-sm text-muted-foreground">
-          Total lag <span className="font-mono text-foreground tabular-nums">{formatNumber(detail.totalLag)}</span>
+          Remaining <span className="font-mono text-foreground tabular-nums">{formatNumber(detail.totalLag)}</span>
         </span>
         <div className="flex-1" />
         <AlertDialog>

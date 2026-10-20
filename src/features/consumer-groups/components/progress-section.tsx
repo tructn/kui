@@ -21,12 +21,7 @@ interface ProgressSectionProps {
 /** One group × topic: totals and a bar, expanding to every partition. */
 export function ProgressSection({ title, extra, progress, offsets, defaultOpen = false }: ProgressSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const counts = [
-    [progress.caughtUp, "caught up"],
-    [progress.behind, "behind"],
-    [progress.notStarted, "not started"],
-    [progress.outOfRange, "out of range"],
-  ] as const;
+  const read = progress.consumed + progress.lag > 0;
 
   return (
     <div className="rounded-lg border">
@@ -43,26 +38,27 @@ export function ProgressSection({ title, extra, progress, offsets, defaultOpen =
           </button>
           {extra}
           <div className="flex-1" />
-          <span className="text-xs whitespace-nowrap text-muted-foreground">
-            Lag{" "}
-            <span
-              className={cn(
-                "font-mono tabular-nums",
-                progress.lag > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-              )}
-            >
-              {formatNumber(progress.lag)}
+          <span className="flex gap-3 text-xs whitespace-nowrap text-muted-foreground">
+            <span>
+              Consumed <span className="font-mono text-foreground tabular-nums">{formatNumber(progress.consumed)}</span>
+            </span>
+            <span>
+              Remaining{" "}
+              <span
+                className={cn(
+                  "font-mono tabular-nums",
+                  progress.lag > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+                )}
+              >
+                {formatNumber(progress.lag)}
+              </span>
             </span>
           </span>
         </div>
-        <ProgressBar segments={topicSegments(progress)} />
-        <p className="text-xs text-muted-foreground">
-          {progress.partitions} partitions:{" "}
-          {counts
-            .filter(([n]) => n > 0)
-            .map(([n, label]) => `${n} ${label}`)
-            .join(" · ")}
-        </p>
+        <ProgressBar
+          segments={topicSegments(progress)}
+          emptyText={!read && progress.untouched > 0 ? "Not consumed yet" : undefined}
+        />
       </div>
       {open && (
         <div className="border-t">

@@ -5,10 +5,10 @@ import { button, ensureCluster, goTo, openSheet, snapshot } from "../helpers.js"
 describe("Consumer groups", () => {
   before(ensureCluster);
 
-  it("lists the seeded group with its topic and lag", async () => {
+  it("lists the seeded group with its topic and remaining messages", async () => {
     await goTo("Consumer groups");
     const row = $("td=demo-billing").parentElement();
-    // Lag arrives after the list, from a separate request.
+    // Remaining (lag) arrives after the list, from a separate request.
     await expect(row).toHaveText(expect.stringContaining("20"));
     await snapshot("consumer-groups");
     // WebKit's getText skips text inside overflow-hidden badges, so look for the element.
@@ -19,9 +19,9 @@ describe("Consumer groups", () => {
     await $("td=demo-billing").click();
 
     // The seed consumed 30 of 50 messages.
-    await expect(openSheet()).toHaveText(expect.stringContaining("Total lag 20"));
+    await expect(openSheet()).toHaveText(expect.stringContaining("Remaining 20"));
+    await expect(openSheet()).toHaveText(expect.stringContaining("Consumed 30"));
     await expect(openSheet().$("span=demo.orders")).toBeDisplayed();
-    await expect(openSheet()).toHaveText(expect.stringContaining("3 partitions"));
     // A single topic opens expanded, one row per partition.
     await expect(openSheet().$$("tbody tr")).toBeElementsArrayOfSize({ gte: 3 });
     await browser.keys("Escape");
