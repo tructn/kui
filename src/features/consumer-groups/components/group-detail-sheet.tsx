@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ResizableSheetContent } from "@/components/resizable-sheet-content";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TableFrame } from "@/components/table-frame";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
@@ -110,11 +111,21 @@ function GroupDetailBody({
   return (
     <>
       <div className="flex items-center gap-3">
-        {detail && <GroupStateBadge state={detail.state} />}
-        <span className="text-sm text-muted-foreground">
-          Remaining{" "}
-          <span className="font-mono text-foreground tabular-nums">{detail ? formatNumber(detail.totalLag) : "—"}</span>
-        </span>
+        {detail ? (
+          <GroupStateBadge state={detail.state} />
+        ) : (
+          status.isPending && <Skeleton className="h-5 w-16 rounded-full" />
+        )}
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          Remaining
+          {detail ? (
+            <span className="font-mono text-foreground tabular-nums">{formatNumber(detail.totalLag)}</span>
+          ) : status.isPending ? (
+            <Skeleton className="h-4 w-10" />
+          ) : (
+            <span className="text-foreground">—</span>
+          )}
+        </div>
         <div className="flex-1" />
         <AlertDialog>
           <AlertDialogTrigger asChild>
