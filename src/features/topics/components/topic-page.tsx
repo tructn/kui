@@ -3,7 +3,7 @@ import { ArrowLeftIcon, RotateCwIcon } from "lucide-react";
 import { useClusterId, useNavigation } from "@/app/stores/navigation-store";
 import { CopyButton } from "@/components/copy-button";
 import { PageHeader } from "@/components/page-header";
-import { ErrorState, LoadingRows } from "@/components/query-states";
+import { emptyText, ErrorState } from "@/components/query-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,9 +13,14 @@ import { MessageBrowser, ProduceDialog } from "@/features/messages";
 import { formatNumber } from "@/lib/format";
 
 import { useTopic, useTopics } from "../queries";
+import type { Partition, TopicConfigEntry } from "../types";
 import { ConfigsTable } from "./configs-table";
 import { DeleteTopicButton } from "./delete-topic-button";
 import { PartitionsTable } from "./partitions-table";
+
+// Stable empty lists, so the tables' memoised sorting doesn't rerun every render.
+const NO_PARTITIONS: Partition[] = [];
+const NO_CONFIGS: TopicConfigEntry[] = [];
 
 /** One topic: messages, partitions and configuration in tabs. */
 export function TopicPage({ topic }: { topic: string }) {
@@ -100,41 +105,48 @@ export function TopicPage({ topic }: { topic: string }) {
         }
       />
       <div className="flex min-h-0 flex-1 flex-col p-4">
-        {detail.error && (
-          <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
-        )}
-        {detail.isPending && <LoadingRows />}
-        {detail.data && (
-          <Tabs defaultValue="messages" className="min-h-0 flex-1">
-            <TabsList>
-              <TabsTrigger value="messages">Messages</TabsTrigger>
-              <TabsTrigger value="consumers">Consumers</TabsTrigger>
-              <TabsTrigger value="partitions">Partitions</TabsTrigger>
-              <TabsTrigger value="configuration">Configuration</TabsTrigger>
-            </TabsList>
-            <TabsContent value="messages" className="flex min-h-0 flex-col">
-              <MessageBrowser
-                clusterId={clusterId}
-                topic={topic}
-                partitions={partitionIds}
-                copyTargets={copyTargets}
-                readOnly={internal}
-              />
-            </TabsContent>
-            <TabsContent value="consumers" className="flex min-h-0 flex-col">
-              <TopicConsumers clusterId={clusterId} topic={topic} />
-            </TabsContent>
-            <TabsContent value="partitions" className="flex min-h-0 flex-col">
-              <PartitionsTable partitions={detail.data.partitions} />
-            </TabsContent>
-            <TabsContent
-              value="configuration"
-              className="flex min-h-0 flex-col"
-            >
-              <ConfigsTable configs={detail.data.configs} />
-            </TabsContent>
-          </Tabs>
-        )}
+        {/* Tabs and tables show straight away, empty until their data loads. */}
+        <Tabs defaultValue="messages" className="min-h-0 flex-1">
+          <TabsList>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
+            <TabsTrigger value="consumers">Consumers</TabsTrigger>
+            <TabsTrigger value="partitions">Partitions</TabsTrigger>
+            <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          </TabsList>
+          <TabsContent value="messages" className="flex min-h-0 flex-col">
+            <MessageBrowser
+              clusterId={clusterId}
+              topic={topic}
+              partitions={partitionIds}
+              copyTargets={copyTargets}
+              readOnly={internal}
+            />
+          </TabsContent>
+          <TabsContent value="consumers" className="flex min-h-0 flex-col">
+            <TopicConsumers clusterId={clusterId} topic={topic} />
+          </TabsContent>
+          <TabsContent value="partitions" className="flex min-h-0 flex-col">
+            {detail.error && (
+              <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
+            )}
+            <PartitionsTable
+              partitions={detail.data?.partitions ?? NO_PARTITIONS}
+              emptyText={detail.data ? undefined : emptyText(detail, "")}
+            />
+          </TabsContent>
+          <TabsContent
+            value="configuration"
+            className="flex min-h-0 flex-col"
+          >
+            {detail.error && (
+              <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
+            )}
+            <ConfigsTable
+              configs={detail.data?.configs ?? NO_CONFIGS}
+              emptyText={detail.data ? undefined : emptyText(detail, "")}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );

@@ -1,7 +1,7 @@
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 
-import { ErrorState, LoadingRows } from "@/components/query-states";
+import { emptyText, ErrorState } from "@/components/query-states";
 import { ShortcutHint } from "@/components/shortcut-hint";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -54,7 +54,7 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
 
   // While the next page loads, the old one is shown as a placeholder: its `next` is stale.
   const next = messages.isPlaceholderData ? null : (messages.data?.next ?? null);
-  const pager = messages.data && serverPager(messages.data, page, pageSize, next !== null, {
+  const pager = serverPager(messages.data ?? EMPTY_PAGE, page, pageSize, next !== null, {
     setPage: (to) => {
       if (to === page + 1 && next) setCursors([...cursors, next]);
       else if (to < page) setCursors(cursors.slice(0, to + 1));
@@ -135,17 +135,15 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
       ) : (
         <>
           {messages.error && <ErrorState error={messages.error} onRetry={() => messages.refetch()} />}
-          {messages.isPending && <LoadingRows rows={10} />}
-          {messages.data && pager && (
-            <MessageTable
-              messages={messages.data.messages}
-              pager={pager}
-              onSelect={setSelected}
-              checked={readOnly ? undefined : checked}
-              onCheckedChange={setChecked}
-              emptyText="No messages in this range."
-            />
-          )}
+          {/* The table shows even before the first page arrives (or when it fails), just empty. */}
+          <MessageTable
+            messages={pager.items}
+            pager={pager}
+            onSelect={setSelected}
+            checked={readOnly ? undefined : checked}
+            onCheckedChange={setChecked}
+            emptyText={emptyText(messages, "No messages in this range.")}
+          />
         </>
       )}
       <MessageSheet
@@ -159,6 +157,9 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
     </div>
   );
 }
+
+/** Stands in for the first page until it loads, so the table can render empty. */
+const EMPTY_PAGE: BrowsePage = { messages: [], total: 0, next: null };
 
 /** Adapts one server page to the table's pager; `page` is 0-based. */
 function serverPager(

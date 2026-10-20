@@ -2,7 +2,7 @@ import { ArrowUpRightIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { useNavigation } from "@/app/stores/navigation-store";
-import { ErrorState, LoadingRows } from "@/components/query-states";
+import { emptyText, ErrorState } from "@/components/query-states";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ResizableSheetContent } from "@/components/resizable-sheet-content";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TableFrame } from "@/components/table-frame";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
@@ -58,33 +59,49 @@ export function GroupDetailSheet({ clusterId, group, onClose }: GroupDetailSheet
         </SheetHeader>
         <div className="flex flex-col gap-6 overflow-auto p-4">
           {detail.error && <ErrorState error={detail.error} onRetry={() => detail.refetch()} />}
-          {detail.isPending && <LoadingRows />}
-          {detail.data && <GroupDetailBody clusterId={clusterId} detail={detail.data} onDeleted={onClose} />}
+          {group != null && (
+            <GroupDetailBody
+              clusterId={clusterId}
+              name={group}
+              detail={detail.data}
+              status={detail}
+              onDeleted={onClose}
+            />
+          )}
         </div>
       </ResizableSheetContent>
     </Sheet>
   );
 }
 
+const NO_MEMBERS: GroupMember[] = [];
+
+/** The sheet's contents; sections render empty until `detail` loads. */
 function GroupDetailBody({
   clusterId,
+  name,
   detail,
+  status,
   onDeleted,
 }: {
   clusterId: string;
-  detail: GroupDetail;
+  name: string;
+  detail: GroupDetail | undefined;
+  /** The detail query, for the empty-section wording. */
+  status: { isPending: boolean; isError: boolean };
   onDeleted: () => void;
 }) {
   const deleteGroup = useDeleteConsumerGroup(clusterId);
   const navigate = useNavigation((s) => s.navigate);
-  const memberSort = useSort("group-members", detail.members, MEMBER_COLUMNS);
+  const topics = detail?.topics ?? [];
+  const memberSort = useSort("group-members", detail?.members ?? NO_MEMBERS, MEMBER_COLUMNS);
   const members = usePagination(memberSort.rows, memberSort.key);
   const memberResize = useColumnResize("group-members", 3);
 
   function handleDelete() {
-    deleteGroup.mutate(detail.name, {
+    deleteGroup.mutate(name, {
       onSuccess: () => {
-        toast.success(`Deleted ${detail.name}`);
+        toast.success(`Deleted ${name}`);
         onDeleted();
       },
       onError: (e) => toast.error(e.message),
@@ -94,21 +111,32 @@ function GroupDetailBody({
   return (
     <>
       <div className="flex items-center gap-3">
-        <GroupStateBadge state={detail.state} />
-        <span className="text-sm text-muted-foreground">
-          Remaining <span className="font-mono text-foreground tabular-nums">{formatNumber(detail.totalLag)}</span>
-        </span>
+        {detail ? (
+          <GroupStateBadge state={detail.state} />
+        ) : (
+          status.isPending && <Skeleton className="h-5 w-16 rounded-full" />
+        )}
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          Remaining
+          {detail ? (
+            <span className="font-mono text-foreground tabular-nums">{formatNumber(detail.totalLag)}</span>
+          ) : status.isPending ? (
+            <Skeleton className="h-4 w-10" />
+          ) : (
+            <span className="text-foreground">—</span>
+          )}
+        </div>
         <div className="flex-1" />
         <AlertDialog>
           <AlertDialogTrigger asChild>
             {/* Kafka only allows deleting groups without active members. */}
-            <Button variant="destructive" size="sm" disabled={detail.members.length > 0}>
+            <Button variant="destructive" size="sm" disabled={!detail || detail.members.length > 0}>
               <Trash2Icon /> Delete group
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete {detail.name}?</AlertDialogTitle>
+              <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
               <AlertDialogDescription>
                 Its committed offsets are removed permanently. Consumers rejoining will start from their
                 auto.offset.reset position.
@@ -126,17 +154,19 @@ function GroupDetailBody({
 
       <section className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium">Topics ({detail.topics.length})</h3>
+          <h3 className="text-sm font-medium">Topics{detail && ` (${topics.length})`}</h3>
           <ProgressLegend />
         </div>
-        {detail.topics.length === 0 && <p className="text-sm text-muted-foreground">No committed offsets.</p>}
-        {detail.topics.map((t) => (
+        {topics.length === 0 && (
+          <p className="text-sm text-muted-foreground">{emptyText(status, "No committed offsets.")}</p>
+        )}
+        {topics.map((t) => (
           <ProgressSection
             key={t.topic}
             title={t.topic}
             progress={t}
-            offsets={detail.offsets.filter((o) => o.topic === t.topic)}
-            defaultOpen={detail.topics.length === 1}
+            offsets={detail?.offsets.filter((o) => o.topic === t.topic) ?? []}
+            defaultOpen={topics.length === 1}
             extra={
               <Button
                 variant="ghost"
@@ -151,9 +181,9 @@ function GroupDetailBody({
         ))}
       </section>
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">Members ({detail.members.length})</h3>
-        {detail.members.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active members.</p>
+        <h3 className="text-sm font-medium">Members{detail && ` (${detail.members.length})`}</h3>
+        {memberSort.rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{emptyText(status, "No active members.")}</p>
         ) : (
           <TableFrame pager={members} fill={false}>
             <Table resize={memberResize}>
