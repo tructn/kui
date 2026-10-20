@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 
 import { useClusterId } from "@/app/stores/navigation-store";
 import { PageHeader } from "@/components/page-header";
-import { ErrorState, LoadingRows } from "@/components/query-states";
+import { emptyText, ErrorState } from "@/components/query-states";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,60 +80,57 @@ export function ConsumerGroupsPage() {
         </div>
 
         {groups.error && <ErrorState error={groups.error} onRetry={() => groups.refetch()} />}
-        {groups.isPending && <LoadingRows />}
-        {groups.data && (
-          <TableFrame pager={pager}>
-            <Table resize={resize} aria-label="Consumer groups. Use the arrow keys to move between rows and Enter to open one.">
-              <TableHeader>
-                <TableRow>
-                  <SortableTableHead column="name" sort={sorter.sort} onSort={sorter.toggle}>
-                    Group
-                  </SortableTableHead>
-                  <SortableTableHead column="state" sort={sorter.sort} onSort={sorter.toggle} className="w-44">
-                    State
-                  </SortableTableHead>
-                  <SortableTableHead column="topics" sort={sorter.sort} onSort={sorter.toggle}>
-                    Topics
-                  </SortableTableHead>
-                  <SortableTableHead column="assignor" sort={sorter.sort} onSort={sorter.toggle} className="w-32">
-                    Assignor
-                  </SortableTableHead>
-                  <SortableTableHead column="members" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-24">
-                    Members
-                  </SortableTableHead>
-                  <SortableTableHead column="lag" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-32">
-                    Remaining
-                  </SortableTableHead>
+        <TableFrame pager={pager}>
+          <Table resize={resize} aria-label="Consumer groups. Use the arrow keys to move between rows and Enter to open one.">
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead column="name" sort={sorter.sort} onSort={sorter.toggle}>
+                  Group
+                </SortableTableHead>
+                <SortableTableHead column="state" sort={sorter.sort} onSort={sorter.toggle} className="w-44">
+                  State
+                </SortableTableHead>
+                <SortableTableHead column="topics" sort={sorter.sort} onSort={sorter.toggle}>
+                  Topics
+                </SortableTableHead>
+                <SortableTableHead column="assignor" sort={sorter.sort} onSort={sorter.toggle} className="w-32">
+                  Assignor
+                </SortableTableHead>
+                <SortableTableHead column="members" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-24">
+                  Members
+                </SortableTableHead>
+                <SortableTableHead column="lag" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-32">
+                  Remaining
+                </SortableTableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pager.items.map((g, i) => (
+                <TableRow key={g.name} {...rowProps(i, () => setSelected(g.name))}>
+                  <TableCell className="font-mono">{g.name}</TableCell>
+                  <TableCell>
+                    <GroupStateBadge state={g.state} />
+                  </TableCell>
+                  <TableCell>
+                    <TopicsCell lag={lagByGroup.get(g.name)} loading={lags.isPending} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{g.protocol || "—"}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{g.members}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    <LagCell lag={lagByGroup.get(g.name)} loading={lags.isPending} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pager.items.map((g, i) => (
-                  <TableRow key={g.name} {...rowProps(i, () => setSelected(g.name))}>
-                    <TableCell className="font-mono">{g.name}</TableCell>
-                    <TableCell>
-                      <GroupStateBadge state={g.state} />
-                    </TableCell>
-                    <TableCell>
-                      <TopicsCell lag={lagByGroup.get(g.name)} loading={lags.isPending} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{g.protocol || "—"}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{g.members}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      <LagCell lag={lagByGroup.get(g.name)} loading={lags.isPending} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {visible.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No consumer groups found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableFrame>
-        )}
+              ))}
+              {visible.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    {emptyText(groups, "No consumer groups found.")}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableFrame>
       </div>
       <GroupDetailSheet clusterId={clusterId} group={selected} onClose={() => setSelected(null)} />
     </>

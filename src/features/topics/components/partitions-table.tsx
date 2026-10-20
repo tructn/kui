@@ -19,7 +19,8 @@ const COLUMNS: SortColumns<Partition, "id" | "leader" | "replicas" | "isr" | "lo
   messages: (p) => p.high - p.low,
 };
 
-export function PartitionsTable({ partitions }: { partitions: Partition[] }) {
+/** `emptyText` replaces "No partitions." while the topic is loading or failed. */
+export function PartitionsTable({ partitions, emptyText }: { partitions: Partition[]; emptyText?: string }) {
   const sorter = useSort("topic-partitions", partitions, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
   const resize = useColumnResize("partitions", 7);
@@ -52,6 +53,13 @@ export function PartitionsTable({ partitions }: { partitions: Partition[] }) {
               </TableRow>
             );
           })}
+          {partitions.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={7} className="h-24 text-center font-sans text-muted-foreground">
+                {emptyText ?? "No partitions."}
+              </TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </TableFrame>
