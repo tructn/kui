@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { TableFrame } from "@/components/table-frame";
@@ -20,7 +22,7 @@ const COLUMNS: SortColumns<Partition, "id" | "leader" | "replicas" | "isr" | "lo
 };
 
 /** `emptyText` replaces "No partitions." while the topic is loading or failed. */
-export function PartitionsTable({ partitions, emptyText }: { partitions: Partition[]; emptyText?: string }) {
+export function PartitionsTable({ partitions, emptyText }: { partitions: Partition[]; emptyText?: ReactNode }) {
   const sorter = useSort("topic-partitions", partitions, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
   const resize = useColumnResize("partitions", 7);

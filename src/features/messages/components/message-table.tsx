@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { TableFrame } from "@/components/table-frame";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +16,7 @@ import type { KafkaMessage, MessageRef } from "../types";
 interface MessageTableProps {
   messages: KafkaMessage[];
   onSelect: (message: KafkaMessage) => void;
-  emptyText: string;
+  emptyText: ReactNode;
   /** Fade rows in as they arrive (live mode). */
   animate?: boolean;
   /** Server-side paging; without it the table pages `messages` itself. */

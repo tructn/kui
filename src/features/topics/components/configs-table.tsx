@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -18,7 +20,7 @@ const COLUMNS: SortColumns<TopicConfigEntry, "name" | "value" | "source"> = {
 };
 
 /** `emptyText` replaces the usual empty message while the topic is loading or failed. */
-export function ConfigsTable({ configs, emptyText }: { configs: TopicConfigEntry[]; emptyText?: string }) {
+export function ConfigsTable({ configs, emptyText }: { configs: TopicConfigEntry[]; emptyText?: ReactNode }) {
   const [overridesOnly, setOverridesOnly] = useViewState("topic-configs.overridesOnly", false);
   const visible = overridesOnly ? configs.filter((c) => !c.isDefault) : configs;
   const sorter = useSort("topic-configs", visible, COLUMNS);
