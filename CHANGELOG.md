@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.8](https://github.com/tructn/kui/compare/v0.1.0-alpha.7...v0.1.0-alpha.8) (2026-10-20)
+
+
+### Fixed
+
+* show screens while their data loads or fails ([#22](https://github.com/tructn/kui/issues/22)) ([d1b09ba](https://github.com/tructn/kui/commit/d1b09ba5d6fc2ba464b7d71b96c4fb8c2e01e57b))
+
 ## [0.1.0-alpha.7](https://github.com/tructn/kui/compare/v0.1.0-alpha.6...v0.1.0-alpha.7) (2026-10-20)
 
 
