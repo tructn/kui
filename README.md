@@ -23,6 +23,12 @@
   <a href="#install">Install</a>
 </p>
 
+> [!WARNING]
+> **KUI is an experimental alpha.** Features may change or break between versions, and there may be bugs that
+> affect your data. Some actions can't be undone, such as deleting topics or resetting consumer offsets. Try KUI
+> on development or test clusters first, and take extra care before using it on production.
+> If something goes wrong, please [open an issue](https://github.com/tructn/kui/issues).
+
 <p align="center">
   <img src="docs/01_topics.png" alt="KUI showing the topics of a Kafka cluster" width="820" />
 </p>
@@ -115,10 +121,6 @@ it. That's expected; you only need to allow it once.
 2. If you see "Windows protected your PC", click **More info**, then **Run anyway**.
 
 </details>
-
-> [!NOTE]
-> KUI is in early development (alpha). It works well day to day, but expect rough edges and frequent updates.
-> If something breaks, please [open an issue](https://github.com/tructn/kui/issues).
 
 ## Contributing
 
