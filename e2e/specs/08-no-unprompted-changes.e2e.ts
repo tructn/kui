@@ -9,6 +9,7 @@ import {
   ensureCluster,
   expectNoChangingCommands,
   goTo,
+  HOME_PAGE,
   openAlertDialog,
   openDialog,
   openSheet,
@@ -31,9 +32,10 @@ describe("Nothing changes without the user's consent", () => {
 
   it("records the commands the UI sends", async () => {
     // Without this, every check below would pass trivially on a build without VITE_E2E.
-    await goTo("Brokers");
+    // Brokers is the home page and already loaded, so visit pages that fetch on first open.
     await goTo("Topics");
-    expect(await commandsSent()).toEqual(expect.arrayContaining(["cluster_overview", "list_topics"]));
+    await goTo("Consumer groups");
+    expect(await commandsSent()).toEqual(expect.arrayContaining(["list_topics", "list_consumer_groups"]));
   });
 
   it("browses every page, tab, message and group", async () => {
@@ -45,7 +47,7 @@ describe("Nothing changes without the user's consent", () => {
       await button(tab).click();
     }
 
-    await (await activeTabRows())[0].click();
+    await openFirstMessage();
     await expect(openSheet()).toBeDisplayed();
     for (const tab of ["Key", "Headers (0)", "Value"]) await button(tab, openSheet()).click();
     await browser.keys("Escape");
@@ -60,7 +62,7 @@ describe("Nothing changes without the user's consent", () => {
 
   it("ignores stray keys on a focused topic row", async () => {
     await goTo("Topics");
-    const row = $("span=demo.orders").parentElement().parentElement().parentElement();
+    const row = await $("span=demo.orders").$("./ancestor::tr").getElement();
     await browser.execute((el) => (el as unknown as HTMLElement).focus(), row);
     // Moving around, paging, and keys people might expect to delete something.
     for (const key of ["j", "k", "]", "[", Key.Delete, Key.Backspace]) await browser.keys(key);
@@ -197,7 +199,8 @@ describe("Nothing changes without the user's consent", () => {
     it("does not save anything when switching to the current cluster", async () => {
       await openClusterMenu();
       await menuItem(CLUSTER_NAME).click();
-      await expect($("h1=Topics")).toBeDisplayed();
+      // Selecting a cluster opens its home page.
+      await expect($(`h1=${HOME_PAGE}`)).toBeDisplayed();
     });
   });
 
@@ -209,7 +212,7 @@ describe("Nothing changes without the user's consent", () => {
     });
 
     it("copies nothing when the copy dialog of one message is closed", async () => {
-      await (await activeTabRows())[0].click();
+      await openFirstMessage();
       await button("Copy to topic", openSheet()).click();
       await expect(openDialog()).toBeDisplayed();
 
@@ -217,6 +220,8 @@ describe("Nothing changes without the user's consent", () => {
       await $("#copy-target-topic").click();
       await $('[data-slot="command-item"][data-value="demo.customers"]').click();
       await expect(button("Copy", openDialog())).toBeDisplayed();
+      // While the picker is still fading out it takes the Escape meant for the dialog.
+      await $('[data-slot="popover-content"]').waitForExist({ reverse: true });
       await browser.keys("Escape");
       await openDialog().waitForExist({ reverse: true });
       await browser.keys("Escape");
@@ -294,9 +299,13 @@ describe("Nothing changes without the user's consent", () => {
   });
 });
 
-/** Rows of the table in the visible tab. */
-function activeTabRows() {
-  return $$('[role="tabpanel"][data-state="active"] tbody tr');
+/**
+ * Opens the first message of the visible tab in the side sheet. Clicks a narrow cell
+ * (the partition), not the row: the row's centre can sit off-screen in a wide table.
+ */
+async function openFirstMessage() {
+  const rows = await $$('[role="tabpanel"][data-state="active"] tbody tr');
+  await (await rows[0].$$("td.tabular-nums"))[0].click();
 }
 
 /** Waits until the open alert dialog has focused its Cancel button, then presses Enter. */

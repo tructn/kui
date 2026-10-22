@@ -14,7 +14,7 @@
     "package:mac": "tauri build --bundles app,dmg",
     "package:win": "tauri build --bundles nsis",
     "test": "bun test src && cd src-tauri && cargo test",
-    "test:e2e": "docker compose --profile e2e run --build --rm e2e",
+    "test:e2e": "docker compose --profile e2e rm --stop --force kafka-e2e kafka-seed-e2e && docker compose --profile e2e run --build --rm e2e",
     "lint": "cd src-tauri && cargo fmt --check && cargo clippy --all-targets --locked -- -D warnings",
     "security": "bun audit --ignore=GHSA-vfj7-8cjw-p6xm && bun test src && cd src-tauri && cargo test --lib && cargo audit",
     "kafka:up": "docker compose up -d",

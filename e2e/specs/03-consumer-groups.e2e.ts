@@ -32,10 +32,10 @@ describe("Consumer groups", () => {
     await $("span=demo.orders").click();
     await button("Consumers").click();
     const panel = $('[role="tabpanel"][data-state="active"]');
-    // Other groups may read the topic too, so sections start collapsed: expand demo-billing's.
-    const section = panel.$("span=demo-billing").parentElement();
-    await expect(section).toBeExisting();
-    await section.click();
-    await expect(section.parentElement().parentElement().parentElement().$$("tbody tr")).toBeElementsArrayOfSize(3);
+    // A lone group opens expanded; with other groups reading the topic, sections start collapsed.
+    const toggle = panel.$("span=demo-billing").parentElement();
+    await expect(toggle).toBeExisting();
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+    await expect(toggle.parentElement().parentElement().parentElement().$$("tbody tr")).toBeElementsArrayOfSize(3);
   });
 });

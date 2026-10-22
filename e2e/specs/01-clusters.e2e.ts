@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 
-import { addCluster, button, CLUSTER_NAME, KAFKA_BOOTSTRAP, openDialog } from "../helpers.js";
+import { addCluster, button, CLUSTER_NAME, HOME_PAGE, KAFKA_BOOTSTRAP, openDialog } from "../helpers.js";
 
 describe("Clusters", () => {
   it("shows the welcome screen on first launch", async () => {
@@ -30,8 +30,8 @@ describe("Clusters", () => {
     await browser.keys("Escape");
     await addCluster(CLUSTER_NAME, KAFKA_BOOTSTRAP);
 
-    // Saving selects the cluster and opens its topic list.
-    await expect($("h1=Topics")).toBeDisplayed();
+    // Saving selects the cluster and opens its home page.
+    await expect($(`h1=${HOME_PAGE}`)).toBeDisplayed();
     await expect($(`span=${CLUSTER_NAME}`)).toBeDisplayed();
   });
 

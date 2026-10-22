@@ -3,6 +3,8 @@ import { $, browser, expect } from "@wdio/globals";
 /** Kafka address as seen from the app (the e2e container reaches it as kafka:29092). */
 export const KAFKA_BOOTSTRAP = process.env.KAFKA_BOOTSTRAP ?? "localhost:9092";
 export const CLUSTER_NAME = "E2E Kafka";
+/** The page a cluster opens on after it is selected or saved. */
+export const HOME_PAGE = "Brokers";
 
 /** A name no other test run has used, so specs never collide. */
 export function uniqueName(prefix: string): string {
@@ -34,7 +36,11 @@ export async function expectToast(text: string) {
 
 /** Opens a page from the sidebar. */
 export async function goTo(page: "Topics" | "Consumer groups" | "Brokers") {
-  await button(page).click();
+  // A sheet or dialog that is still fading out covers the sidebar and would intercept the click.
+  await openSheet().waitForExist({ reverse: true });
+  await openDialog().waitForExist({ reverse: true });
+  // Sidebar buttons also hold a shortcut hint ("Ctrl 2"), so match the label inside them.
+  await $(`//*[@data-sidebar="menu-button"][.//span[normalize-space()="${page}"]]`).click();
   await expect($(`h1*=${page}`)).toBeDisplayed();
 }
 
@@ -52,11 +58,12 @@ export async function snapshot(name: string) {
  */
 export async function ensureCluster() {
   // Wait for the app to render one of its two start screens before deciding.
+  // A selected cluster opens on its home page (Brokers); a fresh app shows the welcome screen.
   await browser.waitUntil(
-    async () => (await $("h1=Topics").isExisting()) || (await $("button=Add cluster").isExisting()),
-    { timeoutMsg: "The app showed neither the topic list nor the welcome screen" },
+    async () => (await $(`h1=${HOME_PAGE}`).isExisting()) || (await $("button=Add cluster").isExisting()),
+    { timeoutMsg: "The app showed neither the cluster home page nor the welcome screen" },
   );
-  if (await $("h1=Topics").isExisting()) return;
+  if (await $(`h1=${HOME_PAGE}`).isExisting()) return;
 
   const existing = $(`button=${CLUSTER_NAME}`);
   if (await existing.isExisting()) {
@@ -64,7 +71,7 @@ export async function ensureCluster() {
   } else {
     await addCluster(CLUSTER_NAME, KAFKA_BOOTSTRAP);
   }
-  await expect($("h1=Topics")).toBeDisplayed();
+  await expect($(`h1=${HOME_PAGE}`)).toBeDisplayed();
 }
 
 export async function addCluster(name: string, bootstrap: string) {

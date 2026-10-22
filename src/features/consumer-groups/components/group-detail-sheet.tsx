@@ -1,5 +1,5 @@
 import { ArrowUpRightIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useNavigation } from "@/app/stores/navigation-store";
@@ -51,10 +51,21 @@ const MEMBER_COLUMNS: SortColumns<GroupMember, "clientId" | "host" | "assignment
 
 export function GroupDetailSheet({ clusterId, group, onClose }: GroupDetailSheetProps) {
   const detail = useConsumerGroup(clusterId, group);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   return (
     <Sheet open={group != null} onOpenChange={(open) => !open && onClose()}>
-      <ResizableSheetContent panelId="consumer-group" defaultWidth={768}>
+      <ResizableSheetContent
+        ref={contentRef}
+        panelId="consumer-group"
+        defaultWidth={768}
+        // While the group loads its buttons are disabled, so focus would land on the colour legend's
+        // info icon and pop its tooltip; Escape would then close only the tooltip. Focus the panel instead.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          contentRef.current?.focus();
+        }}
+      >
         <SheetHeader className="border-b">
           <SheetTitle className="font-mono">{group}</SheetTitle>
           <SheetDescription>How far the group has read each topic and partition</SheetDescription>

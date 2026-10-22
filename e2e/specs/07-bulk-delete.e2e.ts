@@ -1,4 +1,5 @@
 import { $, browser, expect } from "@wdio/globals";
+import { Key } from "webdriverio";
 
 import { button, ensureCluster, expectToast, goTo, openAlertDialog, openDialog, uniqueName } from "../helpers.js";
 
@@ -6,6 +7,17 @@ describe("Deleting several topics", () => {
   const prefix = uniqueName("e2e.bulk");
 
   before(ensureCluster);
+
+  // Filters are remembered across launches: clear it so later specs see every topic.
+  after(async () => {
+    await goTo("Topics");
+    await $('input[aria-label="Filter topics"]').click();
+    await browser.keys([Key.Ctrl, "a"]);
+    await browser.keys(Key.Backspace);
+    await expect($('input[aria-label="Filter topics"]')).toHaveValue("");
+    // The cleared filter applies (and is saved) once typing pauses.
+    await expect($("span=demo.orders")).toBeExisting();
+  });
 
   it("deletes every selected topic after typing the phrase", async () => {
     for (const name of [`${prefix}.a`, `${prefix}.b`]) {
@@ -17,9 +29,9 @@ describe("Deleting several topics", () => {
     }
 
     await goTo("Topics");
-    await $('input[placeholder="Filter topics"]').setValue(prefix);
+    await $('input[aria-label="Filter topics"]').setValue(prefix);
     // The filter applies once typing pauses; select all only after it has.
-    await $("p^=2 of ").waitForExist();
+    await $("span=1–2 of 2").waitForExist();
     await $('button[aria-label="Select all topics on this page"]').click();
     await button("Delete 2 topics").click();
 
