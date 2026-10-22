@@ -1,0 +1,39 @@
+# Dependabot opens PRs only for security advisories (limit 0 turns off routine
+# version bumps). Fixes that land together are grouped into one PR.
+# The prefixes match the Conventional Commit types in CONTRIBUTING.md.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "fix(deps)"
+    groups:
+      rust-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "fix(deps)"
+    groups:
+      js-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  # Workflow actions get routine weekly bumps too, grouped into one PR.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
