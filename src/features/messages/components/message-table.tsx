@@ -1,5 +1,5 @@
 import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
-import { Fragment, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, startTransition, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/copy-button";
 import { SortableTableHead } from "@/components/sortable-table-head";
@@ -89,16 +89,19 @@ export function MessageTable({
     });
   }
 
-  /** Collapses every row on this page if any is open, otherwise expands them all. */
+  /**
+   * Collapses every row on this page if any is open, otherwise expands them all.
+   * A transition, since a full page of previews is a big render: the UI stays responsive meanwhile.
+   */
   function toggleAllExpanded() {
-    setExpanded((current) => {
+    startTransition(() => setExpanded((current) => {
       const next = new Set(current);
       for (const m of items) {
         if (anyExpanded) next.delete(messageKey(m));
         else next.add(messageKey(m));
       }
       return next;
-    });
+    }));
   }
 
   const head = (column: Column, label: string, className: string, align?: "right") => (
@@ -226,11 +229,14 @@ export function MessageTable({
  * switches between JSON and Base64 and copies like it does there. Pinned to the visible width of the table frame,
  * like `TableStateRow`, so it doesn't scroll away sideways.
  */
-function MessagePreview({ message, colSpan }: { message: KafkaMessage; colSpan: number }) {
+// Memoized: expanding one row re-renders the table, but not the previews already open.
+const MessagePreview = memo(function MessagePreview({ message, colSpan }: { message: KafkaMessage; colSpan: number }) {
   return (
-    <tr data-slot="table-row" className="border-b bg-muted/40">
+    // data-preview opts out of the row enter animation (see index.css).
+    <tr data-slot="table-row" data-preview="" className="border-b bg-muted/40">
       <td colSpan={colSpan} className="p-0">
-        <dl className="sticky left-0 grid w-[100cqw] grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 pt-1 pr-3 pb-3 pl-10">
+        {/* content-visibility skips layout and paint for previews scrolled out of view. */}
+        <dl className="sticky left-0 grid [contain-intrinsic-size:auto_10rem] [content-visibility:auto] w-[100cqw] grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 pt-1 pr-3 pb-3 pl-10">
           <dt className="text-muted-foreground">Key</dt>
           <dd className="break-all whitespace-pre-wrap">{message.key?.text ?? <Null />}</dd>
           <dt className="text-muted-foreground">Headers</dt>
@@ -248,7 +254,7 @@ function MessagePreview({ message, colSpan }: { message: KafkaMessage; colSpan: 
       </td>
     </tr>
   );
-}
+});
 
 /** The value in the preview: its JSON / Base64 switch, encoding, size and a copy button, then the text. */
 function PreviewValue({ payload }: { payload: Payload | null }) {
