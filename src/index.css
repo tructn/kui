@@ -4,7 +4,12 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/cascadia-code";
+@import "@fontsource-variable/fira-code";
 @import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/roboto-mono";
+@import "@fontsource-variable/source-code-pro";
+@import "@fontsource-variable/victor-mono";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -59,14 +64,17 @@
     --app-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
     --app-code-size: 13px;
     --app-code-ligatures: normal;
+    /* Accent color, picked in Settings → Appearance; the blocks below swap it. */
+    --brand: oklch(0.586 0.253 17.585);
+    --brand-foreground: oklch(0.969 0.015 12.422);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.586 0.253 17.585);
-    --primary-foreground: oklch(0.969 0.015 12.422);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-foreground);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
@@ -76,7 +84,7 @@
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.586 0.253 17.585);
+    --ring: var(--brand);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -85,12 +93,12 @@
     --radius: 0.625rem;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.586 0.253 17.585);
-    --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
+    --sidebar-primary: var(--brand);
+    --sidebar-primary-foreground: var(--brand-foreground);
     --sidebar-accent: oklch(0.97 0 0);
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.586 0.253 17.585);
+    --sidebar-ring: var(--brand);
 }
 
 .dark {
@@ -100,8 +108,6 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.645 0.246 16.439);
-    --primary-foreground: oklch(0.969 0.015 12.422);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -111,7 +117,6 @@
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.645 0.246 16.439);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -119,13 +124,29 @@
     --chart-5: oklch(0.269 0 0);
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.645 0.246 16.439);
-    --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
     --sidebar-accent: oklch(0.269 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.645 0.246 16.439);
 }
+
+/*
+ * Accent color schemes, set as data-accent on <html> by the appearance store.
+ * Rose is the default (:root above). Light mode uses a deeper Tailwind shade than dark,
+ * so text on the accent stays readable in both.
+ */
+.dark { --brand: oklch(0.645 0.246 16.439); }
+[data-accent="blue"] { --brand: oklch(0.546 0.245 262.881); --brand-foreground: oklch(0.97 0.014 254.604); }
+.dark[data-accent="blue"] { --brand: oklch(0.623 0.214 259.815); }
+[data-accent="violet"] { --brand: oklch(0.541 0.281 293.009); --brand-foreground: oklch(0.969 0.016 293.756); }
+.dark[data-accent="violet"] { --brand: oklch(0.606 0.25 292.717); }
+[data-accent="green"] { --brand: oklch(0.527 0.154 150.069); --brand-foreground: oklch(0.982 0.018 155.826); }
+.dark[data-accent="green"] { --brand: oklch(0.723 0.219 149.579); --brand-foreground: oklch(0.266 0.065 152.934); }
+[data-accent="teal"] { --brand: oklch(0.511 0.096 186.391); --brand-foreground: oklch(0.984 0.014 180.72); }
+.dark[data-accent="teal"] { --brand: oklch(0.704 0.14 182.503); --brand-foreground: oklch(0.277 0.046 192.524); }
+[data-accent="orange"] { --brand: oklch(0.646 0.222 41.116); --brand-foreground: oklch(0.98 0.016 73.684); }
+.dark[data-accent="orange"] { --brand: oklch(0.705 0.213 47.604); --brand-foreground: oklch(0.266 0.079 36.259); }
+[data-accent="neutral"] { --brand: oklch(0.205 0 0); --brand-foreground: oklch(0.985 0 0); }
+.dark[data-accent="neutral"] { --brand: oklch(0.922 0 0); --brand-foreground: oklch(0.205 0 0); }
 
 @layer base {
   * {

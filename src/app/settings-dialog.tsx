@@ -17,12 +17,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { ToggleGroup } from "radix-ui";
 
 import {
+  ACCENTS,
   CODE_FONT_SIZES,
   CODE_FONTS,
   UI_FONTS,
   useAppearance,
+  type Accent,
   type CodeFont,
   type UiFont,
 } from "./stores/appearance-store";
@@ -130,7 +135,7 @@ function GeneralSettings() {
 }
 
 function AppearanceSettings() {
-  const { uiFont, codeFont, codeFontSize, codeLigatures, update, reset } = useAppearance();
+  const { accent, uiFont, codeFont, codeFontSize, codeLigatures, update, resetFonts } = useAppearance();
 
   return (
     <div className="flex flex-col gap-6">
@@ -138,12 +143,15 @@ function AppearanceSettings() {
         <SettingRow label="Theme">
           <ThemePicker />
         </SettingRow>
+        <SettingRow label="Accent color" description="Buttons, switches and focus rings.">
+          <AccentPicker value={accent} onChange={(value) => update({ accent: value })} />
+        </SettingRow>
       </SettingsGroup>
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h3 className="px-1 text-xs font-medium text-muted-foreground">Fonts</h3>
-          <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={reset}>
+          <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={resetFonts}>
             <RotateCcwIcon /> Reset
           </Button>
         </div>
@@ -207,6 +215,35 @@ function AppearanceSettings() {
         </SettingsGroup>
       </section>
     </div>
+  );
+}
+
+/** A row of color swatches; the chosen one gets a ring. */
+function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Accent) => void }) {
+  return (
+    <ToggleGroup.Root
+      type="single"
+      aria-label="Accent color"
+      value={value}
+      // Clicking the active swatch would deselect it (""); an accent is always set.
+      onValueChange={(v) => v && onChange(v as Accent)}
+      className="flex items-center gap-1.5"
+    >
+      {Object.entries(ACCENTS).map(([id, { label, swatch }]) => (
+        <Tooltip key={id}>
+          <TooltipTrigger asChild>
+            <ToggleGroup.Item
+              value={id}
+              aria-label={label}
+              style={{ backgroundColor: swatch }}
+              // Styled on aria-checked: the Tooltip trigger overwrites data-state.
+              className="size-5 rounded-full ring-offset-2 ring-offset-background transition-shadow outline-none hover:ring-2 hover:ring-border focus-visible:ring-2 focus-visible:ring-ring/50 aria-checked:ring-2 aria-checked:ring-foreground/70"
+            />
+          </TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+      ))}
+    </ToggleGroup.Root>
   );
 }
 
