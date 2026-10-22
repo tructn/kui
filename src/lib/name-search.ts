@@ -14,3 +14,28 @@ export function matchByName<T extends { name: string }>(items: readonly T[], que
   }
   return [...starts, ...contains];
 }
+
+export type NameFilter = {
+  /** Whether a name passes the filter; nothing passes while `error` is set. */
+  matches: (name: string) => boolean;
+  /** Why `query` isn't a valid regular expression, in regex mode. */
+  error: string | null;
+};
+
+/**
+ * A case-insensitive name filter: `query` as a substring, or with `regex` on,
+ * as a regular expression tested anywhere in the name (anchor with ^ and $).
+ */
+export function nameFilter(query: string, regex: boolean): NameFilter {
+  if (!query) return { matches: () => true, error: null };
+  if (!regex) {
+    const q = query.toLowerCase();
+    return { matches: (name) => name.toLowerCase().includes(q), error: null };
+  }
+  try {
+    const re = new RegExp(query, "i");
+    return { matches: (name) => re.test(name), error: null };
+  } catch (e) {
+    return { matches: () => false, error: e instanceof Error ? e.message : String(e) };
+  }
+}

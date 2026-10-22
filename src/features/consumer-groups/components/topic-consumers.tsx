@@ -1,6 +1,6 @@
 import { RotateCwIcon } from "lucide-react";
 
-import { ErrorState, LoadingRows } from "@/components/query-states";
+import { emptyText, ErrorState } from "@/components/query-states";
 import { Button } from "@/components/ui/button";
 
 import { useTopicConsumers } from "../queries";
@@ -21,9 +21,10 @@ export function TopicConsumers({ clusterId, topic }: { clusterId: string; topic:
         </Button>
       </div>
       {consumers.error && <ErrorState error={consumers.error} onRetry={() => consumers.refetch()} />}
-      {consumers.isPending && <LoadingRows rows={3} />}
-      {consumers.data?.length === 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">No consumer group has read this topic yet.</p>
+      {!consumers.data?.length && (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          {emptyText(consumers, "No consumer group has read this topic yet.")}
+        </p>
       )}
       {consumers.data?.map((c) => (
         <ProgressSection

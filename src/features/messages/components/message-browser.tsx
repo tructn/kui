@@ -1,7 +1,9 @@
+import { XIcon } from "lucide-react";
 import { useState } from "react";
 
-import { ErrorState, LoadingRows } from "@/components/query-states";
+import { emptyText, ErrorState } from "@/components/query-states";
 import { ShortcutHint } from "@/components/shortcut-hint";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +14,8 @@ import { formatNumber } from "@/lib/format";
 
 import { LIVE_LIMIT, useLiveTail } from "../live-tail";
 import { useBrowseMessages } from "../queries";
-import type { BrowseCursor, BrowseFilters, BrowsePage, CopyTarget, KafkaMessage } from "../types";
+import type { BrowseCursor, BrowseFilters, BrowsePage, CopyTarget, KafkaMessage, MessageRef } from "../types";
+import { CopyMessageDialog } from "./copy-message-dialog";
 import { MessageFilters } from "./message-filters";
 import { MessageSheet } from "./message-sheet";
 import { MessageTable } from "./message-table";
@@ -37,6 +40,8 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
   const page = cursors.length - 1;
   const [live, setLive] = useState(false);
   const [selected, setSelected] = useState<KafkaMessage | null>(null);
+  // Checked rows for copying. Kept across pages and filters, like the topics list.
+  const [checked, setChecked] = useState<ReadonlyMap<string, MessageRef>>(new Map());
   const messages = useBrowseMessages(clusterId, { ...filters, pageSize, cursor: cursors[page] });
   const tail = useLiveTail(clusterId, topic, filters.partition, live);
 
@@ -49,7 +54,7 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
 
   // While the next page loads, the old one is shown as a placeholder: its `next` is stale.
   const next = messages.isPlaceholderData ? null : (messages.data?.next ?? null);
-  const pager = messages.data && serverPager(messages.data, page, pageSize, next !== null, {
+  const pager = serverPager(messages.data ?? EMPTY_PAGE, page, pageSize, next !== null, {
     setPage: (to) => {
       if (to === page + 1 && next) setCursors([...cursors, next]);
       else if (to < page) setCursors(cursors.slice(0, to + 1));
@@ -94,6 +99,25 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
         </div>
       </div>
 
+      {checked.size > 0 && !live && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm">
+          <span>
+            <span className="font-medium tabular-nums">{checked.size}</span> selected
+          </span>
+          <Button variant="ghost" size="xs" onClick={() => setChecked(new Map())}>
+            <XIcon /> Clear
+          </Button>
+          <div className="flex-1" />
+          <CopyMessageDialog
+            clusterId={clusterId}
+            topic={topic}
+            messages={[...checked.values()]}
+            targets={copyTargets}
+            onCopied={() => setChecked(new Map())}
+          />
+        </div>
+      )}
+
       {live ? (
         <>
           {tail.error && <ErrorState error={tail.error} onRetry={() => toggleLive(false)} />}
@@ -111,15 +135,15 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
       ) : (
         <>
           {messages.error && <ErrorState error={messages.error} onRetry={() => messages.refetch()} />}
-          {messages.isPending && <LoadingRows rows={10} />}
-          {messages.data && pager && (
-            <MessageTable
-              messages={messages.data.messages}
-              pager={pager}
-              onSelect={setSelected}
-              emptyText="No messages in this range."
-            />
-          )}
+          {/* The table shows even before the first page arrives (or when it fails), just empty. */}
+          <MessageTable
+            messages={pager.items}
+            pager={pager}
+            onSelect={setSelected}
+            checked={readOnly ? undefined : checked}
+            onCheckedChange={setChecked}
+            emptyText={emptyText(messages, "No messages in this range.")}
+          />
         </>
       )}
       <MessageSheet
@@ -133,6 +157,9 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
     </div>
   );
 }
+
+/** Stands in for the first page until it loads, so the table can render empty. */
+const EMPTY_PAGE: BrowsePage = { messages: [], total: 0, next: null };
 
 /** Adapts one server page to the table's pager; `page` is 0-based. */
 function serverPager(

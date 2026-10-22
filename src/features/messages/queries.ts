@@ -32,11 +32,11 @@ export function useProduceMessage(clusterId: string) {
   });
 }
 
-export function useCopyMessage(clusterId: string) {
+export function useCopyMessages(clusterId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: CopyRequest) => messagesApi.copy(clusterId, request),
-    // The target gained a message.
+    // The target gained messages.
     onSuccess: (_, request) =>
       queryClient.invalidateQueries({ queryKey: messageKeys.topic(clusterId, request.targetTopic) }),
   });

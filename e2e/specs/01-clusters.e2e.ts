@@ -35,12 +35,15 @@ describe("Clusters", () => {
     await expect($(`span=${CLUSTER_NAME}`)).toBeDisplayed();
   });
 
-  it("toggles between dark and light theme", async () => {
+  it("switches between light, dark and system theme", async () => {
     const isDark = () => browser.execute(() => document.documentElement.classList.contains("dark"));
-    expect(await isDark()).toBe(true);
-    await button("Light mode").click();
+    const systemDark = () => browser.execute(() => matchMedia("(prefers-color-scheme: dark)").matches);
+    const theme = (label: string) => $(`button[aria-label="${label}"]`);
+    await theme("Light").click();
     expect(await isDark()).toBe(false);
-    await button("Dark mode").click();
+    await theme("Dark").click();
     expect(await isDark()).toBe(true);
+    await theme("System").click();
+    expect(await isDark()).toBe(await systemDark());
   });
 });

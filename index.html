@@ -9,7 +9,9 @@
     <script>
       // Match the splash to the last theme before any CSS or JS bundle loads.
       try {
-        if (localStorage.getItem("kui-splash-theme") === "light") document.documentElement.classList.remove("dark");
+        var theme = localStorage.getItem("kui-splash-theme");
+        var dark = theme === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : theme !== "light";
+        if (!dark) document.documentElement.classList.remove("dark");
       } catch {}
     </script>
     <!--
