@@ -24,10 +24,8 @@
 </p>
 
 > [!NOTE]
-> **KUI is in early alpha**, and things may change between versions. Browsing topics, messages and consumer
-> groups only reads from your cluster. Actions that change it ask first: deleting a topic means typing its name,
-> and resetting offsets shows a preview of every change before you apply it.
-> Found a bug or have an idea? Please [open an issue](https://github.com/tructn/kui/issues).
+> **KUI is in early alpha.** Browsing never changes your cluster, and anything that does asks you first.
+> Found a bug? [Open an issue](https://github.com/tructn/kui/issues).
 
 <p align="center">
   <img src="docs/01_topics.png" alt="KUI showing the topics of a Kafka cluster" width="820" />
