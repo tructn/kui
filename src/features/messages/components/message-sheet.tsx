@@ -1,5 +1,3 @@
-import { useMemo, useState } from "react";
-
 import { CopyIndicator, useCopy } from "@/components/copy-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,9 +6,9 @@ import { Sheet, SheetDescription, SheetHeader, SheetTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBytes, formatTimestamp } from "@/lib/format";
 
-import { type PayloadView as View, payloadViews, renderPayload } from "../payload-view";
 import type { CopyTarget, KafkaMessage, Payload } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
+import { encodingLabel, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
 
 interface MessageSheetProps {
   clusterId: string;
@@ -77,30 +75,17 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
   );
 }
 
-const VIEW_LABELS: Record<View, string> = { json: "JSON", base64: "Base64" };
-
 function PayloadView({ payload }: { payload: Payload | null }) {
-  // Kept while moving between messages; "json" on a binary payload shows base64.
-  const [view, setView] = useState<View>("json");
-  const text = useMemo(() => (payload ? renderPayload(payload, view) : ""), [payload, view]);
+  // Kept while moving between messages; a binary payload shows base64.
+  const { views, shown, setView, text } = usePayloadView(payload);
   const { copied, copy } = useCopy();
-  if (!payload) return <p className="text-sm text-muted-foreground">null</p>;
+  if (!payload || text == null) return <p className="text-sm text-muted-foreground">null</p>;
 
-  const views = payloadViews(payload);
-  const shown = views.includes(view) ? view : "base64";
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex items-center gap-2">
-        <Tabs value={shown} onValueChange={(v) => setView(v as View)}>
-          <TabsList aria-label="Show as">
-            {views.map((v) => (
-              <TabsTrigger key={v} value={v}>
-                {VIEW_LABELS[v]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <Badge variant="outline">{payload.encoding === "utf8" ? "UTF-8" : "Binary"}</Badge>
+        <PayloadViewTabs views={views} value={shown} onChange={setView} />
+        <Badge variant="outline">{encodingLabel(payload)}</Badge>
         <Badge variant="outline">{formatBytes(payload.size)}</Badge>
         <div className="flex-1" />
         <Button

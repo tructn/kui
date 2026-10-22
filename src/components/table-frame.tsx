@@ -33,10 +33,11 @@ export function TableFrame({ children, pager, fill = true, className }: TableFra
       {/* min-h-0 lets the scroll area shrink below its content, so a max height works.
           This box is the scroll container in both directions; the table's own
           overflow wrapper is switched off, or the sticky header would stick to
-          that wrapper (which never scrolls vertically) instead. */}
+          that wrapper (which never scrolls vertically) instead. It is also the
+          size container, so `100cqw` inside the table means "the visible width". */}
       <div
         className={cn(
-          "min-h-0 overflow-auto [&_[data-slot=table-container]]:overflow-visible",
+          "@container/table-frame min-h-0 overflow-auto [&_[data-slot=table-container]]:overflow-visible",
           fill && "flex-1"
         )}
       >

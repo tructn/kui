@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { TableFrame } from "@/components/table-frame";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
@@ -55,11 +55,7 @@ export function ConfigsTable({ configs, emptyText }: { configs: TopicConfigEntry
               </TableRow>
             ))}
             {visible.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                  {emptyText ?? (overridesOnly ? "No overridden values." : "No configuration values.")}
-                </TableCell>
-              </TableRow>
+              <TableStateRow colSpan={3}>{emptyText ?? (overridesOnly ? "No overridden values." : "No configuration values.")}</TableStateRow>
             )}
           </TableBody>
         </Table>

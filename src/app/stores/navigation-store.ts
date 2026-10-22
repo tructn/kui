@@ -13,6 +13,9 @@ export type Route =
   | { page: "topic"; topic: string }
   | { page: "consumer-groups" };
 
+/** The page a cluster opens on: its brokers, first in the sidebar. */
+const HOME_ROUTE: Route = { page: "brokers" };
+
 interface NavigationState {
   /** The cluster every page is showing, or null when none is selected. */
   clusterId: string | null;
@@ -32,14 +35,14 @@ export const useNavigation = create<NavigationState>()(
   persist(
     (set) => ({
       clusterId: null,
-      route: { page: "topics" },
-      selectCluster: (clusterId) => set({ clusterId, route: { page: "topics" } }),
+      route: HOME_ROUTE,
+      selectCluster: (clusterId) => set({ clusterId, route: HOME_ROUTE }),
       navigate: (route) => set({ route }),
     }),
     {
       name: "kui.navigation",
       storage: settingsStorage(),
-      // Remember the last cluster across restarts, but always open on the topic list.
+      // Remember the last cluster across restarts, but always open on the home page.
       partialize: (state) => ({ clusterId: state.clusterId }),
     },
   ),

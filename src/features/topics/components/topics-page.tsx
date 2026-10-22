@@ -13,7 +13,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
@@ -234,11 +234,7 @@ export function TopicsPage() {
                 </TableRow>
               ))}
               {visible.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    {emptyText(topics, "No topics found.")}
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={6}>{emptyText(topics, "No topics found.")}</TableStateRow>
               )}
             </TableBody>
           </Table>

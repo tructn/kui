@@ -152,6 +152,37 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   )
 }
 
+/**
+ * A row spanning every column, for a table's empty or loading message. Its content
+ * is pinned to the visible part of the TableFrame (`100cqw` is the frame's width),
+ * so it stays centred even when the columns are wider than the frame and the
+ * table scrolls sideways.
+ */
+function TableStateRow({
+  colSpan,
+  className,
+  children,
+}: {
+  colSpan: number
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <tr data-slot="table-row" className="hover:bg-transparent">
+      <td colSpan={colSpan} className="p-0">
+        <div
+          className={cn(
+            "sticky left-0 flex h-24 w-[100cqw] items-center justify-center gap-2 px-2 text-sm text-muted-foreground",
+            className
+          )}
+        >
+          {children}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 function TableCaption({
   className,
   ...props
@@ -174,4 +205,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TableStateRow,
 }
