@@ -1,6 +1,15 @@
 import { MonitorIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
 import { ToggleGroup } from "radix-ui";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -50,5 +59,42 @@ export function ThemePicker({ iconOnly = false, className }: { iconOnly?: boolea
         ),
       )}
     </ToggleGroup.Root>
+  );
+}
+
+/**
+ * One icon button showing the current theme, which opens a menu of all three.
+ * For the collapsed sidebar, where three segments would be too small to hit.
+ */
+export function ThemeMenuButton() {
+  const theme = useTheme((s) => s.theme);
+  const setTheme = useTheme((s) => s.setTheme);
+  const current = THEMES.find((t) => t.value === theme) ?? THEMES[0];
+
+  return (
+    <DropdownMenu>
+      {/* Tooltip outside the menu trigger: each layer passes its props down to the button. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton aria-label={`Theme: ${current.label}`}>
+              <current.icon />
+              <span>Theme</span>
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="right">Theme: {current.label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent side="right" align="end" className="min-w-36">
+        <DropdownMenuLabel>Theme</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as Theme)}>
+          {THEMES.map(({ value, label, icon: Icon }) => (
+            <DropdownMenuRadioItem key={value} value={value}>
+              <Icon /> {label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

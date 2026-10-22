@@ -19,6 +19,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
 import { ClusterSwitcher } from "@/features/clusters";
@@ -27,7 +28,7 @@ import { useShortcut } from "@/hooks/use-shortcut";
 
 import { useNavigation, type Route } from "./stores/navigation-store";
 import { useSettingsDialog } from "./stores/settings-dialog-store";
-import { ThemePicker } from "./theme-picker";
+import { ThemeMenuButton, ThemePicker } from "./theme-picker";
 
 interface NavItem {
   label: string;
@@ -56,6 +57,9 @@ export function AppSidebar() {
   const route = useNavigation((s) => s.route);
   const navigate = useNavigation((s) => s.navigate);
   const clusterId = useNavigation((s) => s.clusterId);
+  const { state, isMobile } = useSidebar();
+  // The mobile sidebar is a full-width sheet, never the icon strip.
+  const collapsed = state === "collapsed" && !isMobile;
   // The topic detail page belongs to the "Topics" section.
   const activePage = route.page === "topic" ? "topics" : route.page;
   useShortcut("mod+1", () => navigate(NAV_ITEMS[0].route), clusterId !== null);
@@ -74,9 +78,15 @@ export function AppSidebar() {
             <NavGroup label="Cluster" items={NAV_ITEMS} activePage={activePage} onNavigate={navigate} />
           </>
         )}
+        <SettingsGroup />
       </SidebarContent>
       <SidebarFooter>
-        <FooterMenu />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            {/* Collapsed to icons, three segments would be too small to hit: show one button with a menu. */}
+            {collapsed ? <ThemeMenuButton /> : <ThemePicker iconOnly className="flex w-full" />}
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -142,25 +152,27 @@ function SearchButton() {
   );
 }
 
-function FooterMenu() {
+/** App-wide settings, in their own group just below the cluster pages. */
+function SettingsGroup() {
   const showSettings = useSettingsDialog((s) => s.show);
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          tooltip={`Settings (${MOD_KEY},)`}
-          aria-keyshortcuts="Meta+, Control+,"
-          onClick={() => showSettings()}
-        >
-          <SettingsIcon />
-          <span>Settings</span>
-          <ShortcutHint keys={[MOD_KEY, ","]} className={HINT} />
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        {/* Stacks vertically when the sidebar collapses to icons. */}
-        <ThemePicker iconOnly className="flex w-full group-data-[collapsible=icon]:flex-col" />
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <SidebarGroup>
+      <SidebarGroupLabel>General</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={`Settings (${MOD_KEY},)`}
+              aria-keyshortcuts="Meta+, Control+,"
+              onClick={() => showSettings()}
+            >
+              <SettingsIcon />
+              <span>Settings</span>
+              <ShortcutHint keys={[MOD_KEY, ","]} className={HINT} />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
