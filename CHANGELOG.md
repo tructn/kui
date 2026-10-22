@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.12](https://github.com/tructn/kui/compare/v0.1.0-alpha.11...v0.1.0-alpha.12) (2026-10-22)
+
+
+### Added
+
+* **settings:** add more code fonts and an accent color picker ([16c417b](https://github.com/tructn/kui/commit/16c417be17298ac3415092f449071baaf1621993))
+
 ## [0.1.0-alpha.11](https://github.com/tructn/kui/compare/v0.1.0-alpha.10...v0.1.0-alpha.11) (2026-10-22)
 
 
