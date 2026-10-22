@@ -45,6 +45,14 @@ KUI is neither. It's a desktop app: download it, add your cluster, and you're lo
 
 ## Features
 
+### Connect to any cluster
+
+<img src="docs/00_cluster.png" alt="The Add cluster dialog" width="820" />
+
+Add a cluster with its address, test the connection, and save it. Secure clusters work too:
+SSL, plus SASL with PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512. If a connection fails, KUI tells you why in plain
+words instead of showing a raw error.
+
 ### Find any topic in seconds
 
 Search every topic from anywhere with <kbd>⌘</kbd> <kbd>K</kbd>, or filter the list with a regular expression.
@@ -71,14 +79,6 @@ in a few clicks.
 
 See every consumer group, whether it's caught up, and how far behind it is on each partition.
 When a group needs a fresh start, **reset its offsets** to the earliest message, the latest one, or a point in time.
-
-### Connect to any cluster
-
-<img src="docs/00_cluster.png" alt="The Add cluster dialog" width="820" />
-
-Add a cluster with its address, test the connection, and save it. Secure clusters work too:
-SSL, plus SASL with PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512. If a connection fails, KUI tells you why in plain
-words instead of showing a raw error.
 
 ### Make it yours
 
