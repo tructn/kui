@@ -23,8 +23,8 @@
   <a href="#install">Install</a>
 </p>
 
-> [!NOTE]
-> **KUI is in early alpha.** Browsing never changes your cluster, and anything that does asks you first.
+> [!WARNING]
+> **KUI is in early alpha and not yet ready for production.**
 > Found a bug? [Open an issue](https://github.com/tructn/kui/issues).
 
 <p align="center">
