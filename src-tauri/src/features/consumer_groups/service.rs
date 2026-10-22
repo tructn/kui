@@ -1,16 +1,19 @@
 use std::collections::{BTreeSet, HashMap};
 
 use rdkafka::admin::AdminOptions;
-use rdkafka::consumer::Consumer;
+use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::groups::GroupInfo;
+use rdkafka::{Offset, TopicPartitionList};
 
-use super::model::{GroupDetail, GroupLag, GroupMember, GroupSummary, TopicConsumer};
-use super::{assignment, progress};
+use super::model::{
+    GroupDetail, GroupLag, GroupMember, GroupSummary, OffsetChange, ResetRequest, ResetTo, TopicConsumer,
+};
+use super::{assignment, progress, reset};
 use crate::error::{Error, Result};
 use crate::kafka::connection::explain;
 use crate::kafka::metadata::{fetch_metadata, is_broker_internal, partition_ids};
-use crate::kafka::offsets::{PartitionKey, committed, committed_by_group, watermarks};
-use crate::kafka::{KafkaClients, TIMEOUT};
+use crate::kafka::offsets::{PartitionKey, committed, committed_by_group, offsets_at, watermarks};
+use crate::kafka::{KafkaClients, TIMEOUT, new_consumer};
 
 pub fn list(clients: &KafkaClients) -> Result<Vec<GroupSummary>> {
     let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
@@ -132,6 +135,75 @@ pub async fn delete(clients: &KafkaClients, group: &str) -> Result<()> {
         result.map_err(|(name, code)| Error::msg(format!("Delete {name} failed: {code}")))?;
     }
     Ok(())
+}
+
+/// What `reset_offsets` would change, without changing anything.
+pub fn plan_reset(clients: &KafkaClients, request: &ResetRequest) -> Result<Vec<OffsetChange>> {
+    let keys = reset_partitions(clients, request)?;
+    let marks = watermarks(&clients.metadata, &keys)?;
+    let current = committed(&clients.admin, &request.group, &keys)?;
+    let at_time = match request.to {
+        ResetTo::Timestamp { value } => offsets_at(&clients.metadata, &keys, Offset::Offset(value))?,
+        _ => HashMap::new(),
+    };
+    Ok(reset::plan(request.to, &by_partition(marks), &by_partition(current), &by_partition(at_time)))
+}
+
+/// Moves the group's committed offsets on one topic, e.g. back to replay
+/// messages after a bug fix. Returns what changed.
+///
+/// Kafka only accepts this while the group has no active members: a running
+/// consumer would overwrite the new offsets with its own on its next commit.
+pub fn reset_offsets(clients: &KafkaClients, request: &ResetRequest) -> Result<Vec<OffsetChange>> {
+    ensure_inactive(clients, &request.group)?;
+    let changes = plan_reset(clients, request)?;
+    let mut offsets = TopicPartitionList::new();
+    for c in &changes {
+        offsets.add_partition_offset(&request.topic, c.partition, Offset::Offset(c.target))?;
+    }
+    // Carries the group's id but never subscribes, so it never joins the group: it only commits.
+    let consumer = new_consumer(&clients.cluster, &request.group)?;
+    consumer.commit(&offsets, CommitMode::Sync).map_err(|e| explain(&consumer, e))?;
+
+    // A commit doesn't report failures per partition, so read the offsets back.
+    let keys: Vec<PartitionKey> = changes.iter().map(|c| (request.topic.clone(), c.partition)).collect();
+    let now = by_partition(committed(&clients.admin, &request.group, &keys)?);
+    let failed: Vec<String> =
+        changes.iter().filter(|c| now.get(&c.partition) != Some(&c.target)).map(|c| c.partition.to_string()).collect();
+    if !failed.is_empty() {
+        return Err(Error::msg(format!("Kafka did not accept the new offsets for partition(s) {}", failed.join(", "))));
+    }
+    Ok(changes)
+}
+
+fn ensure_inactive(clients: &KafkaClients, group: &str) -> Result<()> {
+    let list = clients.metadata.fetch_group_list(Some(group), TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
+    let members = list.groups().first().map_or(0, |g| g.members().len());
+    if members > 0 {
+        return Err(Error::msg(format!(
+            "{group} has {members} active member(s). Stop its consumers first: \
+             offsets can only be reset while no consumer is connected."
+        )));
+    }
+    Ok(())
+}
+
+/// The topic's partitions a reset applies to.
+fn reset_partitions(clients: &KafkaClients, request: &ResetRequest) -> Result<Vec<PartitionKey>> {
+    let keys: Vec<PartitionKey> = partition_ids(&clients.metadata, &request.topic)?
+        .into_iter()
+        .filter(|p| request.partitions.as_ref().is_none_or(|wanted| wanted.contains(p)))
+        .map(|p| (request.topic.clone(), p))
+        .collect();
+    if keys.is_empty() {
+        return Err(Error::msg("No matching partitions"));
+    }
+    Ok(keys)
+}
+
+/// Drops the topic from keys of one topic.
+fn by_partition<T>(by_key: HashMap<PartitionKey, T>) -> HashMap<i32, T> {
+    by_key.into_iter().map(|((_, partition), v)| (partition, v)).collect()
 }
 
 fn members(info: &GroupInfo) -> Vec<GroupMember> {

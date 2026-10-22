@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { clusterKeys } from "@/features/clusters";
 
 import { consumerGroupsApi } from "./api";
+import type { ResetRequest } from "./types";
 
 export const groupKeys = {
   all: (clusterId: string) => [...clusterKeys.scope(clusterId), "groups"] as const,
@@ -46,6 +47,27 @@ export function useDeleteConsumerGroup(clusterId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (group: string) => consumerGroupsApi.remove(clusterId, group),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: groupKeys.all(clusterId) }),
+  });
+}
+
+/** Each partition's current and new offset for a reset; null skips the request. */
+export function useResetPreview(clusterId: string, request: ResetRequest | null) {
+  return useQuery({
+    queryKey: [...groupKeys.detail(clusterId, request?.group ?? ""), "$reset", request] as const,
+    queryFn: () => consumerGroupsApi.previewReset(clusterId, request!),
+    enabled: request != null,
+    // Offsets move all the time; preview what is there now.
+    staleTime: 0,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useResetOffsets(clusterId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: ResetRequest) => consumerGroupsApi.resetOffsets(clusterId, request),
+    // Lag changes everywhere the group shows: list, detail and topic pages.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: groupKeys.all(clusterId) }),
   });
 }

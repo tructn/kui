@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -108,4 +108,40 @@ pub struct TopicConsumer {
     pub members: usize,
     pub progress: TopicProgress,
     pub offsets: Vec<PartitionOffset>,
+}
+
+/// Where to move a group's committed offsets.
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum ResetTo {
+    /// The first message still on the broker: replay everything retained.
+    Earliest,
+    /// The end: skip everything not yet read.
+    Latest,
+    /// The first message at or after an epoch-millis time.
+    Timestamp { value: i64 },
+    /// A given offset, kept within what the broker still has.
+    Offset { value: i64 },
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetRequest {
+    pub group: String,
+    pub topic: String,
+    /// `None` resets every partition of the topic.
+    pub partitions: Option<Vec<i32>>,
+    pub to: ResetTo,
+}
+
+/// One partition's committed offset before and after a reset.
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OffsetChange {
+    pub partition: i32,
+    pub low: i64,
+    pub high: i64,
+    /// `None` when the group never committed here.
+    pub current: Option<i64>,
+    pub target: i64,
 }

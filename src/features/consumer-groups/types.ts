@@ -80,3 +80,32 @@ export interface TopicConsumer {
   progress: TopicProgress;
   offsets: PartitionOffset[];
 }
+
+/** Where to move a group's committed offsets. */
+export type ResetTo =
+  /** First message still on the broker: replay everything retained. */
+  | { kind: "earliest" }
+  /** The end: skip everything not yet read. */
+  | { kind: "latest" }
+  /** First message at or after an epoch-millis time. */
+  | { kind: "timestamp"; value: number }
+  /** A given offset, kept within what the broker still has. */
+  | { kind: "offset"; value: number };
+
+export interface ResetRequest {
+  group: string;
+  topic: string;
+  /** null = every partition of the topic */
+  partitions: number[] | null;
+  to: ResetTo;
+}
+
+/** One partition's committed offset before and after a reset. */
+export interface OffsetChange {
+  partition: number;
+  low: number;
+  high: number;
+  /** null when the group never committed here. */
+  current: number | null;
+  target: number;
+}
