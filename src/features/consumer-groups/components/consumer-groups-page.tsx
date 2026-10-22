@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableFrame } from "@/components/table-frame";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
@@ -122,11 +122,7 @@ export function ConsumerGroupsPage() {
                 </TableRow>
               ))}
               {visible.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    {emptyText(groups, "No consumer groups found.")}
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={6}>{emptyText(groups, "No consumer groups found.")}</TableStateRow>
               )}
             </TableBody>
           </Table>

@@ -38,16 +38,18 @@ interface NavItem {
   key: string;
 }
 
+// Ordered the way a cluster is built up: the brokers, the topics they host,
+// then the consumer groups reading those topics.
 const NAV_ITEMS: NavItem[] = [
-  { label: "Topics", icon: ListTreeIcon, page: "topics", route: { page: "topics" }, key: "1" },
+  { label: "Brokers", icon: ServerIcon, page: "brokers", route: { page: "brokers" }, key: "1" },
+  { label: "Topics", icon: ListTreeIcon, page: "topics", route: { page: "topics" }, key: "2" },
   {
     label: "Consumer groups",
     icon: UsersIcon,
     page: "consumer-groups",
     route: { page: "consumer-groups" },
-    key: "2",
+    key: "3",
   },
-  { label: "Brokers", icon: ServerIcon, page: "brokers", route: { page: "brokers" }, key: "3" },
 ];
 
 export function AppSidebar() {

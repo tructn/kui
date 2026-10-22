@@ -8,7 +8,7 @@ import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableFrame } from "@/components/table-frame";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
@@ -53,14 +53,20 @@ export function BrokersPage() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
           <StatCard label="Brokers" value={data ? data.brokers.length : placeholder} />
           <StatCard label="Topics" value={data ? formatNumber(data.topicCount) : placeholder} />
-          <StatCard label="Partitions" value={data ? formatNumber(data.partitionCount) : placeholder} />
+          <StatCard
+            label="Partitions"
+            info="Total partitions across all topics in the cluster."
+            value={data ? formatNumber(data.partitionCount) : placeholder}
+          />
           <StatCard
             label="Under-replicated"
+            info="Partitions where some replicas have fallen out of sync with the leader, usually because a broker is down or lagging. Data is still available but has less redundancy."
             value={data ? data.underReplicatedPartitions : placeholder}
             warning={(data?.underReplicatedPartitions ?? 0) > 0}
           />
           <StatCard
             label="Offline"
+            info="Partitions with no leader. They can't be read from or written to until a replica comes back online."
             value={data ? data.offlinePartitions : placeholder}
             warning={(data?.offlinePartitions ?? 0) > 0}
           />
@@ -88,11 +94,7 @@ export function BrokersPage() {
                 </TableRow>
               ))}
               {sorter.rows.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center font-sans text-muted-foreground">
-                    {emptyText(overview, "No brokers found.")}
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={5} className="font-sans">{emptyText(overview, "No brokers found.")}</TableStateRow>
               )}
             </TableBody>
           </Table>

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { TableFrame } from "@/components/table-frame";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
@@ -56,11 +56,7 @@ export function PartitionsTable({ partitions, emptyText }: { partitions: Partiti
             );
           })}
           {partitions.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center font-sans text-muted-foreground">
-                {emptyText ?? "No partitions."}
-              </TableCell>
-            </TableRow>
+            <TableStateRow colSpan={7} className="font-sans">{emptyText ?? "No partitions."}</TableStateRow>
           )}
         </TableBody>
       </Table>
