@@ -6,6 +6,14 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.9](https://github.com/tructn/kui/compare/v0.1.0-alpha.8...v0.1.0-alpha.9) (2026-10-22)
+
+
+### Added
+
+* export messages and reset consumer group offsets ([#27](https://github.com/tructn/kui/issues/27)) ([9e5f3f1](https://github.com/tructn/kui/commit/9e5f3f1b5eee9e373672bbee852df29ad2bd19fd))
+* **messages:** expand message rows to preview key, headers and value ([#25](https://github.com/tructn/kui/issues/25)) ([fe314da](https://github.com/tructn/kui/commit/fe314da12713e8f6c9ef037d08a835e287e19773))
+
 ## [0.1.0-alpha.8](https://github.com/tructn/kui/compare/v0.1.0-alpha.7...v0.1.0-alpha.8) (2026-10-20)
 
 
