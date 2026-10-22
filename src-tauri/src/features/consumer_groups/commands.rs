@@ -1,6 +1,6 @@
 use tauri::State;
 
-use super::model::{GroupDetail, GroupLag, GroupSummary, TopicConsumer};
+use super::model::{GroupDetail, GroupLag, GroupSummary, OffsetChange, ResetRequest, TopicConsumer};
 use super::service;
 use crate::blocking::run_blocking;
 use crate::error::Result;
@@ -42,4 +42,26 @@ pub async fn topic_consumer_groups(
 pub async fn delete_consumer_group(state: State<'_, AppState>, cluster_id: String, group: String) -> Result<()> {
     let clients = state.clients(&cluster_id)?;
     service::delete(&clients, &group).await
+}
+
+/// Previews a reset: each partition's current and new offset. Changes nothing.
+#[tauri::command]
+pub async fn preview_offset_reset(
+    state: State<'_, AppState>,
+    cluster_id: String,
+    request: ResetRequest,
+) -> Result<Vec<OffsetChange>> {
+    let clients = state.clients(&cluster_id)?;
+    run_blocking(move || service::plan_reset(&clients, &request)).await
+}
+
+/// Moves a group's committed offsets (earliest, latest, a time or an offset).
+#[tauri::command]
+pub async fn reset_consumer_group_offsets(
+    state: State<'_, AppState>,
+    cluster_id: String,
+    request: ResetRequest,
+) -> Result<Vec<OffsetChange>> {
+    let clients = state.clients(&cluster_id)?;
+    run_blocking(move || service::reset_offsets(&clients, &request)).await
 }

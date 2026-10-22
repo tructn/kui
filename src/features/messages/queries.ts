@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { clusterKeys } from "@/features/clusters";
 
 import { messagesApi } from "./api";
-import type { BrowseRequest, CopyRequest, ProduceRequest } from "./types";
+import type { BrowseRequest, CopyRequest, ExportRequest, ProduceRequest } from "./types";
 
 export const messageKeys = {
   topic: (clusterId: string, topic: string) => [...clusterKeys.scope(clusterId), "messages", topic] as const,
@@ -39,5 +39,11 @@ export function useCopyMessages(clusterId: string) {
     // The target gained messages.
     onSuccess: (_, request) =>
       queryClient.invalidateQueries({ queryKey: messageKeys.topic(clusterId, request.targetTopic) }),
+  });
+}
+
+export function useExportMessages(clusterId: string) {
+  return useMutation({
+    mutationFn: (request: ExportRequest) => messagesApi.export(clusterId, request),
   });
 }

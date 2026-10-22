@@ -27,6 +27,7 @@ use state::AppState;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(updates::PendingUpdate::default())
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
@@ -57,6 +58,7 @@ pub fn run() {
             messages::commands::produce_message,
             messages::commands::copy_messages,
             messages::commands::tail_messages,
+            messages::commands::export_messages,
             generator::commands::list_generators,
             generator::commands::preview_records,
             generator::commands::generate_records,
@@ -66,6 +68,8 @@ pub fn run() {
             consumer_groups::commands::consumer_group_lags,
             consumer_groups::commands::topic_consumer_groups,
             consumer_groups::commands::delete_consumer_group,
+            consumer_groups::commands::preview_offset_reset,
+            consumer_groups::commands::reset_consumer_group_offsets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

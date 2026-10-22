@@ -10,9 +10,11 @@ use std::time::Duration;
 use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::{Offset, TopicPartitionList};
 
+use crate::features::consumer_groups::model::{ResetRequest, ResetTo};
 use crate::features::generator::model::{GenerateRequest, HeaderTemplate, RecordTemplate};
 use crate::features::messages::model::{
-    BrowseRequest, CopyRequest, MessageRef, ProduceHeader, ProduceRequest, StartFrom, TailRequest,
+    BrowseRequest, CopyRequest, ExportFormat, ExportRequest, ExportSource, MessageRef, ProduceHeader, ProduceRequest,
+    StartFrom, TailRequest,
 };
 use crate::features::topics::model::NewTopicRequest;
 use crate::features::{brokers, clusters, consumer_groups, generator, messages, topics};
@@ -274,4 +276,151 @@ async fn live_tail_sees_generated_records() {
     assert!(first.headers[0].value.as_deref().unwrap().starts_with("kui-"));
 
     topics::service::delete(&clients, std::slice::from_ref(&topic)).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "needs a running Kafka broker"]
+async fn export_messages() {
+    use rdkafka::producer::FutureRecord;
+
+    let clients = KafkaClients::connect(local_cluster()).unwrap();
+    let topic = format!("kui-it-export-{}", uuid::Uuid::new_v4());
+    let request =
+        NewTopicRequest { name: topic.clone(), partitions: 2, replication_factor: 1, configs: Default::default() };
+    topics::service::create(&clients, &request).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // More than one page (1,000) in total, so a range export has to continue.
+    for i in 0..1500 {
+        let value = format!("{{\"n\":{i}}}");
+        let record = FutureRecord::<str, str>::to(&topic).partition(i % 2).key("k").payload(&value);
+        clients.producer.send(record, Duration::from_secs(5)).await.unwrap();
+    }
+
+    let range = |limit, format| ExportRequest {
+        source: ExportSource::Range {
+            browse: BrowseRequest {
+                topic: topic.clone(),
+                partition: None,
+                from: StartFrom::Earliest,
+                value: None,
+                page_size: 50,
+                cursor: None,
+            },
+            limit,
+        },
+        format,
+    };
+    let export = |request: &ExportRequest| {
+        let mut out = Vec::new();
+        let count = messages::service::export(&clients, request, &mut out).unwrap();
+        (count, String::from_utf8(out).unwrap())
+    };
+
+    let (count, ndjson) = export(&range(1200, ExportFormat::Ndjson));
+    assert_eq!((count, ndjson.lines().count()), (1200, 1200));
+    // No message is written twice across pages.
+    let mut seen: Vec<(i64, i64)> = ndjson
+        .lines()
+        .map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap())
+        .map(|v| (v["partition"].as_i64().unwrap(), v["offset"].as_i64().unwrap()))
+        .collect();
+    seen.sort_unstable();
+    seen.dedup();
+    assert_eq!(seen.len(), 1200);
+
+    // A limit above what is there stops at the end of the topic.
+    let (count, json) = export(&range(5000, ExportFormat::Json));
+    assert_eq!(count, 1500);
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&json).unwrap().as_array().unwrap().len(), 1500);
+
+    // Selected messages, in partition and offset order, as CSV.
+    let picked = ExportRequest {
+        source: ExportSource::Messages {
+            topic: topic.clone(),
+            messages: vec![MessageRef { partition: 1, offset: 0 }, MessageRef { partition: 0, offset: 2 }],
+        },
+        format: ExportFormat::Csv,
+    };
+    let (count, csv) = export(&picked);
+    assert_eq!(count, 2);
+    let rows: Vec<&str> = csv.lines().skip(1).collect();
+    assert!(rows[0].starts_with(&format!("{topic},0,2,")), "{}", rows[0]);
+    assert!(rows[1].contains("\"{\"\"n\"\":1}\""), "{}", rows[1]);
+
+    // To a file: the finished file appears, the temporary one doesn't stay.
+    let path = std::env::temp_dir().join(format!("{topic}.json"));
+    assert_eq!(messages::service::export_to_file(&clients, &range(10, ExportFormat::Json), &path).unwrap(), 10);
+    assert!(path.exists() && !path.with_extension("json.part").exists());
+    std::fs::remove_file(&path).unwrap();
+
+    topics::service::delete(&clients, &[topic]).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "needs a running Kafka broker"]
+async fn reset_consumer_group_offsets() {
+    use rdkafka::producer::FutureRecord;
+
+    let cluster = local_cluster();
+    let clients = KafkaClients::connect(cluster.clone()).unwrap();
+    let id = uuid::Uuid::new_v4();
+    let (topic, group) = (format!("kui-it-reset-{id}"), format!("kui-it-reset-group-{id}"));
+    let request =
+        NewTopicRequest { name: topic.clone(), partitions: 2, replication_factor: 1, configs: Default::default() };
+    topics::service::create(&clients, &request).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Partition 0 gets 10 messages stamped 1000..1009; partition 1 stays empty.
+    for i in 0..10 {
+        let record = FutureRecord::<str, str>::to(&topic).partition(0).payload("x").timestamp(1_000 + i);
+        clients.producer.send(record, Duration::from_secs(5)).await.unwrap();
+    }
+    {
+        let committer = new_consumer(&cluster, &group).unwrap();
+        let mut tpl = TopicPartitionList::new();
+        tpl.add_partition_offset(&topic, 0, Offset::Offset(4)).unwrap();
+        committer.commit(&tpl, CommitMode::Sync).unwrap();
+    }
+    let reset =
+        |to, partitions: Option<Vec<i32>>| ResetRequest { group: group.clone(), topic: topic.clone(), partitions, to };
+    let committed_on_0 = || {
+        let detail = consumer_groups::service::detail(&clients, &group).unwrap();
+        detail.offsets.iter().find(|o| o.partition == 0).unwrap().committed
+    };
+
+    // A preview changes nothing.
+    let plan = consumer_groups::service::plan_reset(&clients, &reset(ResetTo::Earliest, None)).unwrap();
+    assert_eq!(
+        plan.iter().map(|c| (c.partition, c.current, c.target)).collect::<Vec<_>>(),
+        [(0, Some(4), 0), (1, None, 0)]
+    );
+    assert_eq!(committed_on_0(), Some(4));
+
+    // Replay from a point in time.
+    let changed =
+        consumer_groups::service::reset_offsets(&clients, &reset(ResetTo::Timestamp { value: 1_006 }, Some(vec![0])))
+            .unwrap();
+    assert_eq!(changed.iter().map(|c| c.target).collect::<Vec<_>>(), [6]);
+    assert_eq!(committed_on_0(), Some(6));
+
+    // Earliest, an offset past the end (kept at the end), latest.
+    for (to, expected) in [(ResetTo::Earliest, 0), (ResetTo::Offset { value: 99 }, 10), (ResetTo::Latest, 10)] {
+        consumer_groups::service::reset_offsets(&clients, &reset(to, None)).unwrap();
+        assert_eq!(committed_on_0(), Some(expected), "{to:?}");
+    }
+
+    // Refused while a consumer is connected to the group.
+    let member = new_consumer(&cluster, &group).unwrap();
+    member.subscribe(&[&topic]).unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while member.assignment().unwrap().count() == 0 && std::time::Instant::now() < deadline {
+        member.poll(Duration::from_millis(200));
+    }
+    let refused = consumer_groups::service::reset_offsets(&clients, &reset(ResetTo::Earliest, None));
+    assert!(refused.unwrap_err().to_string().contains("active member"));
+    drop(member);
+
+    consumer_groups::service::delete(&clients, &group).await.ok();
+    topics::service::delete(&clients, &[topic]).await.unwrap();
 }

@@ -1,21 +1,16 @@
-import { InfoList } from "@/components/info-tip";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import type { PartitionStatus } from "../types";
+import type { PartitionOffset, PartitionStatus } from "../types";
 
-/** Caught up and Behind share their colors with the progress bar's Consumed and Remaining. */
-export const STATUS_META: Record<PartitionStatus, { label: string; className: string; description: string }> = {
-  caughtUp: {
-    label: "Caught up",
-    className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    description: "The group has read every message: its committed offset is at the end of the partition.",
-  },
-  behind: {
-    label: "Behind",
-    className: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    description: "Messages are waiting after the committed offset. Remaining is how many.",
-  },
+/** Statuses the progress bar can't draw: the group has no readable position on the partition. */
+export type UnreadStatus = Extract<PartitionStatus, "notStarted" | "outOfRange">;
+
+export function isUnread(o: PartitionOffset): o is PartitionOffset & { status: UnreadStatus } {
+  return o.status === "notStarted" || o.status === "outOfRange";
+}
+
+const STATUS_META: Record<UnreadStatus, { label: string; className: string; description: string }> = {
   notStarted: {
     label: "Not started",
     className: "bg-muted text-muted-foreground",
@@ -29,14 +24,8 @@ export const STATUS_META: Record<PartitionStatus, { label: string; className: st
   },
 };
 
-const ORDER: PartitionStatus[] = ["caughtUp", "behind", "notStarted", "outOfRange"];
-
-/** Every status and its meaning, for an `InfoTip`. */
-export function PartitionStatusInfo() {
-  return <InfoList items={ORDER.map((s) => ({ term: STATUS_META[s].label, description: STATUS_META[s].description }))} />;
-}
-
-export function PartitionStatusBadge({ status }: { status: PartitionStatus }) {
+/** Shown in place of the progress bar when there is no position to draw. */
+export function PartitionStatusBadge({ status }: { status: UnreadStatus }) {
   const { label, className, description } = STATUS_META[status];
   return (
     <Tooltip>

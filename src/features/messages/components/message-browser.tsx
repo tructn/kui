@@ -16,6 +16,7 @@ import { LIVE_LIMIT, useLiveTail } from "../live-tail";
 import { useBrowseMessages } from "../queries";
 import type { BrowseCursor, BrowseFilters, BrowsePage, CopyTarget, KafkaMessage, MessageRef } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
+import { ExportMessagesDialog } from "./export-messages-dialog";
 import { MessageFilters } from "./message-filters";
 import { MessageSheet } from "./message-sheet";
 import { MessageTable } from "./message-table";
@@ -42,7 +43,8 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
   const [selected, setSelected] = useState<KafkaMessage | null>(null);
   // Checked rows for copying. Kept across pages and filters, like the topics list.
   const [checked, setChecked] = useState<ReadonlyMap<string, MessageRef>>(new Map());
-  const messages = useBrowseMessages(clusterId, { ...filters, pageSize, cursor: cursors[page] });
+  const request = { ...filters, pageSize, cursor: cursors[page] };
+  const messages = useBrowseMessages(clusterId, request);
   const tail = useLiveTail(clusterId, topic, filters.partition, live);
 
   function toggleLive(on: boolean) {
@@ -91,6 +93,13 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
           ) : (
             messages.isFetching && <Spinner className="size-3.5 text-muted-foreground" />
           )}
+          <ExportMessagesDialog
+            clusterId={clusterId}
+            request={request}
+            pageCount={pager.items.length}
+            selected={[...checked.values()]}
+            disabled={live}
+          />
           <div className="flex items-center gap-2">
             <Switch id="live-tail" checked={live} onCheckedChange={toggleLive} aria-keyshortcuts="L" />
             <Label htmlFor="live-tail">Live</Label>

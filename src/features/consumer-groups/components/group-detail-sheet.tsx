@@ -1,4 +1,5 @@
-import { ArrowUpRightIcon, Trash2Icon } from "lucide-react";
+import { ArrowUpRightIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { useNavigation } from "@/app/stores/navigation-store";
@@ -32,6 +33,7 @@ import type { GroupDetail, GroupMember } from "../types";
 import { GroupStateBadge } from "./group-state-badge";
 import { ProgressLegend } from "./progress-bar";
 import { ProgressSection } from "./progress-section";
+import { ResetOffsetsDialog, type ResetTopic } from "./reset-offsets-dialog";
 
 interface GroupDetailSheetProps {
   clusterId: string;
@@ -97,6 +99,18 @@ function GroupDetailBody({
   const memberSort = useSort("group-members", detail?.members ?? NO_MEMBERS, MEMBER_COLUMNS);
   const members = usePagination(memberSort.rows, memberSort.key);
   const memberResize = useColumnResize("group-members", 3);
+  // The topic the reset dialog opens on; a new key each time starts it fresh.
+  const [resetTopic, setResetTopic] = useState<string | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+  const resetTopics: ResetTopic[] = topics.map((t) => ({
+    topic: t.topic,
+    partitions: (detail?.offsets ?? []).filter((o) => o.topic === t.topic).map((o) => o.partition),
+  }));
+
+  function openReset(topic: string) {
+    setResetKey((k) => k + 1);
+    setResetTopic(topic);
+  }
 
   function handleDelete() {
     deleteGroup.mutate(name, {
@@ -127,6 +141,14 @@ function GroupDetailBody({
           )}
         </div>
         <div className="flex-1" />
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!detail || topics.length === 0}
+          onClick={() => openReset(topics[0].topic)}
+        >
+          <RotateCcwIcon /> Reset offsets
+        </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             {/* Kafka only allows deleting groups without active members. */}
@@ -168,18 +190,41 @@ function GroupDetailBody({
             offsets={detail?.offsets.filter((o) => o.topic === t.topic) ?? []}
             defaultOpen={topics.length === 1}
             extra={
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Open ${t.topic}`}
-                onClick={() => navigate({ page: "topic", topic: t.topic })}
-              >
-                <ArrowUpRightIcon />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Open ${t.topic}`}
+                  onClick={() => navigate({ page: "topic", topic: t.topic })}
+                >
+                  <ArrowUpRightIcon />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Reset offsets on ${t.topic}`}
+                  title="Reset offsets"
+                  onClick={() => openReset(t.topic)}
+                >
+                  <RotateCcwIcon />
+                </Button>
+              </>
             }
           />
         ))}
       </section>
+      {detail && resetTopics.length > 0 && (
+        <ResetOffsetsDialog
+          key={resetKey}
+          clusterId={clusterId}
+          group={name}
+          topics={resetTopics}
+          initialTopic={resetTopic ?? resetTopics[0].topic}
+          activeMembers={detail.members.length}
+          open={resetTopic != null}
+          onOpenChange={(open) => !open && setResetTopic(null)}
+        />
+      )}
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Members{detail && ` (${detail.members.length})`}</h3>
         {memberSort.rows.length === 0 ? (
