@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.10](https://github.com/tructn/kui/compare/v0.1.0-alpha.9...v0.1.0-alpha.10) (2026-10-22)
+
+
+### Fixed
+
+* **deps:** bump webpki crates for RustSec advisories ([#29](https://github.com/tructn/kui/issues/29)) ([b1edc38](https://github.com/tructn/kui/commit/b1edc38516defce0235fa8b20a2678269d309483))
+
 ## [0.1.0-alpha.9](https://github.com/tructn/kui/compare/v0.1.0-alpha.8...v0.1.0-alpha.9) (2026-10-22)
 
 
