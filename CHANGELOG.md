@@ -6,6 +6,25 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.11](https://github.com/tructn/kui/compare/v0.1.0-alpha.10...v0.1.0-alpha.11) (2026-10-22)
+
+
+### Added
+
+* **messages:** default to 25 rows per page ([3432c9b](https://github.com/tructn/kui/commit/3432c9b6ef0c6629cfe68d15a1cb61c0cb69e64d))
+* **ui:** add subtle motion to pages, tables and the sidebar ([cc7fe7c](https://github.com/tructn/kui/commit/cc7fe7c4533de82aca0aec0ca4223809f44f42ec))
+* **ui:** move Settings into a General sidebar group ([de84ffa](https://github.com/tructn/kui/commit/de84ffa42e626497973cd2cbf7d5385fb84980a9))
+
+
+### Fixed
+
+* **e2e:** skip install scripts in the e2e image ([d565d3d](https://github.com/tructn/kui/commit/d565d3d16c33430827005ecd73e874a4ce286583))
+
+
+### Performance
+
+* **messages:** speed up expanding all rows ([f72f602](https://github.com/tructn/kui/commit/f72f602b716120f92a0a430cb850466a12705e90))
+
 ## [0.1.0-alpha.10](https://github.com/tructn/kui/compare/v0.1.0-alpha.9...v0.1.0-alpha.10) (2026-10-22)
 
 
