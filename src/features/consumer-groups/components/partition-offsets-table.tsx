@@ -1,4 +1,3 @@
-import { InfoTip } from "@/components/info-tip";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { TableFrame } from "@/components/table-frame";
 import {
@@ -15,22 +14,17 @@ import { useSort, type SortColumns } from "@/hooks/use-sort";
 import { formatNumber } from "@/lib/format";
 
 import type { PartitionOffset } from "../types";
-import {
-  PartitionStatusBadge,
-  PartitionStatusInfo,
-  STATUS_META,
-} from "./partition-status-badge";
+import { isUnread, PartitionStatusBadge } from "./partition-status-badge";
 import { partitionSegments, ProgressBar } from "./progress-bar";
 
 const COLUMNS: SortColumns<
   PartitionOffset,
-  "partition" | "owner" | "consumed" | "remaining" | "status"
+  "partition" | "owner" | "consumed" | "remaining"
 > = {
   partition: (o) => o.partition,
   owner: (o) => o.owner,
   consumed: (o) => partitionSegments(o).consumed,
   remaining: (o) => o.lag,
-  status: (o) => o.status,
 };
 
 /** Where a group stands on each partition of one topic: consumed and remaining messages. */
@@ -41,7 +35,7 @@ export function PartitionOffsetsTable({
 }) {
   const sorter = useSort("partition-offsets", offsets, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("partition-offsets", 6);
+  const resize = useColumnResize("partition-offsets", 5);
   return (
     // Sits inside a bordered section, so no border of its own.
     <TableFrame pager={pager} fill={false} className="rounded-none border-0">
@@ -81,19 +75,6 @@ export function PartitionOffsetsTable({
             >
               Remaining
             </SortableTableHead>
-            <SortableTableHead
-              column="status"
-              sort={sorter.sort}
-              onSort={sorter.toggle}
-              className="w-32"
-              info={
-                <InfoTip label="What the statuses mean">
-                  <PartitionStatusInfo />
-                </InfoTip>
-              }
-            >
-              Status
-            </SortableTableHead>
           </TableRow>
         </TableHeader>
         <TableBody className="font-mono text-xs tabular-nums">
@@ -112,15 +93,12 @@ export function PartitionOffsetsTable({
                     </span>
                   )}
                 </TableCell>
-                <TableCell>
-                  <ProgressBar
-                    segments={segments}
-                    emptyText={
-                      segments.consumed == null
-                        ? STATUS_META[o.status].label
-                        : undefined
-                    }
-                  />
+                <TableCell className="font-sans">
+                  {isUnread(o) ? (
+                    <PartitionStatusBadge status={o.status} />
+                  ) : (
+                    <ProgressBar segments={segments} />
+                  )}
                 </TableCell>
                 <TableCell
                   className="text-right"
@@ -142,9 +120,6 @@ export function PartitionOffsetsTable({
                   }
                 >
                   {o.lag == null ? "—" : formatNumber(o.lag)}
-                </TableCell>
-                <TableCell className="font-sans">
-                  <PartitionStatusBadge status={o.status} />
                 </TableCell>
               </TableRow>
             );

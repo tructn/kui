@@ -8,6 +8,7 @@ import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { PartitionOffset, TopicProgress } from "../types";
+import { isUnread } from "./partition-status-badge";
 
 /** One color per kind of message, shared by bars, legends and badges. */
 export const SEGMENT_COLORS = {
@@ -37,7 +38,7 @@ export function topicSegments(t: TopicProgress): Segments {
 
 /** Partitions the group never read, or whose offset retention deleted, have no segments. */
 export function partitionSegments(o: PartitionOffset): Segments {
-  if (o.status === "notStarted" || o.status === "outOfRange") return {};
+  if (isUnread(o)) return {};
   return {
     consumed: Math.min(Math.max(o.committed! - o.low, 0), o.high - o.low),
     remaining: o.lag ?? 0,
