@@ -10,6 +10,13 @@
 </p>
 
 <p align="center">
+
+[![Security](https://github.com/tructn/kui/actions/workflows/security.yml/badge.svg)](https://github.com/tructn/kui/actions/workflows/security.yml)
+[![Release](https://github.com/tructn/kui/actions/workflows/release.yml/badge.svg)](https://github.com/tructn/kui/actions/workflows/release.yml)
+
+</p>
+
+<p align="center">
   <a href="https://github.com/tructn/kui/releases/latest"><strong>Download for macOS &amp; Windows</strong></a>
 </p>
 
