@@ -149,10 +149,10 @@ in [.release-please-manifest.json](.release-please-manifest.json). KUI is in alp
 uses that version) and set `prerelease-type` to `beta`; for stable releases, remove `versioning`, `prerelease`
 and `prerelease-type`. Before 1.0, breaking changes bump the minor.
 
-The release PR is opened with the workflow's `GITHUB_TOKEN`, which needs **Settings → Actions → General → Allow
-GitHub Actions to create and approve pull requests**. CI doesn't run on PRs it opens; to get checks on it, add a
-`RELEASE_PLEASE_TOKEN` secret: a fine-grained personal access token for this repo with **Contents** and
-**Pull requests** read and write.
+The release PR is opened with the `RELEASE_PLEASE_TOKEN` secret: a fine-grained personal access token for this
+repo with **Contents** and **Pull requests** read and write. It can't use the workflow's `GITHUB_TOKEN`, because
+CI doesn't run on PRs opened with it, so the release PR could never pass the required checks. When the token
+expires, the release workflow fails until you replace the secret.
 
 To build the installers without releasing, run the workflow by hand (**Actions → Release → Run workflow**); they
 are attached to the run as artifacts.

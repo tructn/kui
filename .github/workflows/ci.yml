@@ -27,6 +27,7 @@ jobs:
   pr-title:
     name: Conventional PR title
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       pull-requests: read
     steps:
@@ -49,12 +50,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS runners bill 10x on private repos; while KUI is private, macOS
-        # is covered by the local pre-push hook (developers work on Macs).
-        os: ${{ github.event.repository.private && fromJSON('["windows-latest"]') || fromJSON('["macos-latest", "windows-latest"]') }}
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
 
