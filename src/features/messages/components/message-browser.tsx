@@ -34,8 +34,8 @@ interface MessageBrowserProps {
 /** Filter toolbar + message table + detail sheet for one topic, with an optional live tail. */
 export function MessageBrowser({ clusterId, topic, partitions, copyTargets, readOnly = false }: MessageBrowserProps) {
   const [filters, setFilters] = useState<BrowseFilters>({ topic, partition: null, from: "latest", value: null });
-  const pageSize = useTablePrefs((s) => s.pageSize);
-  const setPageSize = useTablePrefs((s) => s.setPageSize);
+  const pageSize = useTablePrefs((s) => s.messagePageSize);
+  const setPageSize = useTablePrefs((s) => s.setMessagePageSize);
   // cursors[i] reads page i, so stepping back reuses the cursor that led to a page.
   const [cursors, setCursors] = useState<(BrowseCursor | null)[]>([null]);
   const page = cursors.length - 1;
