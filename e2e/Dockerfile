@@ -22,7 +22,8 @@ WORKDIR /app
 
 # Install JS dependencies in their own layers so source edits don't reinstall them.
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+# --ignore-scripts skips `prepare` (lefthook install), which needs a git checkout.
+RUN bun install --frozen-lockfile --ignore-scripts
 COPY e2e/package.json e2e/bun.lock e2e/
 RUN cd e2e && bun install --frozen-lockfile
 
