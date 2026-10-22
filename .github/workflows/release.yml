@@ -38,6 +38,7 @@ jobs:
   release-please:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
@@ -49,10 +50,10 @@ jobs:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          # Pull requests opened with GITHUB_TOKEN don't run CI, so the release
-          # PR gets no checks. Add a RELEASE_PLEASE_TOKEN secret (a fine-grained
-          # PAT with contents and pull-requests write) to have them run.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          # A PAT rather than GITHUB_TOKEN: pull requests opened with
+          # GITHUB_TOKEN don't run CI, so the release PR could never pass the
+          # required checks. See CONTRIBUTING.md.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
   build:
     name: ${{ matrix.name }}
@@ -79,6 +80,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             bundles: nsis
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
     env:
       BUNDLE: src-tauri/target/${{ matrix.target }}/release/bundle
       TAG: ${{ needs.release-please.outputs.tag }}
@@ -195,9 +197,8 @@ jobs:
           if-no-files-found: error
 
       # Signed SLSA provenance, verifiable with `gh attestation verify`.
-      # Private repos only get attestations on GitHub Enterprise Cloud.
       - name: Attest build provenance
-        if: env.TAG != '' && !github.event.repository.private
+        if: env.TAG != ''
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
@@ -210,6 +211,7 @@ jobs:
     needs: [release-please, build]
     if: needs.release-please.outputs.created == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
     env:
