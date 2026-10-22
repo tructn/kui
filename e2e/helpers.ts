@@ -78,4 +78,44 @@ export async function addCluster(name: string, bootstrap: string) {
   await expectToast(`Saved ${name}`);
 }
 
+/**
+ * Commands that change a Kafka cluster or the saved cluster connections.
+ * `save_setting` (UI preferences) and read-only commands are left out.
+ */
+export const CHANGING_COMMANDS = [
+  "save_cluster",
+  "delete_cluster",
+  "create_topic",
+  "delete_topics",
+  "produce_message",
+  "copy_messages",
+  "generate_records",
+  "delete_consumer_group",
+  "reset_consumer_group_offsets",
+  "install_update",
+];
+
+declare global {
+  interface Window {
+    __KUI_COMMANDS__?: string[];
+  }
+}
+
+/** Every command the UI has sent since launch (or the last `clearCommands`). Needs a VITE_E2E=1 build. */
+export function commandsSent(): Promise<string[]> {
+  return browser.execute(() => window.__KUI_COMMANDS__ ?? []);
+}
+
+export async function clearCommands() {
+  await browser.execute(() => {
+    window.__KUI_COMMANDS__ = [];
+  });
+}
+
+/** Fails if the UI sent any command that changes the cluster or the saved connections. */
+export async function expectNoChangingCommands() {
+  const changing = (await commandsSent()).filter((c) => CHANGING_COMMANDS.includes(c));
+  expect(changing).toEqual([]);
+}
+
 type ChainablePromiseElement = ReturnType<typeof $>;

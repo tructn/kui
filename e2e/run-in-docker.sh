@@ -5,7 +5,8 @@ set -euo pipefail
 cd /app
 
 echo "▶ Building KUI (debug)…"
-bun run tauri build --debug --no-bundle
+# VITE_E2E records every command the UI sends, so specs can assert none changed anything.
+VITE_E2E=1 bun run tauri build --debug --no-bundle
 
 echo "▶ Rust unit + integration tests against ${KAFKA_BOOTSTRAP}…"
 (cd src-tauri && KUI_TEST_BOOTSTRAP="$KAFKA_BOOTSTRAP" cargo test -- --include-ignored)
