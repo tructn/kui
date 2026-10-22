@@ -20,9 +20,9 @@ export function WelcomeScreen() {
       <div className="p-3">
         <SidebarTrigger />
       </div>
-      <Empty>
+      <Empty className="page-enter">
         <EmptyHeader>
-          <EmptyMedia variant="icon">
+          <EmptyMedia variant="icon" className="float-gentle">
             <DatabaseIcon />
           </EmptyMedia>
           <EmptyTitle>{clusters.length ? "Select a cluster" : "Connect to Kafka"}</EmptyTitle>
