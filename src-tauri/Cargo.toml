@@ -38,6 +38,10 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "rus
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 semver = "1"
 
+# Native "Save as" window for exports. Rust opens it, so the webview never gets
+# dialog or file-system permissions (see security_tests.rs).
+tauri-plugin-dialog = "2"
+
 # librdkafka and OpenSSL are linked statically, so the app has no runtime
 # dependency on system Kafka/SSL libraries. OpenSSL is compiled from source
 # except on Windows, where building it needs Perl. There it is linked from a

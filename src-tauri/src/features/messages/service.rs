@@ -1,16 +1,21 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use rdkafka::consumer::Consumer;
 use rdkafka::error::KafkaError;
-use rdkafka::message::{BorrowedMessage, Header, Headers, OwnedHeaders, OwnedMessage};
+use rdkafka::message::{Header, Headers, OwnedHeaders, OwnedMessage};
 use rdkafka::producer::FutureRecord;
 use rdkafka::{Message as _, Offset, TopicPartitionList};
 
 use super::codec::decode;
+use super::export::ExportWriter;
 use super::model::{
-    BrowsePage, BrowseRequest, CopyRequest, Delivered, Message, MessageHeader, ProduceRequest, StartFrom, TailRequest,
+    BrowsePage, BrowseRequest, CopyRequest, Delivered, ExportRequest, ExportSource, Message, MessageHeader,
+    ProduceRequest, StartFrom, TailRequest,
 };
 use super::window::{PartitionRead, ReadWindow, merge_page, page_window, remaining, start_position};
 use crate::blocking::run_blocking;
@@ -29,11 +34,15 @@ const MAX_PAGE_SIZE: usize = 1000;
 /// merged by time (see `window::merge_page`). Uses a fresh consumer with manual
 /// partition assignment and no commits, so browsing never affects a real consumer group.
 pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowsePage> {
+    browse_with(&browsing_consumer(clients)?, request)
+}
+
+/// `browse` on an existing browsing consumer, so several pages can share one.
+fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<BrowsePage> {
     let size = request.page_size.clamp(1, MAX_PAGE_SIZE);
     let backward = request.from == StartFrom::Latest;
-    let consumer = browsing_consumer(clients)?;
 
-    let partitions = plan_partitions(&consumer, request)?;
+    let partitions = plan_partitions(consumer, request)?;
     let total = partitions.iter().map(|p| remaining(p.start, p.marks, backward)).sum();
     let position = |p: &PartitionPlan| request.cursor.as_ref().and_then(|c| c.get(&p.id)).copied().unwrap_or(p.start);
 
@@ -48,7 +57,7 @@ pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowseP
             assignment.add_partition_offset(&request.topic, *partition, Offset::Offset(window.start))?;
         }
         consumer.assign(&assignment)?;
-        for message in read_until_done(&consumer, windows.clone())? {
+        for message in read_until_done(consumer, windows.clone())? {
             by_partition.entry(message.partition).or_default().push(message);
         }
     }
@@ -69,6 +78,74 @@ pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowseP
     }
     let more = partitions.iter().any(|p| remaining(next[&p.id], p.marks, backward) > 0);
     Ok(BrowsePage { messages, total, next: more.then_some(next) })
+}
+
+/// Most messages one export reads.
+pub const MAX_EXPORT: usize = 100_000;
+
+/// Exports messages to `path`, returning how many were written.
+///
+/// Writes to `<path>.part` first and renames it at the end, so a failed export
+/// never leaves a half-written file under the chosen name.
+pub fn export_to_file(clients: &KafkaClients, request: &ExportRequest, path: &Path) -> Result<usize> {
+    let mut part = path.as_os_str().to_owned();
+    part.push(".part");
+    let part = Path::new(&part);
+    let written = File::create(part).map_err(Error::from).and_then(|file| {
+        let mut out = BufWriter::new(file);
+        let count = export(clients, request, &mut out)?;
+        out.into_inner().map_err(|e| e.into_error())?.sync_all()?;
+        Ok(count)
+    });
+    match written {
+        Ok(count) => {
+            std::fs::rename(part, path)?;
+            Ok(count)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(part);
+            Err(e)
+        }
+    }
+}
+
+/// Writes the messages `request` selects to `out`, one page at a time.
+pub fn export(clients: &KafkaClients, request: &ExportRequest, out: impl Write) -> Result<usize> {
+    let consumer = browsing_consumer(clients)?;
+    let mut writer = ExportWriter::new(out, request.format, request.topic())?;
+    match &request.source {
+        ExportSource::Range { browse, limit } => {
+            let mut left = (*limit).clamp(1, MAX_EXPORT);
+            let mut cursor = browse.cursor.clone();
+            while left > 0 {
+                let page_request = BrowseRequest { page_size: left.min(MAX_PAGE_SIZE), cursor, ..browse.clone() };
+                let page = browse_with(&consumer, &page_request)?;
+                for message in page.messages.iter().take(left) {
+                    writer.write(message)?;
+                }
+                left -= page.messages.len().min(left);
+                // Stop at the end, or if a page made no progress (so it can never spin).
+                match page.next {
+                    Some(next) if !page.messages.is_empty() || page_request.cursor.as_ref() != Some(&next) => {
+                        cursor = Some(next)
+                    }
+                    _ => break,
+                }
+            }
+        }
+        ExportSource::Messages { topic, messages } => {
+            if messages.is_empty() {
+                return Err(Error::msg("No messages to export"));
+            }
+            let mut refs: Vec<(i32, i64)> = messages.iter().map(|m| (m.partition, m.offset)).collect();
+            refs.sort_unstable();
+            refs.dedup();
+            for (partition, offset) in refs {
+                writer.write(&to_message(&fetch_one(&consumer, topic, partition, offset)?))?;
+            }
+        }
+    }
+    writer.finish()
 }
 
 /// How often a live tail hands new messages to the UI, and the most it sends at once.
@@ -192,7 +269,7 @@ fn read_until_done(consumer: &KafkaConsumer, mut pending: HashMap<i32, ReadWindo
     Ok(messages)
 }
 
-fn to_message(m: &BorrowedMessage<'_>) -> Message {
+fn to_message<M: rdkafka::Message>(m: &M) -> Message {
     let headers = m
         .headers()
         .map(|hs| {

@@ -16,7 +16,7 @@ pub enum StartFrom {
     Timestamp,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowseRequest {
     pub topic: String,
@@ -121,4 +121,59 @@ pub struct CopyRequest {
 pub struct MessageRef {
     pub partition: i32,
     pub offset: i64,
+}
+
+/// File formats messages can be exported to.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ExportFormat {
+    /// One JSON array.
+    Json,
+    /// One JSON object per line.
+    Ndjson,
+    Csv,
+}
+
+impl ExportFormat {
+    pub fn extension(self) -> &'static str {
+        match self {
+            ExportFormat::Json => "json",
+            ExportFormat::Ndjson => "ndjson",
+            ExportFormat::Csv => "csv",
+        }
+    }
+}
+
+/// Which messages to export.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum ExportSource {
+    /// Messages in browse order, starting at `browse` (its cursor included),
+    /// until `limit` are read or the topic ends.
+    Range { browse: BrowseRequest, limit: usize },
+    /// Specific messages, e.g. the rows checked in the table.
+    Messages { topic: String, messages: Vec<MessageRef> },
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportRequest {
+    pub source: ExportSource,
+    pub format: ExportFormat,
+}
+
+impl ExportRequest {
+    pub fn topic(&self) -> &str {
+        match &self.source {
+            ExportSource::Range { browse, .. } => &browse.topic,
+            ExportSource::Messages { topic, .. } => topic,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Exported {
+    pub path: String,
+    pub count: usize,
 }

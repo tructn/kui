@@ -89,3 +89,23 @@ export interface CopyTarget {
   name: string;
   partitions: number;
 }
+
+export type ExportFormat = "json" | "ndjson" | "csv";
+
+/** Which messages to export. */
+export type ExportSource =
+  /** Browse order from `browse` (cursor included) until `limit` messages or the end. */
+  | { kind: "range"; browse: BrowseRequest; limit: number }
+  /** Specific messages, e.g. the checked rows. */
+  | { kind: "messages"; topic: string; messages: MessageRef[] };
+
+export interface ExportRequest {
+  source: ExportSource;
+  format: ExportFormat;
+}
+
+export interface Exported {
+  /** Where the file was saved. */
+  path: string;
+  count: number;
+}
