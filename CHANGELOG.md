@@ -6,6 +6,14 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.13](https://github.com/tructn/kui/compare/v0.1.0-alpha.12...v0.1.0-alpha.13) (2026-10-23)
+
+
+### Fixed
+
+* **e2e:** make the end-to-end suite pass again ([245c573](https://github.com/tructn/kui/commit/245c57322a7cb0e277b5c6f671d19a4187c79dc5))
+* **settings:** apply the editor font size outside the preview ([d7d00f5](https://github.com/tructn/kui/commit/d7d00f50c564d8d1fe383de864a2006d671e804c))
+
 ## [0.1.0-alpha.12](https://github.com/tructn/kui/compare/v0.1.0-alpha.11...v0.1.0-alpha.12) (2026-10-22)
 
 
