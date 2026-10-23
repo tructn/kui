@@ -61,7 +61,7 @@ export function MessageSheet({ clusterId, topic, targets, readOnly = false, mess
               <TabsContent value="headers" className="flex flex-col gap-2">
                 {message.headers.length === 0 && <p className="text-sm text-muted-foreground">No headers.</p>}
                 {message.headers.map((h, i) => (
-                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 font-mono text-xs">
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 font-mono text-code">
                     <span className="truncate text-muted-foreground">{h.key}</span>
                     <span className="break-all">{h.value ?? "null"}</span>
                   </div>
@@ -96,7 +96,7 @@ function PayloadView({ payload }: { payload: Payload | null }) {
           <CopyIndicator copied={copied} /> {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+      <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-muted p-3 font-mono text-code leading-relaxed break-all whitespace-pre-wrap">
         {text}
       </pre>
     </div>

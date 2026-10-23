@@ -26,7 +26,7 @@ export function RecordPreview({ records, error, loading, stale }: RecordPreviewP
       )}
       <div className={cn("flex max-h-80 flex-col gap-2 overflow-y-auto", (error || stale) && "opacity-50")}>
         {records?.map((record, i) => (
-          <div key={i} className="rounded-lg bg-muted p-3 font-mono text-xs">
+          <div key={i} className="rounded-lg bg-muted p-3 font-mono text-code">
             <div className="mb-1 truncate text-muted-foreground">
               key: {record.key ?? <span className="italic">null</span>}
               {record.headers.map((h) => ` · ${h.key}=${h.value}`).join("")}

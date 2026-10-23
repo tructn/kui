@@ -196,7 +196,7 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
                     id="generate-value"
                     ref={valueRef}
                     spellCheck={false}
-                    className="min-h-64 font-mono text-xs"
+                    className="min-h-64 font-mono text-code md:text-code"
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                   />
@@ -206,7 +206,7 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
                   <Textarea
                     id="generate-headers"
                     spellCheck={false}
-                    className="min-h-14 font-mono text-xs"
+                    className="min-h-14 font-mono text-code md:text-code"
                     placeholder="trace-id={{uuid}}"
                     value={headers}
                     onChange={(e) => setHeaders(e.target.value)}

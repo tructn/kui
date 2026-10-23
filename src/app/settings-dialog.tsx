@@ -209,7 +209,7 @@ function AppearanceSettings() {
             />
           </SettingRow>
 
-          <pre className="bg-muted/40 whitespace-pre-wrap px-4 py-3 font-mono text-[length:var(--app-code-size)] leading-relaxed">
+          <pre className="bg-muted/40 whitespace-pre-wrap px-4 py-3 font-mono text-code leading-relaxed">
             {`{ "orderId": "o-1001", "total": 129.90, "status": "PAID" } // => 0O1lI`}
           </pre>
         </SettingsGroup>

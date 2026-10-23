@@ -96,7 +96,7 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
               <FieldLabel htmlFor="produce-value">Value</FieldLabel>
               <Textarea
                 id="produce-value"
-                className="min-h-40 font-mono text-xs"
+                className="min-h-40 font-mono text-code md:text-code"
                 placeholder='{"hello": "kafka"}'
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
@@ -106,7 +106,7 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
               <FieldLabel htmlFor="produce-headers">Headers</FieldLabel>
               <Textarea
                 id="produce-headers"
-                className="min-h-16 font-mono text-xs"
+                className="min-h-16 font-mono text-code md:text-code"
                 placeholder="content-type=application/json"
                 value={headers}
                 onChange={(e) => setHeaders(e.target.value)}

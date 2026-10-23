@@ -18,6 +18,8 @@
     /* Set at runtime from Settings → Appearance (see app/stores/appearance-store.ts). */
     --font-sans: var(--app-font-sans);
     --font-mono: var(--app-font-mono);
+    /* `text-code`: the editor font size from Settings → Appearance. */
+    --text-code: var(--app-code-size);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
