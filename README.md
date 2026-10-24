@@ -48,8 +48,9 @@ KUI is neither. It's a desktop app: download it, add your cluster, and you're lo
 <img src="docs/00_cluster.png" alt="The Add cluster dialog" width="820" />
 
 Add a cluster with its address, test the connection, and save it. Secure clusters work too:
-SSL, plus SASL with PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512. If a connection fails, KUI tells you why in plain
-words instead of showing a raw error.
+TLS with your own CA and client certificates (mutual TLS), plus SASL with PLAIN, SCRAM-SHA-256,
+SCRAM-SHA-512 (username and password) or OAUTHBEARER (OAuth 2.0 client credentials; macOS and Linux
+only for now). If a connection fails, KUI tells you why in plain words instead of showing a raw error.
 
 ### Find any topic in seconds
 

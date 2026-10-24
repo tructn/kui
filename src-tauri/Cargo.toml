@@ -47,8 +47,12 @@ tauri-plugin-dialog = "2"
 # except on Windows, where building it needs Perl. There it is linked from a
 # prebuilt static OpenSSL found through the OPENSSL_* variables (the CI
 # runner's preinstalled copy or vcpkg; see .github/actions/windows-openssl).
+#
+# curl-static adds librdkafka's built-in OAuth/OIDC token fetching (SASL
+# OAUTHBEARER with sasl.oauthbearer.method=oidc). It is left out on Windows:
+# rdkafka-sys expects a `libcurl.a` there, which an MSVC build doesn't produce.
 [target.'cfg(not(windows))'.dependencies]
-rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored", "zstd"] }
+rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored", "zstd", "curl-static"] }
 
 [target.'cfg(windows)'.dependencies]
 rdkafka = { version = "0.39", features = ["cmake-build", "ssl", "zstd"] }
