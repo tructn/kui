@@ -6,6 +6,18 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.14](https://github.com/tructn/kui/compare/v0.1.0-alpha.13...v0.1.0-alpha.14) (2026-10-24)
+
+
+### Added
+
+* **clusters:** add TLS certificates and OAuth sign-in ([316b776](https://github.com/tructn/kui/commit/316b7769a1f0ebca8e102e9388a8d332fc2165fb))
+
+
+### Fixed
+
+* **consumer-groups:** show groups on the KIP-848 consumer protocol ([f12bab2](https://github.com/tructn/kui/commit/f12bab267087f660c4171b504b3b360b24cca0e2))
+
 ## [0.1.0-alpha.13](https://github.com/tructn/kui/compare/v0.1.0-alpha.12...v0.1.0-alpha.13) (2026-10-23)
 
 
