@@ -1,7 +1,8 @@
-import { CheckCircle2Icon, PlugZapIcon } from "lucide-react";
+import { CheckCircle2Icon, PlugZapIcon, TriangleAlertIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,9 +49,11 @@ const PROTOCOL_HINTS: Record<SecurityProtocol, string> = {
 };
 
 const MECHANISM_HINTS: Record<SaslMechanism, string> = {
-  PLAIN: "Username and password, sent as they are. Only safe over SASL_SSL.",
-  "SCRAM-SHA-256": "Username and password. The password itself is never sent.",
-  "SCRAM-SHA-512": "Username and password. The password itself is never sent.",
+  PLAIN: "Username and password. Use with SASL_SSL, since the password travels as plain text otherwise.",
+  "SCRAM-SHA-256":
+    "Username and password, sent more securely than PLAIN. Pick this if your cluster's users use SCRAM-SHA-256.",
+  "SCRAM-SHA-512":
+    "Username and password, sent more securely than PLAIN. Pick this if your cluster's users use SCRAM-SHA-512.",
   OAUTHBEARER: "OAuth 2.0 client credentials. KUI gets a token from your identity provider and renews it.",
 };
 
@@ -102,7 +105,10 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
     test.reset();
   };
   const toConfig = (): ClusterConfig =>
-    withoutUnusedSecurity({ ...form, properties: Object.fromEntries(parseKeyValueLines(propertiesText)) });
+    withoutUnusedSecurity({
+      ...form,
+      properties: Object.fromEntries(parseKeyValueLines(propertiesText)),
+    });
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -181,6 +187,16 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
               </Select>
               <FieldDescription>{MECHANISM_HINTS[mechanism]}</FieldDescription>
             </Field>
+            {mechanism === "PLAIN" && form.securityProtocol === "SASL_PLAINTEXT" && (
+              <Alert variant="destructive">
+                <TriangleAlertIcon />
+                <AlertTitle>The password will be sent unencrypted</AlertTitle>
+                <AlertDescription>
+                  PLAIN over SASL_PLAINTEXT lets anyone on the network read it. Use SASL_SSL, or SCRAM if the cluster
+                  supports it.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {mechanism === "OAUTHBEARER" ? (
               <>
@@ -286,6 +302,16 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
                 Verify broker hostname
               </FieldLabel>
             </Field>
+            {!form.sslVerifyHostname && (
+              <Alert variant="destructive">
+                <TriangleAlertIcon />
+                <AlertTitle>Hostname check is off</AlertTitle>
+                <AlertDescription>
+                  Any server with a certificate from a trusted CA could pose as the broker and read your traffic. Only
+                  turn this off for test clusters whose certificates don't match their hostnames.
+                </AlertDescription>
+              </Alert>
+            )}
           </FieldSet>
         )}
 
@@ -310,7 +336,13 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
 
       <DialogFooter className="sm:justify-between">
         <Button type="button" variant="outline" disabled={test.isPending} onClick={() => test.mutate(toConfig())}>
-          {test.isPending ? <Spinner /> : test.isSuccess ? <CheckCircle2Icon className="text-emerald-500" /> : <PlugZapIcon />}
+          {test.isPending ? (
+            <Spinner />
+          ) : test.isSuccess ? (
+            <CheckCircle2Icon className="text-emerald-500" />
+          ) : (
+            <PlugZapIcon />
+          )}
           {test.isSuccess ? `Connected · ${test.data} broker${test.data === 1 ? "" : "s"}` : "Test connection"}
         </Button>
         <Button type="submit" disabled={save.isPending}>
@@ -334,7 +366,17 @@ interface TextFieldProps {
   mono?: boolean;
 }
 
-function TextField({ id, label, value, onChange, type = "text", placeholder, description, required, mono }: TextFieldProps) {
+function TextField({
+  id,
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+  description,
+  required,
+  mono,
+}: TextFieldProps) {
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>

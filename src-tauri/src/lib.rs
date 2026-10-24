@@ -31,7 +31,10 @@ pub fn run() {
         .manage(updates::PendingUpdate::default())
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
-            let store = clusters::store::ClusterStore::load(config_dir.join("clusters.json"))?;
+            let store = clusters::store::ClusterStore::load(
+                config_dir.join("clusters.json"),
+                Box::new(clusters::secrets::Keychain),
+            )?;
             app.manage(AppState::new(store));
             app.manage(settings::SettingsStore::load(config_dir.join("settings.json"))?);
             // The version comes from package.json (via tauri.conf.json), so the title never drifts.

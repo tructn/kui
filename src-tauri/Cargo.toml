@@ -42,6 +42,11 @@ semver = "1"
 # dialog or file-system permissions (see security_tests.rs).
 tauri-plugin-dialog = "2"
 
+# Cluster passwords live in the OS credential store (macOS Keychain, Windows
+# Credential Manager, Secret Service on Linux), not in clusters.json. On Linux
+# it talks D-Bus through zbus in pure Rust, so the build needs no libdbus.
+keyring = { version = "3.6", features = ["apple-native", "windows-native", "async-secret-service", "async-io", "crypto-rust"] }
+
 # librdkafka and OpenSSL are linked statically, so the app has no runtime
 # dependency on system Kafka/SSL libraries. OpenSSL is compiled from source
 # except on Windows, where building it needs Perl. There it is linked from a

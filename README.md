@@ -38,7 +38,7 @@ KUI is neither. It's a desktop app: download it, add your cluster, and you're lo
 
 - **Nothing to set up.** No server, no Docker, no config files. Install it like any other app.
 - **Small and fast.** Built with [Tauri](https://tauri.app) and Rust, so it starts quickly and uses little memory.
-- **Private by design.** Your clusters and passwords stay on your computer. KUI doesn't collect anything.
+- **Private by design.** Your clusters and passwords stay on your computer, with passwords in the system keychain. KUI doesn't collect anything.
 - **Free and open source.** MIT licensed, with no account and no paid tier.
 
 ## Features

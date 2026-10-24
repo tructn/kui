@@ -152,3 +152,4 @@ fn security_links_never_navigate_the_app_window() {
 // A01  internal topics are read-only ........ kafka::metadata::tests::platform_topics_are_internal
 //                                             integration_tests::full_round_trip (refused batch delete)
 // A02  secrets readable by the owner only ... json_file::tests::saved_files_are_readable_by_the_owner_only
+//                                             clusters::store::tests::passwords_go_to_the_keychain_not_the_file
