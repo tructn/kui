@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.15](https://github.com/tructn/kui/compare/v0.1.0-alpha.14...v0.1.0-alpha.15) (2026-10-24)
+
+
+### Added
+
+* **clusters:** keep passwords in the system keychain ([eb69e54](https://github.com/tructn/kui/commit/eb69e5463c2a862d462a19e0d9096bf5caffc0ed))
+
 ## [0.1.0-alpha.14](https://github.com/tructn/kui/compare/v0.1.0-alpha.13...v0.1.0-alpha.14) (2026-10-24)
 
 
