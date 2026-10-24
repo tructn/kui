@@ -2,40 +2,35 @@ use std::collections::{BTreeSet, HashMap};
 
 use rdkafka::admin::AdminOptions;
 use rdkafka::consumer::{CommitMode, Consumer};
-use rdkafka::groups::GroupInfo;
 use rdkafka::{Offset, TopicPartitionList};
 
 use super::model::{
     GroupDetail, GroupLag, GroupMember, GroupSummary, OffsetChange, ResetRequest, ResetTo, TopicConsumer,
 };
-use super::{assignment, progress, reset};
+use super::{progress, reset};
 use crate::error::{Error, Result};
-use crate::kafka::connection::explain;
+use crate::kafka::connection::{explain, rejection};
+use crate::kafka::groups::{self, GroupDescription};
 use crate::kafka::metadata::{fetch_metadata, is_broker_internal, partition_ids};
 use crate::kafka::offsets::{PartitionKey, committed, committed_by_group, offsets_at, watermarks};
 use crate::kafka::{KafkaClients, TIMEOUT, new_consumer};
 
 pub fn list(clients: &KafkaClients) -> Result<Vec<GroupSummary>> {
-    let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
-    let mut groups: Vec<GroupSummary> = list
-        .groups()
-        .iter()
+    Ok(all_groups(clients)?
+        .into_iter()
         .map(|g| GroupSummary {
-            name: g.name().to_string(),
-            state: g.state().to_string(),
-            protocol_type: g.protocol_type().to_string(),
-            protocol: g.protocol().to_string(),
-            members: g.members().len(),
+            name: g.name,
+            state: g.state,
+            group_type: g.group_type,
+            protocol: g.assignor,
+            members: g.members.len(),
         })
-        .collect();
-    groups.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(groups)
+        .collect())
 }
 
 pub fn detail(clients: &KafkaClients, group: &str) -> Result<GroupDetail> {
-    let list = clients.metadata.fetch_group_list(Some(group), TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
-    let info = list.groups().first().ok_or_else(|| Error::msg(format!("Group not found: {group}")))?;
-    let members = members(info);
+    let info = groups::describe_one(&clients.admin, group).map_err(|e| connection_error(clients, e))?;
+    let members = members(&info);
 
     // Ask for the group's committed offset on every partition, then report
     // every partition of the topics it touched, so untouched ones show up too.
@@ -49,7 +44,7 @@ pub fn detail(clients: &KafkaClients, group: &str) -> Result<GroupDetail> {
     let topics = progress::topic_progress(&offsets);
     Ok(GroupDetail {
         name: group.to_string(),
-        state: info.state().to_string(),
+        state: info.state,
         total_lag: topics.iter().map(|t| t.lag).sum(),
         members,
         topics,
@@ -59,9 +54,9 @@ pub fn detail(clients: &KafkaClients, group: &str) -> Result<GroupDetail> {
 
 /// Total lag of every group. Slower than `list`: one offset request per group.
 pub fn lags(clients: &KafkaClients) -> Result<Vec<GroupLag>> {
-    let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
+    let list = all_groups(clients)?;
     let all = all_partitions(clients)?;
-    let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
+    let names: Vec<String> = list.iter().map(|g| g.name.clone()).collect();
     let committed = committed_by_group(&clients.admin, &names, &all);
 
     // One watermark request for every partition any group has committed to.
@@ -70,7 +65,7 @@ pub fn lags(clients: &KafkaClients) -> Result<Vec<GroupLag>> {
     let committed_keys: Vec<PartitionKey> = committed_keys.into_iter().cloned().collect();
     let marks = watermarks(&clients.metadata, &committed_keys)?;
 
-    let infos: HashMap<&str, &GroupInfo> = list.groups().iter().map(|g| (g.name(), g)).collect();
+    let infos: HashMap<&str, &GroupDescription> = list.iter().map(|g| (g.name.as_str(), g)).collect();
     let mut lags: Vec<GroupLag> = committed
         .into_iter()
         .map(|(name, committed)| {
@@ -96,8 +91,8 @@ pub fn topic_consumers(clients: &KafkaClients, topic: &str) -> Result<Vec<TopicC
     // the groups are probed.
     let (marks, list, committed) = std::thread::scope(|s| {
         let marks = s.spawn(|| watermarks(&clients.metadata, &keys));
-        let list = clients.metadata.fetch_group_list(None, TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
-        let names: Vec<String> = list.groups().iter().map(|g| g.name().to_string()).collect();
+        let list = all_groups(clients)?;
+        let names: Vec<String> = list.iter().map(|g| g.name.clone()).collect();
         let committed = committed_by_group(&clients.admin, &names, &keys);
         Ok::<_, Error>((marks.join().expect("watermark lookup panicked")?, list, committed))
     })?;
@@ -105,10 +100,9 @@ pub fn topic_consumers(clients: &KafkaClients, topic: &str) -> Result<Vec<TopicC
         committed.into_iter().filter_map(|(name, result)| Some((name, result.ok()?))).collect();
 
     let mut consumers: Vec<TopicConsumer> = list
-        .groups()
         .iter()
         .filter_map(|info| {
-            let committed = committed.remove(info.name()).unwrap_or_default();
+            let committed = committed.remove(&info.name).unwrap_or_default();
             let owners: HashMap<PartitionKey, String> =
                 owners(&members(info)).into_iter().filter(|((t, _), _)| t == topic).collect();
             if committed.is_empty() && owners.is_empty() {
@@ -117,9 +111,9 @@ pub fn topic_consumers(clients: &KafkaClients, topic: &str) -> Result<Vec<TopicC
             let offsets = progress::partition_rows(&keys, &marks, &committed, &owners);
             let progress = progress::topic_progress(&offsets).into_iter().next().unwrap_or_default();
             Some(TopicConsumer {
-                group: info.name().to_string(),
-                state: info.state().to_string(),
-                members: info.members().len(),
+                group: info.name.clone(),
+                state: info.state.clone(),
+                members: info.members.len(),
                 progress,
                 offsets,
             })
@@ -177,8 +171,7 @@ pub fn reset_offsets(clients: &KafkaClients, request: &ResetRequest) -> Result<V
 }
 
 fn ensure_inactive(clients: &KafkaClients, group: &str) -> Result<()> {
-    let list = clients.metadata.fetch_group_list(Some(group), TIMEOUT).map_err(|e| explain(&clients.metadata, e))?;
-    let members = list.groups().first().map_or(0, |g| g.members().len());
+    let members = groups::describe_one(&clients.admin, group).map_err(|e| connection_error(clients, e))?.members.len();
     if members > 0 {
         return Err(Error::msg(format!(
             "{group} has {members} active member(s). Stop its consumers first: \
@@ -206,14 +199,28 @@ fn by_partition<T>(by_key: HashMap<PartitionKey, T>) -> HashMap<i32, T> {
     by_key.into_iter().map(|((_, partition), v)| (partition, v)).collect()
 }
 
-fn members(info: &GroupInfo) -> Vec<GroupMember> {
-    info.members()
+/// Every consumer group, classic or KIP-848, sorted by name.
+fn all_groups(clients: &KafkaClients) -> Result<Vec<GroupDescription>> {
+    let names = groups::list(&clients.admin).map_err(|e| connection_error(clients, e))?;
+    let mut list = groups::describe(&clients.admin, &names).map_err(|e| connection_error(clients, e))?;
+    list.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(list)
+}
+
+/// The cluster's reason for turning the connection down, if it did, rather
+/// than the admin request's bare timeout.
+fn connection_error(clients: &KafkaClients, e: Error) -> Error {
+    rejection(&clients.metadata).unwrap_or(e)
+}
+
+fn members(info: &GroupDescription) -> Vec<GroupMember> {
+    info.members
         .iter()
         .map(|m| GroupMember {
-            id: m.id().to_string(),
-            client_id: m.client_id().to_string(),
-            host: m.client_host().to_string(),
-            assignment: m.assignment().map(assignment::decode).unwrap_or_default(),
+            id: m.id.clone(),
+            client_id: m.client_id.clone(),
+            host: m.host.clone(),
+            assignment: m.assignment.clone(),
         })
         .collect()
 }

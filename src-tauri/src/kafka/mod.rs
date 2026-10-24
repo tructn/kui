@@ -6,6 +6,8 @@ mod cluster;
 pub mod connection;
 #[allow(unsafe_code)] // librdkafka call rust-rdkafka does not wrap
 mod group_offsets;
+#[allow(unsafe_code)] // librdkafka calls rust-rdkafka does not wrap
+pub mod groups;
 pub mod metadata;
 pub mod offsets;
 

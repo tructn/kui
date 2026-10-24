@@ -2,9 +2,11 @@
 
 export interface GroupSummary {
   name: string;
-  /** e.g. Stable, Empty, PreparingRebalance, Dead */
+  /** e.g. Stable, Empty, PreparingRebalance, Assigning, Dead */
   state: string;
-  protocolType: string;
+  /** Rebalance protocol: Classic, or Consumer for KIP-848 groups. */
+  groupType: string;
+  /** Partition assignor, e.g. range or uniform. */
   protocol: string;
   members: number;
 }

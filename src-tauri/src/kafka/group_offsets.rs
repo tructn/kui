@@ -117,6 +117,6 @@ unsafe fn read(event: *mut rd::rd_kafka_event_t) -> Result<HashMap<PartitionKey,
     }
 }
 
-unsafe fn cstr(s: *const std::ffi::c_char) -> String {
+pub(super) unsafe fn cstr(s: *const std::ffi::c_char) -> String {
     if s.is_null() { String::new() } else { unsafe { CStr::from_ptr(s) }.to_string_lossy().into_owned() }
 }

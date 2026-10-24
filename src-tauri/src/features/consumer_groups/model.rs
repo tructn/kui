@@ -8,7 +8,8 @@ pub struct GroupSummary {
     pub name: String,
     /// e.g. `Stable`, `Empty`, `PreparingRebalance`, `Dead`.
     pub state: String,
-    pub protocol_type: String,
+    /// Rebalance protocol: `Classic`, or `Consumer` for KIP-848 groups.
+    pub group_type: String,
     /// Partition assignor, e.g. `range` or `cooperative-sticky`.
     pub protocol: String,
     pub members: usize,
