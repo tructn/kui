@@ -10,7 +10,7 @@ export interface BrowseFilters {
   from: StartFrom;
   /** Offset for "offset", epoch millis for "timestamp". */
   value: number | null;
-  /** SQL-like filter (see `src-tauri/src/features/messages/query`); null = every message. */
+  /** SQL-like filter (TQL, see `crates/tql_compiler`); null = every message. */
   query: string | null;
 }
 

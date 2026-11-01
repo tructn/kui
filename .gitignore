@@ -26,3 +26,6 @@ dist-ssr
 # e2e
 e2e/node_modules
 e2e/artifacts
+
+# Rust build output (the Cargo workspace is at the repo root)
+/target/

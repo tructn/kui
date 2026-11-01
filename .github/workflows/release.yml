@@ -82,7 +82,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
-      BUNDLE: src-tauri/target/${{ matrix.target }}/release/bundle
+      BUNDLE: target/${{ matrix.target }}/release/bundle
       TAG: ${{ needs.release-please.outputs.tag }}
     steps:
       # Without it the release has no signed update and installed apps never
@@ -113,7 +113,6 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           prefix-key: v1-rust
-          workspaces: src-tauri -> target
           key: ${{ matrix.target }}
 
       - uses: ./.github/actions/windows-openssl

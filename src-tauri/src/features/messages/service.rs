@@ -17,7 +17,7 @@ use super::model::{
     BrowsePage, BrowseRequest, CopyRequest, Delivered, ExportRequest, ExportSource, Message, MessageHeader,
     ProduceRequest, StartFrom, TailRequest,
 };
-use super::query::Query;
+use super::query;
 use super::window::{
     Cursor, PartitionRead, ReadWindow, merge_page, page_window, remaining, resume_after, start_position,
 };
@@ -43,7 +43,7 @@ pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowseP
 /// `browse` on an existing browsing consumer, so several pages can share one.
 fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<BrowsePage> {
     // Parse first: a typo should fail fast, before any reading.
-    let query = Query::optional(request.query.as_deref())?;
+    let query = query::optional(request.query.as_deref())?;
     let size = request.page_size.clamp(1, MAX_PAGE_SIZE);
     let backward = request.from == StartFrom::Latest;
 
@@ -235,7 +235,7 @@ pub fn tail(
     cancel: &CancelToken,
     mut emit: impl FnMut(Vec<Message>) -> bool,
 ) -> Result<()> {
-    let query = Query::optional(request.query.as_deref())?;
+    let query = query::optional(request.query.as_deref())?;
     let consumer = browsing_consumer(clients)?;
     let mut assignment = TopicPartitionList::new();
     for id in partition_ids(&consumer, &request.topic)? {

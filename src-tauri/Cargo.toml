@@ -19,13 +19,14 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tql_compiler = { workspace = true }
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["time"] }
 fake = { version = "5.1.0", features = ["uuid", "chrono", "random_color"] }
-chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+chrono = { workspace = true }
 
 # In-app updates from GitHub releases. reqwest and rustls are the versions and
 # TLS setup the updater already uses, so finding the newest release adds no
@@ -63,21 +64,8 @@ rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored", "zstd",
 rdkafka = { version = "0.39", features = ["cmake-build", "ssl", "zstd"] }
 
 
-[lints.rust]
-unsafe_code = "deny"
-
-[lints.clippy]
-dbg_macro = "warn"
-todo = "warn"
-print_stdout = "warn"
+[lints]
+workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-panic = "abort"
-strip = true

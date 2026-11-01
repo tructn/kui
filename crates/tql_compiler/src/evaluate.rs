@@ -16,24 +16,24 @@ use std::cmp::Ordering;
 use serde_json::{Map, Number, Value};
 
 use super::parser::{Cmp, Expr, Func, Literal, Operand, Root, Segment, TextOp};
-use crate::features::messages::model::{Message, Payload};
+use crate::{Payload, Record};
 
 /// One message being tested, with its key and value parsed as JSON on first use.
-pub struct Doc<'a> {
-    message: &'a Message,
+pub struct Doc<'a, R: ?Sized> {
+    record: &'a R,
     key: OnceCell<Value>,
     value: OnceCell<Value>,
 }
 
-impl<'a> Doc<'a> {
-    pub fn new(message: &'a Message) -> Self {
-        Doc { message, key: OnceCell::new(), value: OnceCell::new() }
+impl<'a, R: Record + ?Sized> Doc<'a, R> {
+    pub fn new(record: &'a R) -> Self {
+        Doc { record, key: OnceCell::new(), value: OnceCell::new() }
     }
 
-    fn payload(&self, root: Root) -> Option<(&'a Payload, &OnceCell<Value>)> {
+    fn payload(&self, root: Root) -> Option<(Payload<'a>, &OnceCell<Value>)> {
         match root {
-            Root::Key => Some((self.message.key.as_ref()?, &self.key)),
-            Root::Value => Some((self.message.value.as_ref()?, &self.value)),
+            Root::Key => Some((self.record.key()?, &self.key)),
+            Root::Value => Some((self.record.value()?, &self.value)),
             _ => None,
         }
     }
@@ -41,7 +41,7 @@ impl<'a> Doc<'a> {
 
 type Vals<'a> = Vec<Cow<'a, Value>>;
 
-pub fn evaluate(expr: &Expr, doc: &Doc) -> bool {
+pub fn evaluate<R: Record + ?Sized>(expr: &Expr, doc: &Doc<R>) -> bool {
     match expr {
         Expr::And(a, b) => evaluate(a, doc) && evaluate(b, doc),
         Expr::Or(a, b) => evaluate(a, doc) || evaluate(b, doc),
@@ -98,17 +98,17 @@ impl Candidate<'_> {
     }
 }
 
-fn texts_or_values<'a>(operand: &Operand, doc: &'a Doc) -> Vec<Candidate<'a>> {
+fn texts_or_values<'a, R: Record + ?Sized>(operand: &Operand, doc: &'a Doc<R>) -> Vec<Candidate<'a>> {
     if let Operand::Path { root, segments } = operand
         && segments.is_empty()
         && let Some((payload, _)) = doc.payload(*root)
     {
-        return vec![Candidate::Raw(&payload.text)];
+        return vec![Candidate::Raw(payload.text)];
     }
     values(operand, doc).into_iter().map(Candidate::Value).collect()
 }
 
-fn values<'a>(operand: &Operand, doc: &'a Doc) -> Vals<'a> {
+fn values<'a, R: Record + ?Sized>(operand: &Operand, doc: &'a Doc<R>) -> Vals<'a> {
     match operand {
         Operand::Literal(literal) => vec![Cow::Owned(match literal {
             Literal::Str(s) => Value::String(s.clone()),
@@ -140,44 +140,43 @@ fn values<'a>(operand: &Operand, doc: &'a Doc) -> Vals<'a> {
     }
 }
 
-fn root_values<'a>(root: Root, first: Option<&Segment>, doc: &'a Doc) -> Vals<'a> {
-    let m = doc.message;
+fn root_values<'a, R: Record + ?Sized>(root: Root, first: Option<&Segment>, doc: &'a Doc<R>) -> Vals<'a> {
+    let m = doc.record;
     match root {
-        Root::Partition => vec![Cow::Owned(Value::from(m.partition))],
-        Root::Offset => vec![Cow::Owned(Value::from(m.offset))],
-        Root::Timestamp => m.timestamp.map(|t| Cow::Owned(Value::from(t))).into_iter().collect(),
+        Root::Partition => vec![Cow::Owned(Value::from(m.partition()))],
+        Root::Offset => vec![Cow::Owned(Value::from(m.offset()))],
+        Root::Timestamp => m.timestamp().map(|t| Cow::Owned(Value::from(t))).into_iter().collect(),
         Root::Key | Root::Value => match doc.payload(root) {
             Some((payload, cell)) => vec![Cow::Borrowed(cell.get_or_init(|| parse_payload(payload)))],
             None => Vec::new(),
         },
         Root::Headers => {
-            let header = |value: &Option<String>| match value {
-                Some(text) => embedded_json(text).unwrap_or_else(|| Value::String(text.clone())),
+            let header = |value: Option<&str>| match value {
+                Some(text) => embedded_json(text).unwrap_or_else(|| Value::String(text.to_string())),
                 None => Value::Null,
             };
             match first {
                 None => {
-                    let map: Map<String, Value> = m.headers.iter().map(|h| (h.key.clone(), header(&h.value))).collect();
+                    let map: Map<String, Value> = m.headers().map(|(k, v)| (k.to_string(), header(v))).collect();
                     vec![Cow::Owned(Value::Object(map))]
                 }
                 Some(Segment::Field(name)) => {
                     let exact: Vals =
-                        m.headers.iter().filter(|h| h.key == *name).map(|h| Cow::Owned(header(&h.value))).collect();
+                        m.headers().filter(|(k, _)| k == name).map(|(_, v)| Cow::Owned(header(v))).collect();
                     if !exact.is_empty() {
                         return exact;
                     }
                     // Header names are case-insensitive by convention (HTTP habits).
-                    m.headers
-                        .iter()
-                        .filter(|h| h.key.eq_ignore_ascii_case(name))
-                        .map(|h| Cow::Owned(header(&h.value)))
+                    m.headers()
+                        .filter(|(k, _)| k.eq_ignore_ascii_case(name))
+                        .map(|(_, v)| Cow::Owned(header(v)))
                         .collect()
                 }
-                Some(Segment::Each) => m.headers.iter().map(|h| Cow::Owned(header(&h.value))).collect(),
+                Some(Segment::Each) => m.headers().map(|(_, v)| Cow::Owned(header(v))).collect(),
                 Some(Segment::Index(i)) => usize::try_from(*i)
                     .ok()
-                    .and_then(|i| m.headers.get(i))
-                    .map(|h| Cow::Owned(header(&h.value)))
+                    .and_then(|i| m.headers().nth(i))
+                    .map(|(_, v)| Cow::Owned(header(v)))
                     .into_iter()
                     .collect(),
             }
@@ -186,13 +185,13 @@ fn root_values<'a>(root: Root, first: Option<&Segment>, doc: &'a Doc) -> Vals<'a
 }
 
 /// A payload as JSON when it parses, otherwise as one string.
-fn parse_payload(payload: &Payload) -> Value {
-    if payload.encoding == "utf8"
-        && let Ok(json) = serde_json::from_str(&payload.text)
+fn parse_payload(payload: Payload) -> Value {
+    if payload.utf8
+        && let Ok(json) = serde_json::from_str(payload.text)
     {
         return json;
     }
-    Value::String(payload.text.clone())
+    Value::String(payload.text.to_string())
 }
 
 /// An object or array written inside a string, as some producers double-encode.
@@ -409,22 +408,41 @@ fn like(text: &str, pattern: &str, ignore_case: bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Query;
     use super::*;
-    use crate::features::messages::codec::decode;
-    use crate::features::messages::model::MessageHeader;
+    use crate::Query;
+
+    struct Message {
+        key: Option<String>,
+        value: String,
+        headers: Vec<(String, String)>,
+    }
+
+    impl Record for Message {
+        fn partition(&self) -> i32 {
+            2
+        }
+        fn offset(&self) -> i64 {
+            40
+        }
+        fn timestamp(&self) -> Option<i64> {
+            Some(1_790_000_000_000)
+        }
+        fn key(&self) -> Option<Payload<'_>> {
+            self.key.as_deref().map(|text| Payload { text, utf8: true })
+        }
+        fn value(&self) -> Option<Payload<'_>> {
+            Some(Payload { text: &self.value, utf8: true })
+        }
+        fn headers(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
+            self.headers.iter().map(|(k, v)| (k.as_str(), Some(v.as_str())))
+        }
+    }
 
     fn message(key: Option<&str>, value: &str, headers: &[(&str, &str)]) -> Message {
         Message {
-            partition: 2,
-            offset: 40,
-            timestamp: Some(1_790_000_000_000),
-            key: key.map(|k| decode(k.as_bytes())),
-            value: Some(decode(value.as_bytes())),
-            headers: headers
-                .iter()
-                .map(|(k, v)| MessageHeader { key: k.to_string(), value: Some(v.to_string()) })
-                .collect(),
+            key: key.map(str::to_string),
+            value: value.to_string(),
+            headers: headers.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
         }
     }
 

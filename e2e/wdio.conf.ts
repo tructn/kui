@@ -8,7 +8,7 @@ import path from "node:path";
  * tauri-driver only supports Linux and Windows, so on macOS run this via
  * Docker:  bun run test:e2e   (from the repo root)
  */
-const APP = process.env.KUI_APP ?? path.resolve(import.meta.dirname, "../src-tauri/target/debug/kui");
+const APP = process.env.KUI_APP ?? path.resolve(import.meta.dirname, "../target/debug/kui");
 const ARTIFACTS = path.resolve(import.meta.dirname, "artifacts");
 const DRIVER_PORT = 4444;
 

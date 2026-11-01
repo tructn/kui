@@ -25,8 +25,8 @@ bun run test:e2e      # everything, in Docker: build, Rust integration tests, UI
 Installers can only be built for the OS you're on:
 
 ```bash
-bun run package:mac   # → src-tauri/target/release/bundle/{macos/KUI.app,dmg/*.dmg}
-bun run package:win   # → src-tauri/target/release/bundle/nsis/*-setup.exe
+bun run package:mac   # → target/release/bundle/{macos/KUI.app,dmg/*.dmg}
+bun run package:win   # → target/release/bundle/nsis/*-setup.exe
 ```
 
 On Windows you also need the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)

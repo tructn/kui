@@ -1,6 +1,7 @@
-# Message Query: Compiler Design
+# TQL: Compiler Design
 
-KUI filters a topic's messages with a SQL-like condition, the part of a query that would follow `WHERE`:
+KUI filters a topic's messages with **TQL**, the *topic query language*: a SQL-like condition, the part of a
+query that would follow `WHERE`:
 
 ```sql
 value.status = 'shipped' AND value.items[*].qty > 3
@@ -248,7 +249,8 @@ value.status = 'SHIPPED' AND value.items[*].qty > 3
 
 The computer can't do anything useful with that line while it's just characters. It needs a structured
 description it can check against each message. Turning text into that structure, and then using it, is the
-job of the code in `src-tauri/src/features/messages/query/`.
+job of the `tql_compiler` crate in `crates/tql_compiler/`. It knows nothing about Kafka: the app hands it
+messages through the `Record` trait (implemented in `src-tauri/src/features/messages/query.rs`).
 
 > **Key idea.** A query is a *program* in a tiny language. Our code reads the program once, then runs it once
 > per message. That's all a "language implementation" is.
@@ -313,10 +315,11 @@ always does. [Section 9](#9-the-editor-side-typescript) explains why it exists.
 
 | File                                                 | Language | Job                                                      |
 | ---------------------------------------------------- | -------- | -------------------------------------------------------- |
-| `src-tauri/src/features/messages/query/mod.rs`       | Rust     | Public face: `Query::parse`, `Query::matches`, `QueryError` |
-| `src-tauri/src/features/messages/query/lexer.rs`     | Rust     | Stage 1: text → tokens                                   |
-| `src-tauri/src/features/messages/query/parser.rs`    | Rust     | Stage 2: tokens → tree (`Expr`)                          |
-| `src-tauri/src/features/messages/query/evaluate.rs`  | Rust     | Stage 3: tree + message → bool                           |
+| `crates/tql_compiler/src/lib.rs`                     | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
+| `crates/tql_compiler/src/lexer.rs`                   | Rust     | Stage 1: text → tokens                                   |
+| `crates/tql_compiler/src/parser.rs`                  | Rust     | Stage 2: tokens → tree (`Expr`)                          |
+| `crates/tql_compiler/src/evaluate.rs`                | Rust     | Stage 3: tree + message → bool                           |
+| `src-tauri/src/features/messages/query.rs`           | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter) |
 | `src-tauri/src/features/messages/service.rs`         | Rust     | Stage 4: the search loop (`browse_with`), live tail      |
 | `src-tauri/src/features/messages/commands.rs`        | Rust     | `check_message_query`: parse only, for error underlines  |
 | `src-tauri/src/features/messages/window.rs`          | Rust     | `resume_after`: the cursor after part of a page          |
@@ -1009,8 +1012,8 @@ Parsing JSON is the most expensive thing the evaluator does. A query may mention
 queries never touch `value` at all (`partition = 0`). `Doc` handles both:
 
 ```rust
-pub struct Doc<'a> {
-    message: &'a Message,
+pub struct Doc<'a, R: ?Sized> {
+    record: &'a R,            // any message type that implements `Record`
     key: OnceCell<Value>,     // empty until first asked for
     value: OnceCell<Value>,
 }
@@ -1067,12 +1070,13 @@ never recurses, so a long text can't overflow the stack. `ILIKE` is the same wit
 
 ### 8. Stage 4: searching a topic (`service.rs`)
 
-`Query` (in `mod.rs`) is the small public wrapper the rest of the app uses:
+`Query` (in `tql_compiler`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
+the app side (`src-tauri/src/features/messages/query.rs`):
 
 ```rust
 Query::parse(text)          // Result<Query, QueryError>   (lexer + parser)
-Query::optional(Some(text)) // blank text → Ok(None): "no filter"
-query.matches(&message)     // evaluator, wrapped around a fresh Doc
+query.matches(&message)     // evaluator, wrapped around a fresh Doc; any `impl Record`
+query::optional(Some(text)) // app side: blank text → Ok(None), "no filter"
 ```
 
 It's used in three places:
@@ -1101,7 +1105,7 @@ loop:
 
 ```mermaid
 flowchart TD
-    P["Query::optional(text)"] -->|syntax error| X(["error, nothing read"])
+    P["query::optional(text)"] -->|syntax error| X(["error, nothing read"])
     P -->|blank| PLAIN(["plain page, no filter"])
     P -->|ok| READ["read next chunk<br/>(500 messages)"]
     READ --> EACH["for each message:<br/>scanned += 1<br/>keep it if query.matches"]
@@ -1398,7 +1402,7 @@ evaluator.
 #### Running tests
 
 ```sh
-cd src-tauri && cargo test query          # Rust: lexer, parser, evaluator tests
+cargo test -p tql_compiler                # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
 bun test src/features/messages/query      # TypeScript: completion tests
 bun run test:e2e                          # the real app in Docker, against seeded Kafka
 ```
@@ -1544,7 +1548,7 @@ Errors are tied to the token where parsing stopped, with messages written for pe
 
 ### Evaluation (`evaluate.rs`)
 
-`evaluate(&Expr, &Doc) -> bool`. A `Doc` wraps one `Message` and parses its key and value as JSON **at most once,
+`evaluate(&Expr, &Doc) -> bool`. A `Doc` wraps one `Record` (KUI's `Message` implements it) and parses its key and value as JSON **at most once,
 and only if the query touches them** (`OnceCell`). A query on `headers` or `offset` never parses payloads.
 
 **Operands evaluate to a list of values** (`Vec<Cow<Value>>`), not one value:
@@ -1723,9 +1727,9 @@ filter never reaches `browse`.
 
 | Where | Covers |
 | ----- | ------ |
-| `query/lexer.rs` | tokens, quotes, UTF-16 positions, errors |
-| `query/parser.rs` | precedence, paths, desugaring, error positions and messages |
-| `query/evaluate.rs` | paths and wildcards, embedded JSON, by-meaning comparison, missing fields, text operators, `LIKE`, dates |
+| `tql_compiler/src/lexer.rs` | tokens, quotes, UTF-16 positions, errors |
+| `tql_compiler/src/parser.rs` | precedence, paths, desugaring, error positions and messages |
+| `tql_compiler/src/evaluate.rs` | paths and wildcards, embedded JSON, by-meaning comparison, missing fields, text operators, `LIKE`, dates |
 | `window.rs` | `resume_after` in both directions |
 | `integration_tests.rs` (needs Kafka) | search pages hold only matches and resume mid-chunk; invalid queries fail |
 | `query/completion.test.ts` | catalog stats; suggestions for each state on a topic with two message shapes |

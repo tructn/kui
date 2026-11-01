@@ -1,0 +1,27 @@
+# The Rust workspace: the Tauri app (src-tauri) and the crates it is built
+# from (crates/). Run cargo from here; Cargo.lock and target/ live here too.
+[workspace]
+resolver = "3"
+members = ["src-tauri", "crates/*"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+tql_compiler = { path = "crates/tql_compiler" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

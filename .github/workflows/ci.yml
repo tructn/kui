@@ -69,7 +69,6 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           prefix-key: v1-rust
-          workspaces: src-tauri
 
       - uses: ./.github/actions/windows-openssl
         if: runner.os == 'Windows'
@@ -80,5 +79,4 @@ jobs:
       - run: bun run build
 
       - name: Compile and test
-        working-directory: src-tauri
         run: cargo test --locked --lib

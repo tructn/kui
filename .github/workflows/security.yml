@@ -35,8 +35,6 @@ jobs:
           components: rustfmt, clippy
 
       - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       # Tauri's Linux webview, and CMake + headers for the bundled librdkafka
       # (its OAuth code includes curl.h even when built without curl).
