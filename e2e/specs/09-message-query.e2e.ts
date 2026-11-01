@@ -9,7 +9,9 @@ describe("Message query", () => {
 
   const editor = () => $('[aria-label="Message filter"]');
   const suggestions = () => $$(".cm-tooltip-autocomplete li");
-  const suggestion = (text: string) => $(".cm-tooltip-autocomplete").$(`li*=${text}`);
+  /** A suggestion by its exact label (LIKE, not ILIKE or NOT LIKE). */
+  const suggestion = (label: string) => $(".cm-tooltip-autocomplete").$(`span.cm-completionLabel=${label}`);
+  const clearButton = () => $('button[aria-label="Clear filter"]');
 
   it("suggests fields, operators and values from the messages", async () => {
     await goTo("Topics");
@@ -41,12 +43,13 @@ describe("Message query", () => {
   });
 
   it("underlines mistakes and won't run them", async () => {
-    if (await button("Clear filter").isExisting()) await button("Clear filter").click();
+    if (await clearButton().isExisting()) await clearButton().click();
+    await expect(editor()).toHaveText("");
     await editor().click();
     await browser.keys("value.total >");
     await expect($("p[role=alert]")).toHaveText("Expected a field or value");
     await expect($(".cm-lintRange-error")).toExist();
     await expect(button("Apply")).toBeDisabled();
-    await button("Clear filter").click();
+    await clearButton().click();
   });
 });

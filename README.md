@@ -28,7 +28,7 @@
 > Found a bug? [Open an issue](https://github.com/tructn/kui/issues).
 
 <p align="center">
-  <img src="docs/01_topics.png" alt="KUI showing the topics of a Kafka cluster" width="820" />
+  <img src="docs/screenshots/01_topics.png" alt="KUI showing the topics of a Kafka cluster" width="820" />
 </p>
 
 ## Why KUI
@@ -45,7 +45,7 @@ KUI is neither. It's a desktop app: download it, add your cluster, and you're lo
 
 ### Connect to any cluster
 
-<img src="docs/00_cluster.png" alt="The Add cluster dialog" width="820" />
+<img src="docs/screenshots/00_cluster.png" alt="The Add cluster dialog" width="820" />
 
 Add a cluster with its address, test the connection, and save it. Secure clusters work too:
 TLS with your own CA and client certificates (mutual TLS), plus SASL with PLAIN, SCRAM-SHA-256,
@@ -60,13 +60,13 @@ topic's name with one click. A Brokers page shows the machines your cluster runs
 
 ### Read messages the way you want
 
-<img src="docs/02_messages.png" alt="The messages of a topic, with one row expanded" width="820" />
+<img src="docs/screenshots/02_messages.png" alt="The messages of a topic, with one row expanded" width="820" />
 
 - Start from the newest or oldest message, or **watch new ones arrive live**.
 - Expand any row to see its key, headers and value side by side. Values show as formatted JSON or Base64.
 - **Filter with SQL-like queries**, e.g. `value.status = 'shipped' AND value.items[*].qty > 3`. Suggestions
   come from the topic's own messages, so they know every field even when messages differ in shape. See the
-  [query guide](docs/message-query.md).
+  [query guide](docs/designs/MESSAGE_QUERY.md).
 - **Export** messages to JSON, NDJSON or CSV.
 - **Copy** one or many messages to another topic, which is handy for replaying a message or moving test data.
 
@@ -77,14 +77,14 @@ in a few clicks.
 
 ### Know which consumers are falling behind
 
-<img src="docs/03_consumers.png" alt="A consumer group's progress on each partition" width="820" />
+<img src="docs/screenshots/03_consumers.png" alt="A consumer group's progress on each partition" width="820" />
 
 See every consumer group, whether it's caught up, and how far behind it is on each partition.
 When a group needs a fresh start, **reset its offsets** to the earliest message, the latest one, or a point in time.
 
 ### Make it yours
 
-<img src="docs/04_settings.png" alt="The Settings window" width="820" />
+<img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />
 
 Light, dark, or follow your system. Pick your own fonts. KUI also checks for updates when it starts and asks
 before installing them.

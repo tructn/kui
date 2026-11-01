@@ -1,4 +1,4 @@
-# Message query
+# Message Query
 
 KUI filters a topic's messages with a SQL-like condition, the part of a query that would follow `WHERE`:
 
