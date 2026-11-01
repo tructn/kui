@@ -17,7 +17,7 @@
   "packages": {
     ".": {
       "extra-files": [
-        { "type": "toml", "path": "src-tauri/Cargo.toml", "jsonpath": "$.package.version" },
+        { "type": "toml", "path": "app/Cargo.toml", "jsonpath": "$.package.version" },
         { "type": "toml", "path": "Cargo.lock", "jsonpath": "$.package[?(@.name.value==='kui')].version" }
       ]
     }

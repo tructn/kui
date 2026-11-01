@@ -21,10 +21,10 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Path alias (shadcn) */
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./frontend/*"] }
   },
-  "include": ["src"],
+  "include": ["frontend"],
   // Unit tests run under `bun test`, which provides `bun:test`.
-  "exclude": ["src/**/*.test.ts"],
+  "exclude": ["frontend/**/*.test.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

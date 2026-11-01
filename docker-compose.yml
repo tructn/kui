@@ -102,7 +102,7 @@ services:
       KAFKA_BOOTSTRAP: kafka:29092
     volumes:
       # Cache Rust builds between runs (librdkafka takes minutes to compile).
-      - cargo-target:/app/src-tauri/target
+      - cargo-target:/app/target
       - cargo-registry:/usr/local/cargo/registry
       # Screenshots of failed tests.
       - ./e2e/artifacts:/app/e2e/artifacts

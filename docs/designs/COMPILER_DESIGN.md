@@ -250,7 +250,7 @@ value.status = 'SHIPPED' AND value.items[*].qty > 3
 The computer can't do anything useful with that line while it's just characters. It needs a structured
 description it can check against each message. Turning text into that structure, and then using it, is the
 job of the `tql_compiler` crate in `crates/tql_compiler/`. It knows nothing about Kafka: the app hands it
-messages through the `Record` trait (implemented in `src-tauri/src/features/messages/query.rs`).
+messages through the `Record` trait (implemented in `app/src/features/messages/query.rs`).
 
 > **Key idea.** A query is a *program* in a tiny language. Our code reads the program once, then runs it once
 > per message. That's all a "language implementation" is.
@@ -307,28 +307,28 @@ flowchart LR
 Stages 1 and 2 happen **once per query**. Stage 3 happens **once per message**, possibly millions of times,
 which is why we parse up front instead of re-reading the text for every message.
 
-There is also a **fifth, separate piece**: the TypeScript code in `src/features/messages/query/`. It runs in
+There is also a **fifth, separate piece**: the TypeScript code in `frontend/features/messages/query/`. It runs in
 the editor while the user types, for colors and suggestions. It never decides which messages match; Rust
 always does. [Section 9](#9-the-editor-side-typescript) explains why it exists.
 
 #### Where each piece lives
 
-| File                                                 | Language | Job                                                      |
-| ---------------------------------------------------- | -------- | -------------------------------------------------------- |
-| `crates/tql_compiler/src/lib.rs`                     | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
-| `crates/tql_compiler/src/lexer.rs`                   | Rust     | Stage 1: text → tokens                                   |
-| `crates/tql_compiler/src/parser.rs`                  | Rust     | Stage 2: tokens → tree (`Expr`)                          |
-| `crates/tql_compiler/src/evaluate.rs`                | Rust     | Stage 3: tree + message → bool                           |
-| `src-tauri/src/features/messages/query.rs`           | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter) |
-| `src-tauri/src/features/messages/service.rs`         | Rust     | Stage 4: the search loop (`browse_with`), live tail      |
-| `src-tauri/src/features/messages/commands.rs`        | Rust     | `check_message_query`: parse only, for error underlines  |
-| `src-tauri/src/features/messages/window.rs`          | Rust     | `resume_after`: the cursor after part of a page          |
-| `src/features/messages/query/lexer.ts`               | TS       | Forgiving tokenizer for colors and suggestions           |
-| `src/features/messages/query/catalog.ts`             | TS       | Learns which fields exist from sampled messages          |
-| `src/features/messages/query/completion.ts`          | TS       | Decides what to suggest at the caret                     |
-| `src/features/messages/query/use-field-catalog.ts`  | TS       | Builds the catalog lazily, only when suggestions ask     |
-| `src/features/messages/components/query-editor.tsx`  | TS       | The CodeMirror editor that ties it together              |
-| `src/features/messages/components/query-bar.tsx`     | TS       | The bar around it: Apply, Clear, error line, syntax help |
+| File                                                     | Language | Job                                                                   |
+| -------------------------------------------------------- | -------- | --------------------------------------------------------------------- |
+| `crates/tql_compiler/src/lib.rs`                         | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
+| `crates/tql_compiler/src/lexer.rs`                       | Rust     | Stage 1: text → tokens                                                |
+| `crates/tql_compiler/src/parser.rs`                      | Rust     | Stage 2: tokens → tree (`Expr`)                                       |
+| `crates/tql_compiler/src/evaluate.rs`                    | Rust     | Stage 3: tree + message → bool                                        |
+| `app/src/features/messages/query.rs`                     | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter)          |
+| `app/src/features/messages/service.rs`                   | Rust     | Stage 4: the search loop (`browse_with`), live tail                   |
+| `app/src/features/messages/commands.rs`                  | Rust     | `check_message_query`: parse only, for error underlines               |
+| `app/src/features/messages/window.rs`                    | Rust     | `resume_after`: the cursor after part of a page                       |
+| `frontend/features/messages/query/lexer.ts`              | TS       | Forgiving tokenizer for colors and suggestions                        |
+| `frontend/features/messages/query/catalog.ts`            | TS       | Learns which fields exist from sampled messages                       |
+| `frontend/features/messages/query/completion.ts`         | TS       | Decides what to suggest at the caret                                  |
+| `frontend/features/messages/query/use-field-catalog.ts`  | TS       | Builds the catalog lazily, only when suggestions ask                  |
+| `frontend/features/messages/components/query-editor.tsx` | TS       | The CodeMirror editor that ties it together                           |
+| `frontend/features/messages/components/query-bar.tsx`    | TS       | The bar around it: Apply, Clear, error line, syntax help              |
 
 ---
 
@@ -1071,7 +1071,7 @@ never recurses, so a long text can't overflow the stack. `ILIKE` is the same wit
 ### 8. Stage 4: searching a topic (`service.rs`)
 
 `Query` (in `tql_compiler`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
-the app side (`src-tauri/src/features/messages/query.rs`):
+the app side (`app/src/features/messages/query.rs`):
 
 ```rust
 Query::parse(text)          // Result<Query, QueryError>   (lexer + parser)
@@ -1402,9 +1402,9 @@ evaluator.
 #### Running tests
 
 ```sh
-cargo test -p tql_compiler                # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
-bun test src/features/messages/query      # TypeScript: completion tests
-bun run test:e2e                          # the real app in Docker, against seeded Kafka
+cargo test -p tql_compiler                  # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
+bun test frontend/features/messages/query   # TypeScript: completion tests
+bun run test:e2e                            # the real app in Docker, against seeded Kafka
 ```
 
 Each Rust file has a `#[cfg(test)] mod tests` at the bottom. Read those first. They're the best examples of
@@ -1736,10 +1736,10 @@ filter never reaches `browse`.
 | `e2e/specs/09-message-query.e2e.ts` | the real app: field → operator → value suggestions, results, error underline |
 
 ```sh
-bun test src                                            # TypeScript
-cd src-tauri && cargo test                              # Rust unit tests
-bun run kafka:up && cd src-tauri && cargo test -- --ignored   # with Kafka
-bun run test:e2e                                        # the app, in Docker
+bun test frontend                                  # TypeScript
+cargo test                                         # Rust unit tests
+bun run kafka:up && cargo test -p kui -- --ignored # with Kafka
+bun run test:e2e                                   # the app, in Docker
 ```
 
 ### Extending the language

@@ -9,7 +9,7 @@
 //!
 //! `lexer` → `parser` (an `Expr` tree) → `evaluate` (per message). Messages
 //! come in through the [`Record`] trait, so this crate knows nothing about
-//! Kafka clients. The UI's completion (`src/features/messages/query/`)
+//! Kafka clients. The UI's completion (`frontend/features/messages/query/`)
 //! mirrors the field roots, operators and functions defined here.
 
 mod evaluate;

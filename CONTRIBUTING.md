@@ -159,9 +159,9 @@ are attached to the run as artifacts.
 
 ### In-app updates
 
-Each release carries `latest.json`, the manifest KUI's updater reads ([src-tauri/src/updates.rs](src-tauri/src/updates.rs)),
+Each release carries `latest.json`, the manifest KUI's updater reads ([app/src/updates.rs](app/src/updates.rs)),
 and update packages signed with the **updater key**. This key is separate from code signing and is required: a tag
-build fails without it. The public key is `plugins.updater.pubkey` in [tauri.conf.json](src-tauri/tauri.conf.json); the
+build fails without it. The public key is `plugins.updater.pubkey` in [tauri.conf.json](app/tauri.conf.json); the
 private key goes in the `TAURI_SIGNING_PRIVATE_KEY` secret (and its password, if it has one, in
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`):
 

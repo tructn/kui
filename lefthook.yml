@@ -18,7 +18,7 @@ pre-commit:
       stage_fixed: true
 
     - name: typecheck
-      glob: "src/**/*.{ts,tsx}"
+      glob: "frontend/**/*.{ts,tsx}"
       run: bunx tsc --noEmit
 
 # Commit messages follow Conventional Commits (CONTRIBUTING.md), which
@@ -41,4 +41,4 @@ pre-push:
       run: cargo test --locked
 
     - name: ui tests
-      run: bun test src
+      run: bun test frontend
