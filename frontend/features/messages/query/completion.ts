@@ -12,7 +12,7 @@ export interface Suggestion {
   /** Replaces the completion's `from`–`to` range. */
   insert: string;
   kind: SuggestionKind;
-  /** Short hint shown beside the label, e.g. `string · 82%`. */
+  /** Short hint shown beside the label, e.g. `string`. */
   detail?: string;
   /** Where the caret goes within `insert` (default: its end). */
   caret?: number;
@@ -379,7 +379,7 @@ function fieldItem(stats: FieldStats, catalog: FieldCatalog, label = stats.path)
     label,
     insert: label + suffix,
     kind: "field",
-    detail: describeField(stats, catalog.sampled),
+    detail: describeField(stats),
     retrigger: true,
   };
 }
@@ -571,14 +571,7 @@ function valueItems(s: State, catalog: FieldCatalog, prefix: string, partial: To
       const text = literal(value);
       if (seen.has(text)) continue;
       seen.add(text);
-      const share = catalog.sampled > 0 ? Math.round((v.count / catalog.sampled) * 100) : 0;
-      items.push({
-        label: text,
-        insert: text + end,
-        kind: "value",
-        detail: `${share < 1 ? "<1" : share}% of messages`,
-        retrigger,
-      });
+      items.push({ label: text, insert: text + end, kind: "value", retrigger });
       if (like && typeof value === "string" && items.length < 3) {
         // A starter pattern from a real value.
         const stem = value.slice(0, Math.max(1, Math.ceil(value.length / 2)));

@@ -32,8 +32,8 @@ describe("buildCatalog", () => {
     const status = catalog.fields.get("value.status")!;
     expect(status.present).toBe(3);
     expect(status.values[0]).toEqual({ value: "shipped", count: 2 });
-    expect(describeField(status, catalog.sampled)).toBe("string · 75%");
-    expect(describeField(catalog.fields.get("value.type")!, catalog.sampled)).toBe("string");
+    expect(describeField(status)).toBe("string");
+    expect(describeField(catalog.fields.get("value.type")!)).toBe("string");
     expect(catalog.fields.get("value.items[*].sku")?.values.length).toBe(2);
     expect(catalog.fields.has('value."first name"')).toBe(true);
     // JSON inside a string is walked, like the Rust filter does.

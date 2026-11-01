@@ -1,8 +1,20 @@
 import { autocompletion, type Completion as CmCompletion, completionStatus, startCompletion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type Diagnostic, linter } from "@codemirror/lint";
-import { Annotation, EditorState, Prec, type Range } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, keymap, placeholder, ViewPlugin, type ViewUpdate } from "@codemirror/view";
+import { bracketMatching } from "@codemirror/language";
+import { Annotation, Compartment, EditorState, type Extension, Prec, type Range } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  lineNumbers,
+  placeholder,
+  ViewPlugin,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
@@ -24,20 +36,25 @@ interface QueryEditorProps {
   onProblem: (problem: QueryProblem | null) => void;
   /** First focus: a chance to load a bigger sample for suggestions. */
   onFocus?: () => void;
+  /** Editor mode: several lines with line numbers; Enter adds a line and Mod-Enter submits. */
+  multiline?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
 /**
- * One-line CodeMirror editor for the message filter: highlighting, suggestions
- * from `query/completion.ts`, and errors underlined by the Rust parser.
+ * CodeMirror editor for the message filter: highlighting, suggestions from
+ * `query/completion.ts`, and errors underlined by the Rust parser. One line
+ * by default; `multiline` turns it into a small SQL-style editor.
  */
-export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, onFocus, disabled, className }: QueryEditorProps) {
+export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, onFocus, multiline = false, disabled, className }: QueryEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   // Extensions are built once; they read the latest props through this ref.
-  const props = useRef({ onChange, onSubmit, getCatalog, onProblem, onFocus });
-  props.current = { onChange, onSubmit, getCatalog, onProblem, onFocus };
+  const props = useRef({ onChange, onSubmit, getCatalog, onProblem, onFocus, multiline });
+  props.current = { onChange, onSubmit, getCatalog, onProblem, onFocus, multiline };
+  // Swaps the one-line and multi-line extensions without rebuilding the editor (keeps undo and focus).
+  const mode = useRef(new Compartment());
   // Typing reports to the parent at most every CHANGE_DELAY_MS; Enter and blur report right away.
   const pendingChange = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The last text sent through `onChange`. When `value` comes back equal to it, that's our own
@@ -60,18 +77,33 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
       state: EditorState.create({
         doc: value,
         extensions: [
-          singleLine,
+          mode.current.of(modeExtensions(multiline)),
           history(),
           Prec.high(
             keymap.of([
               {
                 key: "Enter",
                 run: (v) => {
-                  if (completionStatus(v.state) === "active") return false;
+                  // A new line in the multi-line editor (the default keymap handles it).
+                  if (props.current.multiline || completionStatus(v.state) === "active") return false;
                   flushChange(v);
                   props.current.onSubmit(v.state.doc.toString());
                   return true;
                 },
+              },
+            ]),
+          ),
+          // Mod-Enter runs in both modes. Highest precedence: the default keymap binds it to "insert blank line".
+          Prec.highest(
+            keymap.of([
+              {
+                key: "Mod-Enter",
+                run: (v) => {
+                  flushChange(v);
+                  props.current.onSubmit(v.state.doc.toString());
+                  return true;
+                },
+                preventDefault: true,
               },
             ]),
           ),
@@ -80,7 +112,6 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
           // the default keymap binds Mod-l to "select line".
           Prec.highest(keymap.of([{ mac: "Mod-l", run: startCompletion, preventDefault: true }])),
           keymap.of([...defaultKeymap, ...historyKeymap]),
-          placeholder("Filter, e.g. value.status = 'shipped' AND headers.x-source IN ('web', 'ios')"),
           highlighting,
           autocompletion({
             override: [(ctx) => {
@@ -173,6 +204,32 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
     }
   }, [value]);
 
+  // Switching modes. Going back to one line joins the lines, and reports that right away.
+  const modeApplied = useRef(multiline);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor || modeApplied.current === multiline) return;
+    modeApplied.current = multiline;
+    const text = editor.state.doc.toString();
+    const joined = multiline ? text : flattenQuery(text);
+    editor.dispatch({
+      effects: mode.current.reconfigure(modeExtensions(multiline)),
+      ...(joined !== text && {
+        changes: { from: 0, to: text.length, insert: joined },
+        selection: { anchor: Math.min(editor.state.selection.main.head, joined.length) },
+        annotations: fromProps.of(true),
+      }),
+    });
+    if (joined !== text) {
+      if (pendingChange.current !== null) clearTimeout(pendingChange.current);
+      pendingChange.current = null;
+      reported.current = joined;
+      props.current.onChange(joined);
+    }
+    // The toggle button took focus; hand it back to the text.
+    editor.focus();
+  }, [multiline]);
+
   useEffect(() => {
     view.current?.contentDOM.setAttribute("contenteditable", disabled ? "false" : "true");
   }, [disabled]);
@@ -198,10 +255,15 @@ const COMPLETION_TYPE: Record<SuggestionKind, string> = {
   value: "text",
 };
 
+/** Joins a multi-line filter onto one line. Newlines are only whitespace to the parser. */
+export function flattenQuery(text: string): string {
+  return text.replace(/\s*\n\s*/g, " ");
+}
+
 /** Keeps the filter on one line: pasted newlines become spaces. */
 const singleLine = EditorState.transactionFilter.of((tr) => {
   if (!tr.docChanged || tr.newDoc.lines === 1) return tr;
-  const text = tr.newDoc.toString().replace(/\s*\n\s*/g, " ");
+  const text = flattenQuery(tr.newDoc.toString());
   return [tr.startState.update({ changes: { from: 0, to: tr.startState.doc.length, insert: text }, selection: { anchor: Math.min(tr.newSelection.main.head, text.length) } })];
 });
 
@@ -248,13 +310,57 @@ const highlighting = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 );
 
+/** The extensions that differ between the one-line bar and the multi-line editor. */
+function modeExtensions(multiline: boolean): Extension {
+  if (!multiline) {
+    return [singleLine, singleLineTheme, placeholder("Filter, e.g. value.status = 'shipped' AND headers.x-source IN ('web', 'ios')")];
+  }
+  return [
+    lineNumbers(),
+    highlightActiveLine(),
+    highlightActiveLineGutter(),
+    bracketMatching(),
+    multiLineTheme,
+    // One line: on an empty editor the caret takes the placeholder's height, so two lines make it tall.
+    placeholder("value.status = 'shipped' AND headers.x-source IN ('web', 'ios')"),
+  ];
+}
+
+const singleLineTheme = EditorView.theme({
+  ".cm-scroller": { overflowX: "auto", scrollbarWidth: "none" },
+  ".cm-content": { padding: "5px 0" },
+  ".cm-line": { padding: "0 8px" },
+});
+
+/** Fills the resizable box it sits in, with a gutter of line numbers like a SQL console. */
+const multiLineTheme = EditorView.theme({
+  "&": { height: "100%" },
+  ".cm-scroller": { overflow: "auto", scrollbarWidth: "thin" },
+  ".cm-content": { padding: "8px 0" },
+  ".cm-line": { padding: "0 12px 0 10px" },
+  ".cm-gutters": {
+    backgroundColor: "color-mix(in oklab, var(--muted) 45%, transparent)",
+    color: "var(--muted-foreground)",
+    borderRight: "1px solid var(--border)",
+  },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 12px", minWidth: "32px", fontSize: "11.5px", opacity: "0.7" },
+  ".cm-activeLine": { backgroundColor: "color-mix(in oklab, var(--muted) 40%, transparent)" },
+  ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--foreground)" },
+  ".cm-activeLineGutter.cm-gutterElement": { opacity: "1" },
+  "&.cm-focused .cm-matchingBracket": {
+    backgroundColor: "color-mix(in oklab, var(--primary) 18%, transparent)",
+    outline: "1px solid color-mix(in oklab, var(--primary) 40%, transparent)",
+    borderRadius: "2px",
+  },
+  "&.cm-focused .cm-nonmatchingBracket": { backgroundColor: "color-mix(in oklab, var(--destructive) 20%, transparent)" },
+});
+
 /** Blends the editor into the surrounding input group and themes the popups. */
 const theme = EditorView.theme({
   "&": { fontSize: "13px", backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },
-  ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.5", overflowX: "auto", scrollbarWidth: "none" },
-  ".cm-content": { padding: "5px 0", caretColor: "var(--foreground)" },
-  ".cm-line": { padding: "0 8px" },
+  ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.5" },
+  ".cm-content": { caretColor: "var(--foreground)" },
   ".cm-placeholder": { color: "var(--muted-foreground)" },
   ".cm-tooltip": {
     backgroundColor: "var(--popover)",

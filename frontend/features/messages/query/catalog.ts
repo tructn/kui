@@ -217,14 +217,8 @@ export function typesOf(stats: FieldStats | undefined): JsonType[] {
     .map(([type]) => type);
 }
 
-/** e.g. `string · 82%`, `number | string`, or `object` when every message has it. */
-export function describeField(stats: FieldStats, sampled: number): string {
-  const types = stats.builtin
-    ? stats.path === "timestamp"
-      ? "time"
-      : "number"
-    : typesOf(stats).filter((t) => t !== "null" || Object.keys(stats.types).length === 1).join(" | ");
-  if (sampled === 0 || stats.present >= sampled) return types;
-  const share = (stats.present / sampled) * 100;
-  return `${types} · ${share < 1 ? "<1" : Math.round(share)}%`;
+/** The field's types, e.g. `string`, `number | string`, or `time` for the timestamp. */
+export function describeField(stats: FieldStats): string {
+  if (stats.builtin) return stats.path === "timestamp" ? "time" : "number";
+  return typesOf(stats).filter((t) => t !== "null" || Object.keys(stats.types).length === 1).join(" | ");
 }
