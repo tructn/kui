@@ -1,6 +1,6 @@
-//! Connects messages to the TQL filter (the `tql_compiler` crate).
+//! Connects messages to the TQL filter (the `tql_interpreter` crate).
 
-pub use tql_compiler::{Query, QueryError};
+pub use tql_interpreter::{Query, QueryError};
 
 use super::model::{Message, Payload};
 use crate::error::{Error, Result};
@@ -13,7 +13,7 @@ pub fn optional(input: Option<&str>) -> Result<Option<Query>> {
     }
 }
 
-impl tql_compiler::Record for Message {
+impl tql_interpreter::Record for Message {
     fn partition(&self) -> i32 {
         self.partition
     }
@@ -26,11 +26,11 @@ impl tql_compiler::Record for Message {
         self.timestamp
     }
 
-    fn key(&self) -> Option<tql_compiler::Payload<'_>> {
+    fn key(&self) -> Option<tql_interpreter::Payload<'_>> {
         self.key.as_ref().map(payload)
     }
 
-    fn value(&self) -> Option<tql_compiler::Payload<'_>> {
+    fn value(&self) -> Option<tql_interpreter::Payload<'_>> {
         self.value.as_ref().map(payload)
     }
 
@@ -39,6 +39,6 @@ impl tql_compiler::Record for Message {
     }
 }
 
-fn payload(p: &Payload) -> tql_compiler::Payload<'_> {
-    tql_compiler::Payload { text: &p.text, utf8: p.encoding == "utf8" }
+fn payload(p: &Payload) -> tql_interpreter::Payload<'_> {
+    tql_interpreter::Payload { text: &p.text, utf8: p.encoding == "utf8" }
 }

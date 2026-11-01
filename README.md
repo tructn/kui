@@ -66,7 +66,7 @@ topic's name with one click. A Brokers page shows the machines your cluster runs
 - Expand any row to see its key, headers and value side by side. Values show as formatted JSON or Base64.
 - **Filter with SQL-like queries**, e.g. `value.status = 'shipped' AND value.items[*].qty > 3`. Suggestions
   come from the topic's own messages, so they know every field even when messages differ in shape. See the
-  [query guide](crates/tql_compiler/README.md).
+  [query guide](crates/tql_interpreter/README.md).
 - **Export** messages to JSON, NDJSON or CSV.
 - **Copy** one or many messages to another topic, which is handy for replaying a message or moving test data.
 

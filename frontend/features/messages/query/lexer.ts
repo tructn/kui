@@ -1,5 +1,5 @@
 // A forgiving tokenizer for the message filter, used for highlighting and
-// completion while the user types. Rust (`crates/tql_compiler`)
+// completion while the user types. Rust (`crates/tql_interpreter`)
 // is the real parser; this one never fails: half-typed input still yields tokens.
 
 export type TokenKind =

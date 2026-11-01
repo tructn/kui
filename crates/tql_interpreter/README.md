@@ -1,6 +1,6 @@
-# tql_compiler
+# tql_interpreter
 
-The compiler for **TQL**, the *topic query language*: the SQL-like filter KUI uses to search a Kafka topic's
+The interpreter for **TQL**, the *topic query language*: the SQL-like filter KUI uses to search a Kafka topic's
 messages. A query is the part of SQL that would follow `WHERE`:
 
 ```sql
@@ -18,7 +18,7 @@ messages come in through the `Record` trait, which KUI implements for its `Messa
 `app/src/features/messages/query.rs`.
 
 ```rust
-use tql_compiler::Query;
+use tql_interpreter::Query;
 
 let query = Query::parse("value.status = 'shipped' AND headers.source = 'web'")?; // Err(QueryError) on a typo
 if query.matches(&message) {                                                     // any `impl Record`
@@ -34,7 +34,7 @@ if query.matches(&message) {                                                    
 | `Payload { text, utf8 }` | A key or value as displayed; only `utf8` text is tried as JSON |
 
 ```sh
-cargo test -p tql_compiler   # all lexer, parser and evaluator tests, in seconds
+cargo test -p tql_interpreter   # all lexer, parser and evaluator tests, in seconds
 ```
 
 File paths in this guide are relative to the repository root.
@@ -44,7 +44,7 @@ This guide covers the language from three angles. Pick the part that fits you:
 | Part | For | What's in it |
 | ---- | --- | ------------ |
 | [I. Using the language](#part-i-using-the-language) | everyone | syntax, operators, how messages of different shapes are handled |
-| [II. Walkthrough for newcomers](#part-ii-walkthrough-for-newcomers) | anyone new to compilers or to this code | how text becomes a result, stage by stage, with diagrams, traces and exercises. **No compiler experience assumed.** |
+| [II. Walkthrough for newcomers](#part-ii-walkthrough-for-newcomers) | anyone new to language implementation or to this code | how text becomes a result, stage by stage, with diagrams, traces and exercises. **No compiler or interpreter experience assumed.** |
 | [III. Reference for contributors](#part-iii-reference-for-contributors) | people changing the code | precise grammar, evaluation rules, the search loop, API, completion details, tests, extension checklist |
 
 New to this code? Read Part I quickly, then Part II sections 1–4 in order. They give you the map and the
@@ -279,7 +279,7 @@ value.status = 'SHIPPED' AND value.items[*].qty > 3
 
 The computer can't do anything useful with that line while it's just characters. It needs a structured
 description it can check against each message. Turning text into that structure, and then using it, is the
-job of the `tql_compiler` crate in `crates/tql_compiler/`. It knows nothing about Kafka: the app hands it
+job of the `tql_interpreter` crate in `crates/tql_interpreter/`. It knows nothing about Kafka: the app hands it
 messages through the `Record` trait (implemented in `app/src/features/messages/query.rs`).
 
 > **Key idea.** A query is a *program* in a tiny language. Our code reads the program once, then runs it once
@@ -345,10 +345,10 @@ always does. [Section 9](#9-the-editor-side-typescript) explains why it exists.
 
 | File                                                     | Language | Job                                                                   |
 | -------------------------------------------------------- | -------- | --------------------------------------------------------------------- |
-| `crates/tql_compiler/src/lib.rs`                         | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
-| `crates/tql_compiler/src/lexer.rs`                       | Rust     | Stage 1: text → tokens                                                |
-| `crates/tql_compiler/src/parser.rs`                      | Rust     | Stage 2: tokens → tree (`Expr`)                                       |
-| `crates/tql_compiler/src/evaluate.rs`                    | Rust     | Stage 3: tree + message → bool                                        |
+| `crates/tql_interpreter/src/lib.rs`                      | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
+| `crates/tql_interpreter/src/lexer.rs`                    | Rust     | Stage 1: text → tokens                                                |
+| `crates/tql_interpreter/src/parser.rs`                   | Rust     | Stage 2: tokens → tree (`Expr`)                                       |
+| `crates/tql_interpreter/src/evaluate.rs`                 | Rust     | Stage 3: tree + message → bool                                        |
 | `app/src/features/messages/query.rs`                     | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter)          |
 | `app/src/features/messages/service.rs`                   | Rust     | Stage 4: the search loop (`browse_with`), live tail                   |
 | `app/src/features/messages/commands.rs`                  | Rust     | `check_message_query`: parse only, for error underlines               |
@@ -385,7 +385,7 @@ Learn these words once and the rest of the code will read much more easily.
 
 > **"Compiler" or "interpreter"?** A compiler translates a program into another language (often machine code).
 > An interpreter runs it directly. We do the front half of a compiler (lexing and parsing) and then interpret
-> the tree. People loosely call the whole thing "the query compiler", and that's fine.
+> the tree, never producing any other code. That's why the crate is called `tql_interpreter`.
 
 ---
 
@@ -1100,7 +1100,7 @@ never recurses, so a long text can't overflow the stack. `ILIKE` is the same wit
 
 ### 8. Stage 4: searching a topic (`service.rs`)
 
-`Query` (in `tql_compiler`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
+`Query` (in `tql_interpreter`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
 the app side (`app/src/features/messages/query.rs`):
 
 ```rust
@@ -1432,7 +1432,7 @@ evaluator.
 #### Running tests
 
 ```sh
-cargo test -p tql_compiler                  # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
+cargo test -p tql_interpreter                  # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
 bun test frontend/features/messages/query   # TypeScript: completion tests
 bun run test:e2e                            # the real app in Docker, against seeded Kafka
 ```
@@ -1757,9 +1757,9 @@ filter never reaches `browse`.
 
 | Where | Covers |
 | ----- | ------ |
-| `tql_compiler/src/lexer.rs` | tokens, quotes, UTF-16 positions, errors |
-| `tql_compiler/src/parser.rs` | precedence, paths, desugaring, error positions and messages |
-| `tql_compiler/src/evaluate.rs` | paths and wildcards, embedded JSON, by-meaning comparison, missing fields, text operators, `LIKE`, dates |
+| `tql_interpreter/src/lexer.rs` | tokens, quotes, UTF-16 positions, errors |
+| `tql_interpreter/src/parser.rs` | precedence, paths, desugaring, error positions and messages |
+| `tql_interpreter/src/evaluate.rs` | paths and wildcards, embedded JSON, by-meaning comparison, missing fields, text operators, `LIKE`, dates |
 | `window.rs` | `resume_after` in both directions |
 | `integration_tests.rs` (needs Kafka) | search pages hold only matches and resume mid-chunk; invalid queries fail |
 | `query/completion.test.ts` | catalog stats; suggestions for each state on a topic with two message shapes |
