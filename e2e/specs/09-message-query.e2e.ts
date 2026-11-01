@@ -19,6 +19,12 @@ describe("Message query", () => {
     await button("Messages").click();
 
     await editor().click();
+    // Clicking in only focuses; suggestions wait for typing or Ctrl+Space.
+    await browser.pause(500);
+    await expect(suggestions()).toBeElementsArrayOfSize(0);
+    await browser.keys([Key.Ctrl, Key.Space]);
+    await expect(suggestions()).toBeElementsArrayOfSize({ gte: 1 });
+    await browser.keys(Key.Escape);
     // A field found by name alone, without knowing it sits under `value`.
     await browser.keys("stat");
     await expect(suggestion("value.status")).toBeDisplayed();
@@ -44,12 +50,33 @@ describe("Message query", () => {
 
   it("underlines mistakes and won't run them", async () => {
     if (await clearButton().isExisting()) await clearButton().click();
-    await expect(editor()).toHaveText("");
+    // Empty: CodeMirror shows its placeholder, which WebDriver reads as the editor's text.
+    await expect(editor().$(".cm-placeholder")).toExist();
     await editor().click();
     await browser.keys("value.total >");
     await expect($("p[role=alert]")).toHaveText("Expected a field or value");
     await expect($(".cm-lintRange-error")).toExist();
     await expect(button("Apply")).toBeDisabled();
     await clearButton().click();
+  });
+
+  // demo.events: 60 events in six shapes (see docker/kafka-seed.sh), 9 with an item of qty > 3.
+  it("filters nested, mixed-shape messages", async () => {
+    await goTo("Topics");
+    await $("span=demo.events").click();
+    await button("Messages").click();
+
+    await editor().click();
+    // A path four levels deep. (No doubled letters: the WebKitGTK driver drops the second one.)
+    await browser.keys("value.payment.card.br");
+    await expect(suggestion("brand")).toBeDisplayed();
+    await browser.keys(Key.Escape);
+    if (await clearButton().isExisting()) await clearButton().click();
+
+    await editor().click();
+    await browser.keys("value.items[*].qty > 3");
+    await browser.keys(Key.Escape);
+    await browser.keys(Key.Enter);
+    await expect($("span*=9 matches")).toBeDisplayed();
   });
 });

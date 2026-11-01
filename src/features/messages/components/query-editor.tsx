@@ -1,7 +1,7 @@
 import { autocompletion, type Completion as CmCompletion, completionStatus, startCompletion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type Diagnostic, linter } from "@codemirror/lint";
-import { EditorState, Prec, type Range } from "@codemirror/state";
+import { Annotation, EditorState, Prec, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, placeholder, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 
@@ -16,8 +16,8 @@ import type { QueryProblem } from "../types";
 interface QueryEditorProps {
   value: string;
   onChange: (value: string) => void;
-  /** Enter, when no suggestion is open. */
-  onSubmit: () => void;
+  /** Enter, when no suggestion is open. Gets the text as it is now (`onChange` lags behind typing). */
+  onSubmit: (text: string) => void;
   /** Fields learned from sampled messages; called when suggestions are needed. */
   getCatalog: () => FieldCatalog;
   /** The parser's verdict on the current text (null = valid or empty). */
@@ -38,8 +38,23 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
   // Extensions are built once; they read the latest props through this ref.
   const props = useRef({ onChange, onSubmit, getCatalog, onProblem, onFocus });
   props.current = { onChange, onSubmit, getCatalog, onProblem, onFocus };
+  // Typing reports to the parent at most every CHANGE_DELAY_MS; Enter and blur report right away.
+  const pendingChange = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The last text sent through `onChange`. When `value` comes back equal to it, that's our own
+  // echo, even if more was typed meanwhile, and the editor must keep the newer text.
+  const reported = useRef(value);
 
   useEffect(() => {
+    const cancelChange = () => {
+      if (pendingChange.current !== null) clearTimeout(pendingChange.current);
+      pendingChange.current = null;
+    };
+    const flushChange = (v: EditorView) => {
+      if (pendingChange.current === null) return;
+      cancelChange();
+      reported.current = v.state.doc.toString();
+      props.current.onChange(reported.current);
+    };
     const editor = new EditorView({
       parent: host.current!,
       state: EditorState.create({
@@ -53,12 +68,17 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
                 key: "Enter",
                 run: (v) => {
                   if (completionStatus(v.state) === "active") return false;
-                  props.current.onSubmit();
+                  flushChange(v);
+                  props.current.onSubmit(v.state.doc.toString());
                   return true;
                 },
               },
             ]),
           ),
+          // Suggestions open only when asked: Ctrl+Space everywhere (CodeMirror's default keymap),
+          // plus Cmd+L on macOS, where Cmd+Space belongs to Spotlight. Highest precedence, because
+          // the default keymap binds Mod-l to "select line".
+          Prec.highest(keymap.of([{ mac: "Mod-l", run: startCompletion, preventDefault: true }])),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           placeholder("Filter, e.g. value.status = 'shipped' AND headers.x-source IN ('web', 'ios')"),
           highlighting,
@@ -86,6 +106,8 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
             }],
             icons: false,
             activateOnTyping: true,
+            // Wait for a pause in typing before asking for suggestions (CodeMirror's debounce).
+            activateOnTypingDelay: SUGGEST_DELAY_MS,
             maxRenderedOptions: 60,
           }),
           linter(
@@ -106,13 +128,20 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
               const to = Math.min(Math.max(problem.end, from + 1), length);
               return [{ from: Math.max(0, Math.min(from, to - 1)), to, severity: "error", message: problem.message }];
             },
-            { delay: 250 },
+            { delay: CHECK_DELAY_MS },
           ),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) props.current.onChange(update.state.doc.toString());
-            if (update.focusChanged && update.view.hasFocus) {
-              props.current.onFocus?.();
-              if (update.state.doc.length === 0) startCompletion(update.view);
+            // Text set from outside (`value`) is already known to the parent.
+            const external = update.transactions.some((tr) => tr.annotation(fromProps));
+            if (update.docChanged && !external) {
+              cancelChange();
+              const v = update.view;
+              pendingChange.current = setTimeout(() => flushChange(v), CHANGE_DELAY_MS);
+            }
+            if (update.focusChanged) {
+              // Focus only prepares suggestions (loads a sample); it doesn't open them.
+              if (update.view.hasFocus) props.current.onFocus?.();
+              else flushChange(update.view);
             }
           }),
           EditorView.contentAttributes.of({ "aria-label": "Message filter", spellcheck: "false", autocapitalize: "off" }),
@@ -121,15 +150,26 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
       }),
     });
     view.current = editor;
-    return () => editor.destroy();
+    return () => {
+      cancelChange();
+      editor.destroy();
+    };
     // Created once; `value` is synced below.
   }, []);
 
-  // Outside changes (Clear, an example) replace the text.
+  // Outside changes (Clear, an example) replace the text, and drop any typing not yet reported.
   useEffect(() => {
     const editor = view.current;
-    if (editor && editor.state.doc.toString() !== value) {
-      editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: value }, selection: { anchor: value.length } });
+    if (!editor || value === reported.current) return;
+    reported.current = value;
+    if (editor.state.doc.toString() !== value) {
+      if (pendingChange.current !== null) clearTimeout(pendingChange.current);
+      pendingChange.current = null;
+      editor.dispatch({
+        changes: { from: 0, to: editor.state.doc.length, insert: value },
+        selection: { anchor: value.length },
+        annotations: fromProps.of(true),
+      });
     }
   }, [value]);
 
@@ -139,6 +179,16 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
 
   return <div ref={host} className={cn("min-w-0 flex-1", disabled && "opacity-50", className)} />;
 }
+
+/** Pause in typing before suggestions are computed. */
+const SUGGEST_DELAY_MS = 120;
+/** Pause in typing before the text is reported to the parent (re-renders the query bar). */
+const CHANGE_DELAY_MS = 150;
+/** Pause in typing before the Rust parser checks the text. */
+const CHECK_DELAY_MS = 250;
+
+/** Marks a transaction that applies the `value` prop, so it isn't echoed back through `onChange`. */
+const fromProps = Annotation.define<boolean>();
 
 const COMPLETION_TYPE: Record<SuggestionKind, string> = {
   field: "property",

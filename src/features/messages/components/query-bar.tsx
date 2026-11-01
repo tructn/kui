@@ -29,8 +29,9 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
   const applied = (query ?? "").trim();
   const pending = draft.trim() !== applied;
 
-  async function apply() {
-    const text = draft.trim();
+  /** `current` is the editor's text on Enter; `draft` can lag a moment behind typing. */
+  async function apply(current: string = draft) {
+    const text = current.trim();
     if (!text) return onApply(null);
     // The as-you-type check is delayed; make sure before running.
     const found = await messagesApi.checkQuery(text).catch(() => null);
@@ -80,7 +81,7 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
             variant={pending ? "default" : "ghost"}
             size="xs"
             disabled={disabled || !pending || (problem !== null && draft.trim() !== "")}
-            onClick={apply}
+            onClick={() => apply()}
           >
             Apply <CornerDownLeftIcon className="size-3" />
           </Button>
@@ -113,7 +114,9 @@ function QueryHelp() {
           { term: <code>lower(value.name) = 'ada'</code>, description: "Functions: lower, upper, trim, length, type" },
         ]}
       />
-      <p className="opacity-80">Ctrl+Space shows suggestions, drawn from recent messages.</p>
+      <p className="opacity-80">
+        Suggestions appear as you type; Ctrl+Space (or ⌘L on macOS) opens them. They're drawn from recent messages.
+      </p>
     </div>
   );
 }
