@@ -463,7 +463,7 @@ values (`Operand`):
 
 ```mermaid
 flowchart TD
-    AND["And"] --> C1["Compare  &gt;"]
+    AND["And"] --> C1["Compare  #gt;"]
     AND --> NOT["Not"]
     C1 --> P1("Path<br/>value · items · [*] · qty")
     C1 --> L1("Literal 3")
@@ -494,7 +494,7 @@ The tree again, annotated with what each node produced for this message:
 
 ```mermaid
 flowchart TD
-    AND["And → <b>true</b>"] --> C1["Compare &gt; → <b>true</b><br/><i>5 &gt; 3</i>"]
+    AND["And → <b>true</b>"] --> C1["Compare #gt; → <b>true</b><br/><i>5 #gt; 3</i>"]
     AND --> NOT["Not → <b>true</b>"]
     C1 --> P1("value.items[*].qty → [2, 5]")
     C1 --> L1("3 → [3]")
@@ -567,8 +567,8 @@ flowchart TD
     START(["look at chars[i]"]) --> WS{"whitespace?"}
     WS -- yes --> SKIP["i += 1"] --> START
     WS -- no --> PUNCT{". , ( ) [ ] *<br/>or an operator?"}
-    PUNCT -- yes --> OP["peek chars[i+1]<br/>for == != &lt;&gt; &lt;= &gt;="] --> EMIT
-    PUNCT -- no --> Q{"' or &quot; ?"}
+    PUNCT -- yes --> OP["peek chars[i+1]<br/>for == != #lt;#gt; #lt;= #gt;="] --> EMIT
+    PUNCT -- no --> Q{"' or #quot; ?"}
     Q -- yes --> STR["read to the closing quote<br/>('' = one quote)"] --> EMIT
     Q -- no --> NUM{"digit, or . / -<br/>before a digit?"}
     NUM -- yes --> N["read digits . _ e"] --> EMIT
@@ -785,7 +785,7 @@ flowchart TD
     OR["Or"] --> A["key = 'a'"]
     OR --> AND["And"]
     AND --> B["key = 'b'"]
-    AND --> C["offset &gt; 3"]
+    AND --> C["offset #gt; 3"]
 ```
 
 The test `and_binds_tighter_than_or` checks exactly this.
@@ -1248,7 +1248,7 @@ stateDiagram-v2
     operand --> operand: NOT / (
     operand --> operator: field
     operand --> value: function (
-    operator --> value: = != &lt; &gt; LIKE CONTAINS
+    operator --> value: = != #lt; #gt; LIKE CONTAINS
     operator --> notOp: NOT
     operator --> is: IS
     operator --> inOpen: IN
