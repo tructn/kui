@@ -1,4 +1,4 @@
-import { autocompletion, type Completion as CmCompletion, completionStatus, startCompletion } from "@codemirror/autocomplete";
+import { acceptCompletion, autocompletion, type Completion as CmCompletion, completionStatus, startCompletion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type Diagnostic, linter } from "@codemirror/lint";
 import { bracketMatching } from "@codemirror/language";
@@ -111,6 +111,9 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
           // plus Cmd+L on macOS, where Cmd+Space belongs to Spotlight. Highest precedence, because
           // the default keymap binds Mod-l to "select line".
           Prec.highest(keymap.of([{ mac: "Mod-l", run: startCompletion, preventDefault: true }])),
+          // Tab accepts the highlighted suggestion, like Enter. With no list open it returns false,
+          // so Tab still moves focus out of the editor.
+          Prec.highest(keymap.of([{ key: "Tab", run: acceptCompletion }])),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           highlighting,
           autocompletion({

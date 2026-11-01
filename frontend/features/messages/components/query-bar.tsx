@@ -175,7 +175,7 @@ function QueryHelp() {
         ]}
       />
       <p className="opacity-80">
-        Suggestions appear as you type; Ctrl+Space (or ⌘L on macOS) opens them. They're drawn from recent messages. In the expanded editor, Enter adds a line and {MOD_KEY}+Enter runs.
+        Suggestions appear as you type; Ctrl+Space (or ⌘L on macOS) opens them, and Tab or Enter picks one. They're drawn from recent messages. In the expanded editor, Enter adds a line and {MOD_KEY}+Enter runs.
       </p>
     </div>
   );
