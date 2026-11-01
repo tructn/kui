@@ -11,7 +11,7 @@ use rdkafka::consumer::{BaseConsumer, Consumer, ConsumerContext};
 use rdkafka::error::KafkaError;
 use rdkafka::types::RDKafkaErrorCode;
 
-use crate::error::Error;
+use crate::Error;
 
 /// Every consumer KUI creates, so the offset and metadata helpers take any of them.
 pub type KafkaConsumer = BaseConsumer<ConnectionErrors>;

@@ -19,7 +19,7 @@ use rdkafka::types::RDKafkaErrorCode;
 
 use super::TIMEOUT;
 use super::offsets::PartitionKey;
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 
 /// Every offset each of `groups` has committed, in the order given. A group
 /// that never committed anything gets an empty map.

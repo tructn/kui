@@ -3,9 +3,9 @@ use std::time::Duration;
 use rdkafka::consumer::Consumer;
 
 use crate::error::Result;
-use crate::kafka::ClusterConfig;
-use crate::kafka::connection::explain;
-use crate::kafka::new_consumer;
+use kui_kafka::ClusterConfig;
+use kui_kafka::connection::explain;
+use kui_kafka::new_consumer;
 
 /// Connects with a throwaway client and fetches metadata.
 /// Returns the number of brokers that answered.

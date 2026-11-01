@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use super::secrets::{SecretStore, Secrets};
 use crate::error::{Error, Result};
 use crate::json_file;
-use crate::kafka::ClusterConfig;
+use kui_kafka::ClusterConfig;
 
 /// Cluster list persisted as a JSON file in the app config directory. The
 /// secret fields are kept in the OS keychain instead (see `secrets.rs`).

@@ -9,11 +9,11 @@ use super::model::{
 };
 use super::{progress, reset};
 use crate::error::{Error, Result};
-use crate::kafka::connection::{explain, rejection};
-use crate::kafka::groups::{self, GroupDescription};
-use crate::kafka::metadata::{fetch_metadata, is_broker_internal, partition_ids};
-use crate::kafka::offsets::{PartitionKey, committed, committed_by_group, offsets_at, watermarks};
-use crate::kafka::{KafkaClients, TIMEOUT, new_consumer};
+use kui_kafka::connection::{explain, rejection};
+use kui_kafka::groups::{self, GroupDescription};
+use kui_kafka::metadata::{fetch_metadata, is_broker_internal, partition_ids};
+use kui_kafka::offsets::{PartitionKey, committed, committed_by_group, offsets_at, watermarks};
+use kui_kafka::{KafkaClients, TIMEOUT, new_consumer};
 
 pub fn list(clients: &KafkaClients) -> Result<Vec<GroupSummary>> {
     Ok(all_groups(clients)?
@@ -209,7 +209,7 @@ fn all_groups(clients: &KafkaClients) -> Result<Vec<GroupDescription>> {
 
 /// The cluster's reason for turning the connection down, if it did, rather
 /// than the admin request's bare timeout.
-fn connection_error(clients: &KafkaClients, e: Error) -> Error {
+fn connection_error(clients: &KafkaClients, e: kui_kafka::Error) -> kui_kafka::Error {
     rejection(&clients.metadata).unwrap_or(e)
 }
 

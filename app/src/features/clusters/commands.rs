@@ -3,8 +3,8 @@ use tauri::State;
 use super::service;
 use crate::blocking::run_blocking;
 use crate::error::Result;
-use crate::kafka::ClusterConfig;
 use crate::state::AppState;
+use kui_kafka::ClusterConfig;
 
 #[tauri::command]
 pub fn list_clusters(state: State<'_, AppState>) -> Vec<ClusterConfig> {

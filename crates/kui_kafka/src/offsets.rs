@@ -7,7 +7,7 @@ use rdkafka::{Offset, TopicPartitionList};
 
 use super::connection::explain;
 use super::{KafkaConsumer, TIMEOUT, group_offsets};
-use crate::error::Result;
+use crate::Result;
 
 type Admin = AdminClient<DefaultClientContext>;
 

@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, VecDeque};
 
 use super::model::{Message, StartFrom};
-use crate::kafka::offsets::Watermarks;
+use kui_kafka::offsets::Watermarks;
 
 /// Per-partition positions to continue from, keyed by partition id.
 pub type Cursor = BTreeMap<i32, i64>;

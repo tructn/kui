@@ -1,5 +1,5 @@
 [package]
-name = "tql_interpreter"
+name = "kui_tql"
 version = "0.1.0"
 description = "TQL, the topic query language: an interpreter for KUI's message filters"
 license = "MIT"

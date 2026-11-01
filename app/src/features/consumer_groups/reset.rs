@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use super::model::{OffsetChange, ResetTo};
-use crate::kafka::offsets::Watermarks;
+use kui_kafka::offsets::Watermarks;
 
 /// The new committed offset of every partition in `marks`, sorted by partition.
 ///

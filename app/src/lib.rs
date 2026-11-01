@@ -7,7 +7,6 @@ mod blocking;
 mod error;
 mod features;
 mod json_file;
-mod kafka;
 mod settings;
 mod state;
 mod tasks;

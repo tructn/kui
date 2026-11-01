@@ -2,7 +2,7 @@ use serde::{Serialize, Serializer};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{}", crate::kafka::connection::describe(.0))]
+    #[error("{}", kui_kafka::connection::describe(.0))]
     Kafka(#[from] rdkafka::error::KafkaError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -14,6 +14,16 @@ pub enum Error {
     Updater(#[from] tauri_plugin_updater::Error),
     #[error("{0}")]
     Msg(String),
+}
+
+// Kafka-layer errors fold into the matching variants, so callers see one type.
+impl From<kui_kafka::Error> for Error {
+    fn from(e: kui_kafka::Error) -> Self {
+        match e {
+            kui_kafka::Error::Kafka(e) => Error::Kafka(e),
+            kui_kafka::Error::Msg(m) => Error::Msg(m),
+        }
+    }
 }
 
 impl Error {

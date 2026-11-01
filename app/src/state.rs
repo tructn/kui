@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::Result;
 use crate::features::clusters::store::ClusterStore;
-use crate::kafka::KafkaClients;
 use crate::tasks::Tasks;
+use kui_kafka::KafkaClients;
 
 /// Global state managed by Tauri and injected into commands.
 pub struct AppState {

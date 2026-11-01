@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::kafka::ClusterConfig;
+use kui_kafka::ClusterConfig;
 
 /// Holds one secret blob per cluster id.
 pub trait SecretStore: Send + Sync {

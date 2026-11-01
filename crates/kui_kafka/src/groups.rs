@@ -16,7 +16,7 @@ use rdkafka::client::DefaultClientContext;
 
 use super::TIMEOUT;
 use super::group_offsets::cstr;
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 
 type Admin = AdminClient<DefaultClientContext>;
 

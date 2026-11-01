@@ -1,4 +1,4 @@
-// Mirrors `app/src/kafka/cluster.rs`.
+// Mirrors `crates/kui_kafka/src/cluster.rs`.
 
 export const SECURITY_PROTOCOLS = ["PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"] as const;
 export const SASL_MECHANISMS = ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512", "OAUTHBEARER"] as const;

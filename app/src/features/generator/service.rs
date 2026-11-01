@@ -11,9 +11,9 @@ use rdkafka::producer::FutureRecord;
 use super::model::{GenerateProgress, GenerateRequest, GeneratedHeader, GeneratedRecord, Locale, RecordTemplate};
 use super::template::Template;
 use crate::error::{Error, Result};
-use crate::kafka::KafkaClients;
-use crate::kafka::metadata::ensure_writable;
 use crate::tasks::CancelToken;
+use kui_kafka::KafkaClients;
+use kui_kafka::metadata::ensure_writable;
 
 const MAX_COUNT: u64 = 10_000_000;
 const MAX_PREVIEW: usize = 20;

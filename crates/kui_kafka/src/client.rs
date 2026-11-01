@@ -5,7 +5,7 @@ use rdkafka::producer::FutureProducer;
 
 use super::ClusterConfig;
 use super::connection::{ConnectionErrors, KafkaConsumer};
-use crate::error::Result;
+use crate::Result;
 
 /// Long-lived clients for one cluster, cached in `AppState` so we don't
 /// re-bootstrap the connection on every UI request.

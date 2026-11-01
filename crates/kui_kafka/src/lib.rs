@@ -1,9 +1,11 @@
-//! Shared Kafka infrastructure used by every feature.
-//! Features may depend on this module, but never on each other.
+//! Shared Kafka infrastructure for KUI: cluster config, clients, metadata,
+//! offsets and consumer groups. Every app feature builds on this crate, but
+//! features never depend on each other.
 
 mod client;
 mod cluster;
 pub mod connection;
+mod error;
 #[allow(unsafe_code)] // librdkafka call rust-rdkafka does not wrap
 mod group_offsets;
 #[allow(unsafe_code)] // librdkafka calls rust-rdkafka does not wrap
@@ -14,6 +16,7 @@ pub mod offsets;
 pub use client::{KafkaClients, client_config, new_consumer};
 pub use cluster::ClusterConfig;
 pub use connection::KafkaConsumer;
+pub use error::{Error, Result};
 
 use std::time::Duration;
 

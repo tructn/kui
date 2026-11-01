@@ -6,7 +6,7 @@ use rdkafka::types::RDKafkaErrorCode;
 
 use super::connection::{explain, is_unreachable, rejection};
 use super::{KafkaClients, KafkaConsumer, TIMEOUT};
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 
 /// Topics the platform runs on, which KUI shows read-only and never deletes:
 /// Kafka's own (`__consumer_offsets`, `__transaction_state`) and, by

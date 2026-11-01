@@ -2172,6 +2172,8 @@ dependencies = [
  "chrono",
  "fake",
  "keyring",
+ "kui_kafka",
+ "kui_tql",
  "rdkafka",
  "reqwest",
  "rustls",
@@ -2184,8 +2186,26 @@ dependencies = [
  "tauri-plugin-updater",
  "thiserror 2.0.21",
  "tokio",
- "tql_interpreter",
  "uuid",
+]
+
+[[package]]
+name = "kui_kafka"
+version = "0.1.0"
+dependencies = [
+ "rdkafka",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "kui_tql"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4784,15 +4804,6 @@ name = "tower-service"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
-
-[[package]]
-name = "tql_interpreter"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "tracing"

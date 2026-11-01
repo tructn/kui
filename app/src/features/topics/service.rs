@@ -2,9 +2,9 @@ use rdkafka::admin::{NewTopic, ResourceSpecifier, TopicReplication};
 
 use super::model::{DeleteTopicResult, NewTopicRequest, Partition, TopicConfigEntry, TopicSummary};
 use crate::error::{Error, Result};
-use crate::kafka::metadata::{fetch_metadata, is_internal, single_topic};
-use crate::kafka::offsets::{PartitionKey, watermarks};
-use crate::kafka::{KafkaClients, admin_options};
+use kui_kafka::metadata::{fetch_metadata, is_internal, single_topic};
+use kui_kafka::offsets::{PartitionKey, watermarks};
+use kui_kafka::{KafkaClients, admin_options};
 
 pub fn list_topics(clients: &KafkaClients) -> Result<Vec<TopicSummary>> {
     let md = fetch_metadata(clients, None)?;

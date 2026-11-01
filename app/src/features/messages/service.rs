@@ -23,11 +23,11 @@ use super::window::{
 };
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
-use crate::kafka::connection::{ConnectionErrors, explain};
-use crate::kafka::metadata::{ensure_writable, partition_ids};
-use crate::kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
-use crate::kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config};
 use crate::tasks::CancelToken;
+use kui_kafka::connection::{ConnectionErrors, explain};
+use kui_kafka::metadata::{ensure_writable, partition_ids};
+use kui_kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
+use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config};
 
 const MAX_PAGE_SIZE: usize = 1000;
 
@@ -253,7 +253,7 @@ pub fn tail(
     while !cancel.is_cancelled() {
         match consumer.poll(Duration::from_millis(100)) {
             None | Some(Err(KafkaError::PartitionEOF(_))) => {}
-            Some(Err(e)) => return Err(explain(&consumer, e)),
+            Some(Err(e)) => return Err(explain(&consumer, e).into()),
             Some(Ok(m)) => {
                 let message = to_message(&m);
                 if query.as_ref().is_none_or(|q| q.matches(&message)) {
@@ -330,7 +330,7 @@ fn read_until_done(consumer: &KafkaConsumer, mut pending: HashMap<i32, ReadWindo
             Some(Err(KafkaError::PartitionEOF(partition))) => {
                 pending.remove(&partition);
             }
-            Some(Err(e)) => return Err(explain(consumer, e)),
+            Some(Err(e)) => return Err(explain(consumer, e).into()),
             Some(Ok(m)) => {
                 let Some(window) = pending.get(&m.partition()).copied() else {
                     continue;
@@ -456,7 +456,7 @@ fn fetch_one(consumer: &KafkaConsumer, topic: &str, partition: i32, offset: i64)
             Some(Ok(m)) if m.offset() == offset && m.partition() == partition => return Ok(m.detach()),
             // Landed somewhere else: the offset is gone (retention, compaction, deletion).
             Some(Ok(_)) | Some(Err(KafkaError::PartitionEOF(_))) => break,
-            Some(Err(e)) => return Err(explain(consumer, e)),
+            Some(Err(e)) => return Err(explain(consumer, e).into()),
         }
     }
     Err(Error::msg(format!("Message at partition {partition}, offset {offset} no longer exists")))

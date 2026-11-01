@@ -18,9 +18,9 @@ use crate::features::messages::model::{
 };
 use crate::features::topics::model::NewTopicRequest;
 use crate::features::{brokers, clusters, consumer_groups, generator, messages, topics};
-use crate::kafka::ClusterConfig;
-use crate::kafka::{KafkaClients, new_consumer};
 use crate::tasks::Tasks;
+use kui_kafka::ClusterConfig;
+use kui_kafka::{KafkaClients, new_consumer};
 
 fn local_cluster() -> ClusterConfig {
     serde_json::from_value(serde_json::json!({

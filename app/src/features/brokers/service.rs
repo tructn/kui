@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use super::model::{Broker, ClusterOverview};
 use crate::error::Result;
-use crate::kafka::KafkaClients;
-use crate::kafka::metadata::fetch_metadata;
+use kui_kafka::KafkaClients;
+use kui_kafka::metadata::fetch_metadata;
 
 pub fn cluster_overview(clients: &KafkaClients) -> Result<ClusterOverview> {
     let md = fetch_metadata(clients, None)?;

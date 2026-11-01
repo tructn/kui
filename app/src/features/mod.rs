@@ -4,7 +4,7 @@
 //! - `service.rs`  – the Kafka logic; plain Rust, no Tauri
 //! - `commands.rs` – thin `#[tauri::command]` adapters that call the service
 //!
-//! Features only depend on `crate::kafka` (shared infra), never on each other.
+//! Features only depend on `kui_kafka` (shared infra), never on each other.
 //! Even `ClusterConfig`, which every feature takes as input, lives in `kafka`.
 
 pub mod brokers;

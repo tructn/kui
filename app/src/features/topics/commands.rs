@@ -4,8 +4,8 @@ use super::model::{DeleteTopicResult, NewTopicRequest, TopicDetail, TopicSummary
 use super::service;
 use crate::blocking::run_blocking;
 use crate::error::Result;
-use crate::kafka::metadata::is_internal;
 use crate::state::AppState;
+use kui_kafka::metadata::is_internal;
 
 #[tauri::command]
 pub async fn list_topics(state: State<'_, AppState>, cluster_id: String) -> Result<Vec<TopicSummary>> {

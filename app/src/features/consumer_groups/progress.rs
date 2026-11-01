@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::model::{PartitionOffset, PartitionStatus, TopicProgress};
-use crate::kafka::offsets::{PartitionKey, Watermarks};
+use kui_kafka::offsets::{PartitionKey, Watermarks};
 
 pub fn status(marks: Watermarks, committed: Option<i64>) -> PartitionStatus {
     match committed {

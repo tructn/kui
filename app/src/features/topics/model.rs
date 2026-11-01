@@ -41,7 +41,7 @@ pub struct TopicConfigEntry {
 #[serde(rename_all = "camelCase")]
 pub struct TopicDetail {
     pub name: String,
-    /// Kafka's or a platform tool's topic; shown read-only (see `kafka::metadata::is_internal`).
+    /// Kafka's or a platform tool's topic; shown read-only (see `kui_kafka::metadata::is_internal`).
     pub internal: bool,
     pub partitions: Vec<Partition>,
     pub configs: Vec<TopicConfigEntry>,
