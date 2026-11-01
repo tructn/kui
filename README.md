@@ -58,15 +58,19 @@ Search every topic from anywhere with <kbd>⌘</kbd> <kbd>K</kbd>, or filter the
 See each topic's partitions, replicas and message count at a glance, create and delete topics, and copy a
 topic's name with one click. A Brokers page shows the machines your cluster runs on.
 
-### Read messages the way you want
+### Read and filter messages
 
-<img src="docs/screenshots/02_messages.png" alt="The messages of a topic, with one row expanded" width="820" />
+<img src="docs/screenshots/02_messages.png" alt="A topic's messages filtered with a query in the expanded editor" width="820" />
 
 - Start from the newest or oldest message, or **watch new ones arrive live**.
 - Expand any row to see its key, headers and value side by side. Values show as formatted JSON or Base64.
-- **Filter with SQL-like queries**, e.g. `value.status = 'shipped' AND value.items[*].qty > 3`. Suggestions
-  come from the topic's own messages, so they know every field even when messages differ in shape. See the
-  [query guide](crates/kui_tql/README.md).
+- **Filter with SQL-like queries**, e.g. `value.status = 'shipped' AND value.items[*].qty > 3`. Suggestions for
+  fields, operators and values come from the topic's own messages, so they know every field even when messages
+  differ in shape. Press <kbd>Tab</kbd> or <kbd>Enter</kbd> to pick one, or <kbd>⌘</kbd> <kbd>L</kbd>
+  (<kbd>Ctrl</kbd> <kbd>Space</kbd> on Windows) to open the list. Mistakes are underlined as you type.
+- **Expand the filter** into a multi-line editor with line numbers for longer queries. There, <kbd>Enter</kbd>
+  adds a line and <kbd>⌘</kbd> <kbd>Enter</kbd> (<kbd>Ctrl</kbd> <kbd>Enter</kbd> on Windows) runs it. See the
+  [query guide](crates/kui_tql/README.md) for the full syntax.
 - **Export** messages to JSON, NDJSON or CSV.
 - **Copy** one or many messages to another topic, which is handy for replaying a message or moving test data.
 
