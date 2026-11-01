@@ -1,5 +1,5 @@
 import { XIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { emptyText, ErrorState } from "@/components/query-states";
 import { ShortcutHint } from "@/components/shortcut-hint";
@@ -13,13 +13,15 @@ import { useShortcut } from "@/hooks/use-shortcut";
 import { formatNumber } from "@/lib/format";
 
 import { LIVE_LIMIT, useLiveTail } from "../live-tail";
-import { useBrowseMessages } from "../queries";
+import { useFieldCatalog } from "../query/use-field-catalog";
+import { useBrowseMessages, useMessageSample } from "../queries";
 import type { BrowseCursor, BrowseFilters, BrowsePage, CopyTarget, KafkaMessage, MessageRef } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
 import { ExportMessagesDialog } from "./export-messages-dialog";
 import { MessageFilters } from "./message-filters";
 import { MessageSheet } from "./message-sheet";
 import { MessageTable } from "./message-table";
+import { QueryBar } from "./query-bar";
 
 interface MessageBrowserProps {
   clusterId: string;
@@ -33,7 +35,13 @@ interface MessageBrowserProps {
 
 /** Filter toolbar + message table + detail sheet for one topic, with an optional live tail. */
 export function MessageBrowser({ clusterId, topic, partitions, copyTargets, readOnly = false }: MessageBrowserProps) {
-  const [filters, setFilters] = useState<BrowseFilters>({ topic, partition: null, from: "latest", value: null });
+  const [filters, setFilters] = useState<BrowseFilters>({
+    topic,
+    partition: null,
+    from: "latest",
+    value: null,
+    query: null,
+  });
   const pageSize = useTablePrefs((s) => s.messagePageSize);
   const setPageSize = useTablePrefs((s) => s.setMessagePageSize);
   // cursors[i] reads page i, so stepping back reuses the cursor that led to a page.
@@ -45,7 +53,18 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
   const [checked, setChecked] = useState<ReadonlyMap<string, MessageRef>>(new Map());
   const request = { ...filters, pageSize, cursor: cursors[page] };
   const messages = useBrowseMessages(clusterId, request);
-  const tail = useLiveTail(clusterId, topic, filters.partition, live);
+  const tail = useLiveTail(clusterId, topic, filters.partition, filters.query, live);
+
+  // Query suggestions learn fields from recent messages plus whatever is on screen.
+  const [sampling, setSampling] = useState(false);
+  const sample = useMessageSample(clusterId, topic, sampling);
+  const shown = messages.data?.messages;
+  const sources = useMemo(
+    () => [sample.data?.messages ?? [], shown ?? [], tail.messages],
+    [sample.data, shown, tail.messages],
+  );
+  const getCatalog = useFieldCatalog(sources);
+  const scanned = messages.data?.scanned ?? null;
 
   function toggleLive(on: boolean) {
     setLive(on);
@@ -108,6 +127,22 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
         </div>
       </div>
 
+      <QueryBar
+        query={filters.query}
+        onApply={(query) => {
+          setFilters((f) => ({ ...f, query }));
+          setCursors([null]);
+        }}
+        getCatalog={getCatalog}
+        onFocus={() => setSampling(true)}
+      />
+      {filters.query && !live && scanned !== null && !messages.isPlaceholderData && (
+        <p data-testid="search-status" className="-mt-1 px-1 text-xs text-muted-foreground">
+          Searched {formatNumber(scanned)} {scanned === 1 ? "message" : "messages"} for this page
+          {next && pager.items.length < pageSize && " · stopped early to stay responsive; the next page keeps searching"}
+        </p>
+      )}
+
       {checked.size > 0 && !live && (
         <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm">
           <span>
@@ -135,7 +170,9 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
             onSelect={setSelected}
             animate
             emptyText={
-              filters.partition == null
+              filters.query
+                ? "Waiting for new messages that match the filter…"
+                : filters.partition == null
                 ? "Waiting for new messages…"
                 : `Waiting for new messages on partition ${filters.partition}…`
             }
@@ -151,7 +188,14 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
             onSelect={setSelected}
             checked={readOnly ? undefined : checked}
             onCheckedChange={setChecked}
-            emptyText={emptyText(messages, "No messages in this range.")}
+            emptyText={emptyText(
+              messages,
+              !filters.query
+                ? "No messages in this range."
+                : next
+                  ? "No matches yet. The next page keeps searching."
+                  : "No messages match the filter.",
+            )}
           />
         </>
       )}
@@ -168,7 +212,7 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
 }
 
 /** Stands in for the first page until it loads, so the table can render empty. */
-const EMPTY_PAGE: BrowsePage = { messages: [], total: 0, next: null };
+const EMPTY_PAGE: BrowsePage = { messages: [], total: 0, next: null, scanned: null };
 
 /** Adapts one server page to the table's pager; `page` is 0-based. */
 function serverPager(
@@ -179,6 +223,23 @@ function serverPager(
   actions: Pick<Pager<KafkaMessage>, "setPage" | "setPageSize">,
 ): Pager<KafkaMessage> {
   const from = data.messages.length === 0 ? 0 : page * pageSize + 1;
+  // Search pages can come back short, so there is no reliable total or position.
+  if (data.scanned !== null) {
+    const count = data.messages.length;
+    return {
+      items: data.messages,
+      page,
+      pageCount: page + (hasNext ? 2 : 1),
+      from: count === 0 ? 0 : 1,
+      to: count,
+      total: count,
+      pageSize,
+      hasNext,
+      unknownTotal: true,
+      summary: count === 0 ? "No matches on this page" : `${formatNumber(count)} ${count === 1 ? "match" : "matches"}`,
+      ...actions,
+    };
+  }
   return {
     items: data.messages,
     page,

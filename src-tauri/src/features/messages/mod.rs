@@ -8,5 +8,6 @@ mod codec;
 pub mod commands;
 mod export;
 pub mod model;
+mod query;
 pub mod service;
 mod window;

@@ -11,6 +11,7 @@ import type {
   ExportRequest,
   KafkaMessage,
   ProduceRequest,
+  QueryProblem,
   TailRequest,
 } from "./types";
 
@@ -24,6 +25,8 @@ export const messagesApi = {
   /** Asks where to save, then writes the file. null when the user cancels the save window. */
   export: (clusterId: string, request: ExportRequest) =>
     callCommand<Exported | null>("export_messages", { clusterId, request }),
+  /** Parses a filter without reading anything: null when valid. */
+  checkQuery: (query: string) => callCommand<QueryProblem | null>("check_message_query", { query }),
   /** Streams new messages in batches until cancelled. */
   tail: (clusterId: string, request: TailRequest, onBatch: (batch: KafkaMessage[]) => void) =>
     startStream<KafkaMessage[]>("tail_messages", { clusterId, request }, onBatch),

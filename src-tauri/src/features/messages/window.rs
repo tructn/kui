@@ -104,9 +104,33 @@ pub fn merge_page(reads: Vec<PartitionRead>, size: usize, backward: bool) -> (Ve
     (page, cursor)
 }
 
+/// The cursor after reading only part of a page that began at `previous`.
+///
+/// `consumed` holds `(partition, offset)` of the messages actually used, in page
+/// order. A search that fills up mid-page stops there, so the next search starts
+/// right after the last message it looked at instead of skipping the rest.
+pub fn resume_after(previous: &Cursor, consumed: &[(i32, i64)], backward: bool) -> Cursor {
+    let mut cursor = previous.clone();
+    for &(partition, offset) in consumed {
+        // Reading backward the cursor is an exclusive upper bound, so `offset` is next-below.
+        cursor.insert(partition, if backward { offset } else { offset + 1 });
+    }
+    cursor
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resuming_mid_page_continues_after_the_last_message_used() {
+        let previous = Cursor::from([(0, 50), (1, 80)]);
+        let forward = resume_after(&previous, &[(0, 50), (1, 80), (0, 51)], false);
+        assert_eq!(forward, Cursor::from([(0, 52), (1, 81)]));
+        // Backward from 50/80: used 0@49 and 0@48 only, so partition 1 hasn't moved.
+        let backward = resume_after(&previous, &[(0, 49), (0, 48)], true);
+        assert_eq!(backward, Cursor::from([(0, 48), (1, 80)]));
+    }
 
     const MARKS: Watermarks = Watermarks { low: 10, high: 110 };
 

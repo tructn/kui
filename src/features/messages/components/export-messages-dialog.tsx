@@ -166,7 +166,8 @@ export function ExportMessagesDialog({ clusterId, request, pageCount, selected, 
 
 /** The "everything matching" option, worded after where the browse starts. */
 function rangeLabel(request: BrowseRequest): string {
-  const where = request.partition == null ? "" : ` on partition ${request.partition}`;
+  const where =
+    (request.partition == null ? "" : ` on partition ${request.partition}`) + (request.query ? ", matching the filter" : "");
   switch (request.from) {
     case "latest":
       return `Newest first${where}`;

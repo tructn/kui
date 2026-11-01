@@ -64,6 +64,9 @@ topic's name with one click. A Brokers page shows the machines your cluster runs
 
 - Start from the newest or oldest message, or **watch new ones arrive live**.
 - Expand any row to see its key, headers and value side by side. Values show as formatted JSON or Base64.
+- **Filter with SQL-like queries**, e.g. `value.status = 'shipped' AND value.items[*].qty > 3`. Suggestions
+  come from the topic's own messages, so they know every field even when messages differ in shape. See the
+  [query guide](docs/message-query.md).
 - **Export** messages to JSON, NDJSON or CSV.
 - **Copy** one or many messages to another topic, which is handy for replaying a message or moving test data.
 

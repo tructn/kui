@@ -12,7 +12,13 @@ export const LIVE_LIMIT = 1000;
  * This is streaming state, not cached server state, so it lives in a hook
  * instead of React Query. Turning it off (or unmounting) stops the Rust consumer.
  */
-export function useLiveTail(clusterId: string, topic: string, partition: number | null, enabled: boolean) {
+export function useLiveTail(
+  clusterId: string,
+  topic: string,
+  partition: number | null,
+  query: string | null,
+  enabled: boolean,
+) {
   const [messages, setMessages] = useState<KafkaMessage[]>([]);
   const [received, setReceived] = useState(0);
   const [error, setError] = useState<Error | null>(null);
@@ -22,13 +28,13 @@ export function useLiveTail(clusterId: string, topic: string, partition: number 
     setMessages([]);
     setReceived(0);
     setError(null);
-    const task = messagesApi.tail(clusterId, { topic, partition }, (batch) => {
+    const task = messagesApi.tail(clusterId, { topic, partition, query }, (batch) => {
       setReceived((n) => n + batch.length);
       setMessages((previous) => [...batch.reverse(), ...previous].slice(0, LIVE_LIMIT));
     });
     task.result.catch(setError);
     return () => void task.cancel();
-  }, [clusterId, topic, partition, enabled]);
+  }, [clusterId, topic, partition, query, enabled]);
 
   return { messages, received, error };
 }

@@ -5,6 +5,7 @@ use tauri_plugin_dialog::DialogExt;
 use super::model::{
     BrowsePage, BrowseRequest, CopyRequest, Delivered, ExportRequest, Exported, Message, ProduceRequest, TailRequest,
 };
+use super::query::{Query, QueryError};
 use super::service;
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
@@ -39,6 +40,13 @@ pub async fn copy_messages(
 ) -> Result<Vec<Delivered>> {
     let clients = state.clients(&cluster_id)?;
     service::copy(clients, &request).await
+}
+
+/// Checks a message filter as the user types: `None` when it parses, otherwise
+/// what's wrong and where. Pure parsing, nothing is read from Kafka.
+#[tauri::command]
+pub fn check_message_query(query: String) -> Option<QueryError> {
+    Query::parse(&query).err()
 }
 
 /// Streams new messages to `channel` until `cancel_task(task_id)` is called.

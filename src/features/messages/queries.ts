@@ -22,6 +22,28 @@ export function useBrowseMessages(clusterId: string, request: BrowseRequest) {
   });
 }
 
+/** How many recent messages are read to learn a topic's fields for query suggestions. */
+const SAMPLE_SIZE = 500;
+
+/** The newest messages of a topic, read once the query bar is first used. */
+export function useMessageSample(clusterId: string, topic: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...messageKeys.topic(clusterId, topic), "sample"],
+    queryFn: () =>
+      messagesApi.browse(clusterId, {
+        topic,
+        partition: null,
+        from: "latest",
+        value: null,
+        query: null,
+        pageSize: SAMPLE_SIZE,
+        cursor: null,
+      }),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
 export function useProduceMessage(clusterId: string) {
   const queryClient = useQueryClient();
   return useMutation({

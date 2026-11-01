@@ -28,6 +28,9 @@ pub struct BrowseRequest {
     /// Where to continue: `BrowsePage::next` of the previous page. `None` reads the first page.
     #[serde(default)]
     pub cursor: Option<BTreeMap<i32, i64>>,
+    /// Filter (see `query`); blank or `None` returns every message.
+    #[serde(default)]
+    pub query: Option<String>,
 }
 
 /// One page of a topic, newest first for `StartFrom::Latest`, otherwise oldest first.
@@ -40,6 +43,10 @@ pub struct BrowsePage {
     pub total: i64,
     /// Cursor for the following page, or `None` on the last one.
     pub next: Option<BTreeMap<i32, i64>>,
+    /// With a query: how many messages were read to find this page's matches.
+    /// A page can come back short (or empty) when the search budget ran out
+    /// before the topic did; `next` then continues the search.
+    pub scanned: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -48,6 +55,9 @@ pub struct TailRequest {
     pub topic: String,
     /// `None` means all partitions.
     pub partition: Option<i32>,
+    /// Only stream messages matching this filter.
+    #[serde(default)]
+    pub query: Option<String>,
 }
 
 /// Message bytes rendered for display.

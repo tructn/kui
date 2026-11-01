@@ -85,6 +85,7 @@ async fn full_round_trip() {
         value,
         page_size,
         cursor: None,
+        query: None,
     };
     let offsets = |page: &messages::model::BrowsePage| page.messages.iter().map(|m| m.offset).collect::<Vec<_>>();
     let latest = messages::service::browse(&clients, &browse(StartFrom::Latest, None, 3)).unwrap();
@@ -106,6 +107,21 @@ async fn full_round_trip() {
 
     let from_time = messages::service::browse(&clients, &browse(StartFrom::Timestamp, Some(0), 100)).unwrap();
     assert_eq!(from_time.messages.len(), 10);
+
+    // Search: pages hold only matches, and each resumes right after the last message read.
+    let search = |cursor| BrowseRequest {
+        cursor,
+        query: Some("value.n >= 3 AND value.n != 5".into()),
+        ..browse(StartFrom::Earliest, None, 2)
+    };
+    let found = messages::service::browse(&clients, &search(None)).unwrap();
+    assert_eq!((offsets(&found), found.scanned), (vec![3, 4], Some(5)));
+    let found = messages::service::browse(&clients, &search(found.next.clone())).unwrap();
+    assert_eq!(offsets(&found), vec![6, 7]);
+    let found = messages::service::browse(&clients, &search(found.next.clone())).unwrap();
+    assert_eq!((offsets(&found), found.next), (vec![8, 9], None));
+    let bad = BrowseRequest { query: Some("value.n >".into()), ..browse(StartFrom::Earliest, None, 2) };
+    assert!(messages::service::browse(&clients, &bad).is_err());
 
     // Consumer group with a committed offset of 4 → lag 6
     let group = format!("kui-it-group-{}", uuid::Uuid::new_v4());
@@ -186,6 +202,7 @@ async fn copy_messages() {
             value: None,
             page_size: 100,
             cursor: None,
+            query: None,
         };
         messages::service::browse(&clients, &request).unwrap().messages
     };
@@ -236,7 +253,7 @@ async fn live_tail_sees_generated_records() {
     let (tail_clients, tail_topic) = (clients.clone(), topic.clone());
     let tail = std::thread::spawn(move || {
         let mut seen = Vec::new();
-        let request = TailRequest { topic: tail_topic, partition: None };
+        let request = TailRequest { topic: tail_topic, partition: None, query: None };
         messages::service::tail(&tail_clients, &request, &tail_cancel, |batch| {
             seen.extend(batch);
             true
@@ -306,6 +323,7 @@ async fn export_messages() {
                 value: None,
                 page_size: 50,
                 cursor: None,
+                query: None,
             },
             limit,
         },

@@ -10,6 +10,10 @@ export interface Pager<T> extends Page<T> {
    * whether a next page exists. The "last page" button is then hidden.
    */
   hasNext?: boolean;
+  /** The total isn't known (e.g. search results): show the range and page number only. */
+  unknownTotal?: boolean;
+  /** Replaces the "1–50 of 1,234" text, e.g. for search results. */
+  summary?: string;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
 }

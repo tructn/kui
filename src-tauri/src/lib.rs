@@ -62,6 +62,7 @@ pub fn run() {
             messages::commands::copy_messages,
             messages::commands::tail_messages,
             messages::commands::export_messages,
+            messages::commands::check_message_query,
             generator::commands::list_generators,
             generator::commands::preview_records,
             generator::commands::generate_records,

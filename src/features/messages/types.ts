@@ -10,6 +10,8 @@ export interface BrowseFilters {
   from: StartFrom;
   /** Offset for "offset", epoch millis for "timestamp". */
   value: number | null;
+  /** SQL-like filter (see `src-tauri/src/features/messages/query`); null = every message. */
+  query: string | null;
 }
 
 /** Per partition, the position the next page continues from (opaque to the UI). */
@@ -28,12 +30,26 @@ export interface BrowsePage {
   total: number;
   /** Cursor for the following page; null on the last one. */
   next: BrowseCursor | null;
+  /**
+   * With a query: how many messages were read to find this page's matches. A
+   * search stops at a budget, so a page can be short or empty while `next` remains.
+   */
+  scanned: number | null;
 }
 
 export interface TailRequest {
   topic: string;
   /** null = all partitions */
   partition: number | null;
+  /** Only stream messages matching this filter. */
+  query: string | null;
+}
+
+/** Why a query doesn't parse; `start`/`end` index into the query text. */
+export interface QueryProblem {
+  message: string;
+  start: number;
+  end: number;
 }
 
 export interface Payload {

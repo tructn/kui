@@ -17,7 +17,10 @@ use super::model::{
     BrowsePage, BrowseRequest, CopyRequest, Delivered, ExportRequest, ExportSource, Message, MessageHeader,
     ProduceRequest, StartFrom, TailRequest,
 };
-use super::window::{PartitionRead, ReadWindow, merge_page, page_window, remaining, start_position};
+use super::query::Query;
+use super::window::{
+    Cursor, PartitionRead, ReadWindow, merge_page, page_window, remaining, resume_after, start_position,
+};
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
 use crate::kafka::connection::{ConnectionErrors, explain};
@@ -39,45 +42,115 @@ pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowseP
 
 /// `browse` on an existing browsing consumer, so several pages can share one.
 fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<BrowsePage> {
+    // Parse first: a typo should fail fast, before any reading.
+    let query = Query::optional(request.query.as_deref())?;
     let size = request.page_size.clamp(1, MAX_PAGE_SIZE);
     let backward = request.from == StartFrom::Latest;
 
     let partitions = plan_partitions(consumer, request)?;
     let total = partitions.iter().map(|p| remaining(p.start, p.marks, backward)).sum();
-    let position = |p: &PartitionPlan| request.cursor.as_ref().and_then(|c| c.get(&p.id)).copied().unwrap_or(p.start);
-
-    let windows: HashMap<i32, ReadWindow> = partitions
+    let start: Cursor = partitions
         .iter()
-        .filter_map(|p| Some((p.id, page_window(position(p), p.marks, size as i64, backward)?)))
+        .map(|p| (p.id, request.cursor.as_ref().and_then(|c| c.get(&p.id)).copied().unwrap_or(p.start)))
         .collect();
-    let mut by_partition: HashMap<i32, Vec<Message>> = HashMap::new();
-    if !windows.is_empty() {
-        let mut assignment = TopicPartitionList::new();
-        for (partition, window) in &windows {
-            assignment.add_partition_offset(&request.topic, *partition, Offset::Offset(window.start))?;
+    let reader = PageReader { consumer, topic: &request.topic, partitions: &partitions, backward };
+
+    let Some(query) = query else {
+        let (messages, next) = reader.read(&start, size)?;
+        return Ok(BrowsePage { messages, total, next, scanned: None });
+    };
+
+    // Search: read raw pages and keep the matches until the page is full, the
+    // topic ends, or the budget runs out (the UI offers to keep going from `next`).
+    let deadline = Instant::now() + SEARCH_TIME_BUDGET;
+    let mut matches = Vec::with_capacity(size);
+    let mut scanned = 0u64;
+    let mut cursor = start;
+    loop {
+        let (raw, next) = reader.read(&cursor, SEARCH_CHUNK)?;
+        let mut consumed = Vec::with_capacity(raw.len());
+        for message in raw {
+            scanned += 1;
+            consumed.push((message.partition, message.offset));
+            if query.matches(&message) {
+                matches.push(message);
+                if matches.len() == size {
+                    break;
+                }
+            }
         }
-        consumer.assign(&assignment)?;
-        for message in read_until_done(consumer, windows.clone())? {
-            by_partition.entry(message.partition).or_default().push(message);
+        if matches.len() == size {
+            // Full mid-chunk: resume right after the last message looked at.
+            let resumed = resume_after(&cursor, &consumed, backward);
+            let more = partitions.iter().any(|p| remaining(resumed[&p.id], p.marks, backward) > 0);
+            return Ok(BrowsePage { messages: matches, total, next: more.then_some(resumed), scanned: Some(scanned) });
+        }
+        let Some(next) = next else {
+            return Ok(BrowsePage { messages: matches, total, next: None, scanned: Some(scanned) });
+        };
+        // Out of budget, or no progress (so it can never spin): hand back what we have.
+        let stalled = consumed.is_empty() && next == cursor;
+        cursor = next;
+        if stalled || scanned >= SEARCH_SCAN_BUDGET || Instant::now() >= deadline {
+            return Ok(BrowsePage { messages: matches, total, next: Some(cursor), scanned: Some(scanned) });
         }
     }
+}
 
-    let reads = windows
-        .into_iter()
-        .map(|(partition, window)| {
-            let mut messages = by_partition.remove(&partition).unwrap_or_default();
-            messages.sort_by_key(|m| m.offset);
-            PartitionRead { partition, window, messages }
-        })
-        .collect();
-    let (messages, mut next) = merge_page(reads, size, backward);
+/// How many messages a search reads at a time.
+const SEARCH_CHUNK: usize = 500;
+/// Most messages one page of search results reads before handing back what it found.
+const SEARCH_SCAN_BUDGET: u64 = 50_000;
+/// …or how long it may take, so the UI stays responsive on slow clusters.
+const SEARCH_TIME_BUDGET: Duration = Duration::from_secs(5);
 
-    // Partitions that had nothing to read stay where they were.
-    for p in &partitions {
-        next.entry(p.id).or_insert_with(|| position(p).clamp(p.marks.low, p.marks.high));
+/// Reads raw pages of one topic's planned partitions.
+struct PageReader<'a> {
+    consumer: &'a KafkaConsumer,
+    topic: &'a str,
+    partitions: &'a [PartitionPlan],
+    backward: bool,
+}
+
+impl PageReader<'_> {
+    /// Up to `size` messages from `cursor` (a position for every partition), and
+    /// the cursor after them, or `None` when nothing is left.
+    fn read(&self, cursor: &Cursor, size: usize) -> Result<(Vec<Message>, Option<Cursor>)> {
+        let backward = self.backward;
+        let windows: HashMap<i32, ReadWindow> = self
+            .partitions
+            .iter()
+            .filter_map(|p| Some((p.id, page_window(cursor[&p.id], p.marks, size as i64, backward)?)))
+            .collect();
+        let mut by_partition: HashMap<i32, Vec<Message>> = HashMap::new();
+        if !windows.is_empty() {
+            let mut assignment = TopicPartitionList::new();
+            for (partition, window) in &windows {
+                assignment.add_partition_offset(self.topic, *partition, Offset::Offset(window.start))?;
+            }
+            self.consumer.assign(&assignment)?;
+            for message in read_until_done(self.consumer, windows.clone())? {
+                by_partition.entry(message.partition).or_default().push(message);
+            }
+        }
+
+        let reads = windows
+            .into_iter()
+            .map(|(partition, window)| {
+                let mut messages = by_partition.remove(&partition).unwrap_or_default();
+                messages.sort_by_key(|m| m.offset);
+                PartitionRead { partition, window, messages }
+            })
+            .collect();
+        let (messages, mut next) = merge_page(reads, size, backward);
+
+        // Partitions that had nothing to read stay where they were.
+        for p in self.partitions {
+            next.entry(p.id).or_insert_with(|| cursor[&p.id].clamp(p.marks.low, p.marks.high));
+        }
+        let more = self.partitions.iter().any(|p| remaining(next[&p.id], p.marks, backward) > 0);
+        Ok((messages, more.then_some(next)))
     }
-    let more = partitions.iter().any(|p| remaining(next[&p.id], p.marks, backward) > 0);
-    Ok(BrowsePage { messages, total, next: more.then_some(next) })
 }
 
 /// Most messages one export reads.
@@ -162,6 +235,7 @@ pub fn tail(
     cancel: &CancelToken,
     mut emit: impl FnMut(Vec<Message>) -> bool,
 ) -> Result<()> {
+    let query = Query::optional(request.query.as_deref())?;
     let consumer = browsing_consumer(clients)?;
     let mut assignment = TopicPartitionList::new();
     for id in partition_ids(&consumer, &request.topic)? {
@@ -180,7 +254,12 @@ pub fn tail(
         match consumer.poll(Duration::from_millis(100)) {
             None | Some(Err(KafkaError::PartitionEOF(_))) => {}
             Some(Err(e)) => return Err(explain(&consumer, e)),
-            Some(Ok(m)) => batch.push(to_message(&m)),
+            Some(Ok(m)) => {
+                let message = to_message(&m);
+                if query.as_ref().is_none_or(|q| q.matches(&message)) {
+                    batch.push(message);
+                }
+            }
         }
         let due = last_flush.elapsed() >= TAIL_FLUSH_EVERY || batch.len() >= TAIL_MAX_BATCH;
         if due && !batch.is_empty() {

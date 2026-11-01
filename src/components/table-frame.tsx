@@ -50,7 +50,7 @@ export function TableFrame({ children, pager, fill = true, className }: TableFra
 
 /** `shortcuts`: [ and ] page through this table (only the page's main table gets them). */
 function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcuts: boolean }) {
-  const { page, pageCount, from, to, total, pageSize, hasNext, setPage, setPageSize } = pager;
+  const { page, pageCount, from, to, total, pageSize, hasNext, unknownTotal, summary, setPage, setPageSize } = pager;
   const first = page === 0;
   const last = hasNext === undefined ? page >= pageCount - 1 : !hasNext;
   useShortcut("[", () => !first && setPage(page - 1), shortcuts);
@@ -59,7 +59,14 @@ function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcut
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-3 py-1.5 text-xs text-muted-foreground">
       <span className="tabular-nums" aria-live="polite">
-        {total === 0 ? "No rows" : `${formatNumber(from)}–${formatNumber(to)} of ${formatNumber(total)}`}
+        {summary ??
+          (unknownTotal
+          ? to === 0
+            ? "No rows"
+            : `${formatNumber(from)}–${formatNumber(to)}`
+          : total === 0
+            ? "No rows"
+            : `${formatNumber(from)}–${formatNumber(to)} of ${formatNumber(total)}`)}
       </span>
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
@@ -78,7 +85,8 @@ function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcut
           </Select>
         </div>
         <span className="tabular-nums">
-          Page {page + 1} of {pageCount}
+          Page {page + 1}
+          {!unknownTotal && ` of ${pageCount}`}
         </span>
         <div className="flex items-center gap-0.5">
           <Button variant="ghost" size="icon-xs" aria-label="First page" disabled={first} onClick={() => setPage(0)}>
