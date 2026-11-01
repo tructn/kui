@@ -1,16 +1,45 @@
-# TQL: Compiler Design
+# tql_compiler
 
-KUI filters a topic's messages with **TQL**, the *topic query language*: a SQL-like condition, the part of a
-query that would follow `WHERE`:
+The compiler for **TQL**, the *topic query language*: the SQL-like filter KUI uses to search a Kafka topic's
+messages. A query is the part of SQL that would follow `WHERE`:
 
 ```sql
 value.status = 'shipped' AND value.items[*].qty > 3
 ```
 
-Type it in the filter bar above the message table and press **Enter** (or **Apply**). The filter applies to
-browsing, to the **live tail**, and to **exports** of a range, so an export saves only the matching messages.
+In the app, you type it in the filter bar above the message table and press **Enter** (or **Apply**). The
+filter applies to browsing, to the **live tail**, and to **exports** of a range, so an export saves only the
+matching messages.
 
-This one document covers the language from three angles. Pick the part that fits you:
+## At a glance
+
+The crate parses a query once, then tests it against each message. It has no Kafka or Tauri dependencies:
+messages come in through the `Record` trait, which KUI implements for its `Message` type in
+`app/src/features/messages/query.rs`.
+
+```rust
+use tql_compiler::Query;
+
+let query = Query::parse("value.status = 'shipped' AND headers.source = 'web'")?; // Err(QueryError) on a typo
+if query.matches(&message) {                                                     // any `impl Record`
+    // keep it
+}
+```
+
+| Item | What it is |
+| ---- | ---------- |
+| `Query::parse(&str)` | Lexes and parses a query; `QueryError { message, start, end }` points at the problem (UTF-16 offsets) |
+| `Query::matches(&impl Record)` | Runs the parsed query against one message |
+| `Record` | What a message must provide: `partition`, `offset`, `timestamp`, `key`, `value`, `headers` |
+| `Payload { text, utf8 }` | A key or value as displayed; only `utf8` text is tried as JSON |
+
+```sh
+cargo test -p tql_compiler   # all lexer, parser and evaluator tests, in seconds
+```
+
+File paths in this guide are relative to the repository root.
+
+This guide covers the language from three angles. Pick the part that fits you:
 
 | Part | For | What's in it |
 | ---- | --- | ------------ |
@@ -23,6 +52,7 @@ vocabulary. Everything after that can be read on its own, next to the source fil
 
 ## Contents
 
+- [At a glance](#at-a-glance)
 - [Part I: Using the language](#part-i-using-the-language)
   - [Fields](#fields) · [Operators](#operators) · [Values](#values) · [Functions](#functions) ·
     [Messages of different shapes](#messages-of-different-shapes) · [Comparing by meaning](#comparing-by-meaning) ·

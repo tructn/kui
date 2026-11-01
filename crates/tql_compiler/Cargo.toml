@@ -3,6 +3,7 @@ name = "tql_compiler"
 version = "0.1.0"
 description = "TQL, the topic query language: parses and evaluates KUI's message filters"
 license = "MIT"
+readme = "README.md"
 edition = "2024"
 publish = false
 

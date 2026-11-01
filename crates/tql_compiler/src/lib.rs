@@ -11,6 +11,8 @@
 //! come in through the [`Record`] trait, so this crate knows nothing about
 //! Kafka clients. The UI's completion (`frontend/features/messages/query/`)
 //! mirrors the field roots, operators and functions defined here.
+//!
+//! The language, its design and a walkthrough of this code are in README.md.
 
 mod evaluate;
 mod lexer;
