@@ -6,6 +6,21 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.16](https://github.com/tructn/kui/compare/v0.1.0-alpha.15...v0.1.0-alpha.16) (2026-11-01)
+
+
+### Added
+
+* **messages:** accept query suggestions with Tab ([8b6bebd](https://github.com/tructn/kui/commit/8b6bebda47d418336cba288e4e8be8ce60146629))
+* **messages:** expandable multi-line filter editor ([e5846fe](https://github.com/tructn/kui/commit/e5846fed66b8a0443dd0d425e7f1379c77288c52))
+* **messages:** filter messages with SQL-like queries ([020ef12](https://github.com/tructn/kui/commit/020ef12385ef84237d0efdf2dd2bd5a4699c9331))
+* **messages:** open query suggestions only when typing or asked ([eecd526](https://github.com/tructn/kui/commit/eecd526abc2e5fb5f6bd4679beb0845f90ca19fc))
+
+
+### Fixed
+
+* **deps:** resolve security audit failures ([e3d49ab](https://github.com/tructn/kui/commit/e3d49abac45cfe677a6bb73a89f57532cec84ec9))
+
 ## [0.1.0-alpha.15](https://github.com/tructn/kui/compare/v0.1.0-alpha.14...v0.1.0-alpha.15) (2026-10-24)
 
 
