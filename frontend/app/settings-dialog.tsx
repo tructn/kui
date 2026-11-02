@@ -17,20 +17,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-import { ToggleGroup } from "radix-ui";
 
 import {
-  ACCENTS,
   CODE_FONT_SIZES,
   CODE_FONTS,
   UI_FONTS,
   useAppearance,
-  type Accent,
   type CodeFont,
   type UiFont,
 } from "./stores/appearance-store";
+import { AccentPicker } from "@/components/accent-picker";
 import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
 import { useShortcut } from "@/hooks/use-shortcut";
 
@@ -215,35 +211,6 @@ function AppearanceSettings() {
         </SettingsGroup>
       </section>
     </div>
-  );
-}
-
-/** A row of color swatches; the chosen one gets a ring. */
-function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Accent) => void }) {
-  return (
-    <ToggleGroup.Root
-      type="single"
-      aria-label="Accent color"
-      value={value}
-      // Clicking the active swatch would deselect it (""); an accent is always set.
-      onValueChange={(v) => v && onChange(v as Accent)}
-      className="flex items-center gap-1.5"
-    >
-      {Object.entries(ACCENTS).map(([id, { label, swatch }]) => (
-        <Tooltip key={id}>
-          <TooltipTrigger asChild>
-            <ToggleGroup.Item
-              value={id}
-              aria-label={label}
-              style={{ backgroundColor: swatch }}
-              // Styled on aria-checked: the Tooltip trigger overwrites data-state.
-              className="size-5 rounded-full ring-offset-2 ring-offset-background transition-shadow outline-none hover:ring-2 hover:ring-border focus-visible:ring-2 focus-visible:ring-ring/50 aria-checked:ring-2 aria-checked:ring-foreground/70"
-            />
-          </TooltipTrigger>
-          <TooltipContent>{label}</TooltipContent>
-        </Tooltip>
-      ))}
-    </ToggleGroup.Root>
   );
 }
 

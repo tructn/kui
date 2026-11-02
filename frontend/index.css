@@ -134,7 +134,8 @@
 /*
  * Accent color schemes, set as data-accent on <html> by the appearance store.
  * Rose is the default (:root above). Light mode uses a deeper Tailwind shade than dark,
- * so text on the accent stays readable in both.
+ * so text on the accent stays readable in both. Every color but neutral keeps white text
+ * in both modes, which is why green, teal and orange use their 600 shade in dark.
  */
 .dark { --brand: oklch(0.645 0.246 16.439); }
 [data-accent="blue"] { --brand: oklch(0.546 0.245 262.881); --brand-foreground: oklch(0.97 0.014 254.604); }
@@ -142,11 +143,11 @@
 [data-accent="violet"] { --brand: oklch(0.541 0.281 293.009); --brand-foreground: oklch(0.969 0.016 293.756); }
 .dark[data-accent="violet"] { --brand: oklch(0.606 0.25 292.717); }
 [data-accent="green"] { --brand: oklch(0.527 0.154 150.069); --brand-foreground: oklch(0.982 0.018 155.826); }
-.dark[data-accent="green"] { --brand: oklch(0.723 0.219 149.579); --brand-foreground: oklch(0.266 0.065 152.934); }
+.dark[data-accent="green"] { --brand: oklch(0.627 0.194 149.214); }
 [data-accent="teal"] { --brand: oklch(0.511 0.096 186.391); --brand-foreground: oklch(0.984 0.014 180.72); }
-.dark[data-accent="teal"] { --brand: oklch(0.704 0.14 182.503); --brand-foreground: oklch(0.277 0.046 192.524); }
+.dark[data-accent="teal"] { --brand: oklch(0.6 0.118 184.704); }
 [data-accent="orange"] { --brand: oklch(0.646 0.222 41.116); --brand-foreground: oklch(0.98 0.016 73.684); }
-.dark[data-accent="orange"] { --brand: oklch(0.705 0.213 47.604); --brand-foreground: oklch(0.266 0.079 36.259); }
+.dark[data-accent="orange"] { --brand: oklch(0.646 0.222 41.116); }
 [data-accent="neutral"] { --brand: oklch(0.205 0 0); --brand-foreground: oklch(0.985 0 0); }
 .dark[data-accent="neutral"] { --brand: oklch(0.922 0 0); --brand-foreground: oklch(0.205 0 0); }
 
@@ -260,3 +261,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The custom accent picker (react-colorful) in Settings and the cluster form. */
+.kui-color-picker.react-colorful { width: 13rem; height: 10rem; }
+.kui-color-picker .react-colorful__saturation { border-radius: 0.5rem 0.5rem 0 0; }
+.kui-color-picker .react-colorful__last-control { border-radius: 0 0 0.5rem 0.5rem; }
+.kui-color-picker .react-colorful__pointer { width: 1rem; height: 1rem; }

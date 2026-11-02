@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { applyAccent, DEFAULT_ACCENT, isAccent, type Accent } from "@/lib/accent";
 import { settingsStorage } from "@/lib/settings-storage";
+
+export { ACCENTS, type Accent } from "@/lib/accent";
 
 /** Fonts the user can pick in Settings → Appearance. All but "system" ship with the app. */
 export const UI_FONTS = {
@@ -21,21 +24,6 @@ export const CODE_FONTS = {
   system: { label: "System", stack: "ui-monospace, SFMono-Regular, Menlo, monospace" },
 } as const;
 
-/**
- * Accent colors. `index.css` holds the real light/dark values per `data-accent`;
- * `swatch` is only for drawing the picker.
- */
-export const ACCENTS = {
-  rose: { label: "Rose", swatch: "oklch(0.645 0.246 16.439)" },
-  orange: { label: "Orange", swatch: "oklch(0.705 0.213 47.604)" },
-  green: { label: "Green", swatch: "oklch(0.723 0.219 149.579)" },
-  teal: { label: "Teal", swatch: "oklch(0.704 0.14 182.503)" },
-  blue: { label: "Blue", swatch: "oklch(0.623 0.214 259.815)" },
-  violet: { label: "Violet", swatch: "oklch(0.606 0.25 292.717)" },
-  neutral: { label: "Neutral", swatch: "oklch(0.556 0 0)" },
-} as const;
-
-export type Accent = keyof typeof ACCENTS;
 export type UiFont = keyof typeof UI_FONTS;
 export type CodeFont = keyof typeof CODE_FONTS;
 
@@ -58,7 +46,7 @@ interface AppearanceState extends Appearance {
 }
 
 const DEFAULTS: Appearance = {
-  accent: "rose",
+  accent: DEFAULT_ACCENT,
   uiFont: "inter",
   codeFont: "jetbrains-mono",
   codeFontSize: 13,
@@ -80,7 +68,8 @@ export const useAppearance = create<AppearanceState>()(
 function applyAppearance({ accent, uiFont, codeFont, codeFontSize, codeLigatures }: Appearance) {
   const root = document.documentElement;
   const style = root.style;
-  root.dataset.accent = accent in ACCENTS ? accent : DEFAULTS.accent;
+  // A stale or hand-edited accent falls back to the default.
+  applyAccent(root, isAccent(accent) ? accent : DEFAULTS.accent);
   // A stale persisted key (e.g. a font that was removed) falls back to the default.
   style.setProperty("--app-font-sans", (UI_FONTS[uiFont] ?? UI_FONTS[DEFAULTS.uiFont]).stack);
   style.setProperty("--app-font-mono", (CODE_FONTS[codeFont] ?? CODE_FONTS[DEFAULTS.codeFont]).stack);
