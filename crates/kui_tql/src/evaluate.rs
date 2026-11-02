@@ -7,12 +7,14 @@
 //!   the negated forms (`!=`, `NOT LIKE`, `NOT IN`) are true.
 //! - Text and numbers compare by meaning: `'42' = 42`, and a date string such as
 //!   `'2026-10-01'` compares with epoch-millis numbers like `timestamp`.
-//! - A string holding JSON (`"payload": "{\"id\":1}"`) can be walked into.
+//! - A string holding JSON (`"payload": "{\"id\":1}"`) can be walked into, at
+//!   any depth. Each such string is parsed at most once per message (`Doc::embedded`).
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::cmp::Ordering;
 
+use elsa::FrozenMap;
 use serde_json::{Map, Number, Value};
 
 use super::parser::{Cmp, Expr, Func, Literal, Operand, Root, Segment, TextOp};
@@ -23,11 +25,31 @@ pub struct Doc<'a, R: ?Sized> {
     record: &'a R,
     key: OnceCell<Value>,
     value: OnceCell<Value>,
+    /// JSON parsed out of strings, keyed by the string's address and length. Every
+    /// condition that walks into the same string shares one parse, and the result
+    /// is borrowed rather than cloned. Append-only, so references stay valid.
+    embedded: FrozenMap<(usize, usize), Box<Option<Value>>>,
 }
 
 impl<'a, R: Record + ?Sized> Doc<'a, R> {
     pub fn new(record: &'a R) -> Self {
-        Doc { record, key: OnceCell::new(), value: OnceCell::new() }
+        Doc { record, key: OnceCell::new(), value: OnceCell::new(), embedded: FrozenMap::new() }
+    }
+
+    /// The JSON object or array written inside `text`, parsed on first use.
+    ///
+    /// The address is the cache key, so `text` must outlive this `Doc` without moving:
+    /// a header in the record, or a string inside a parsed payload or earlier embedded
+    /// JSON. Never pass a temporary (see `step_detached`).
+    fn embedded(&self, text: &str) -> Option<&Value> {
+        if !looks_like_json(text) {
+            return None;
+        }
+        let id = (text.as_ptr() as usize, text.len());
+        match self.embedded.get(&id) {
+            Some(found) => found.as_ref(),
+            None => self.embedded.insert(id, Box::new(embedded_json(text))).as_ref(),
+        }
     }
 
     fn payload(&self, root: Root) -> Option<(Payload<'a>, &OnceCell<Value>)> {
@@ -55,15 +77,21 @@ pub fn evaluate<R: Record + ?Sized>(expr: &Expr, doc: &Doc<R>) -> bool {
             }
         }
         Expr::Text(left, op, right) => {
-            let patterns: Vec<String> = values(right, doc).iter().map(|v| text(v).into_owned()).collect();
-            texts_or_values(left, doc).iter().any(|candidate| match (op, candidate) {
-                (TextOp::Contains, Candidate::Value(v)) if v.is_array() => {
-                    let items = v.as_array().into_iter().flatten();
-                    values(right, doc).iter().any(|r| items.clone().any(|item| loose_eq(item, r)))
+            let right = values(right, doc);
+            let patterns: Vec<Cow<str>> = right.iter().map(|v| text(v)).collect();
+            texts_or_values(left, doc).iter().any(|candidate| {
+                // CONTAINS on an array (also one written as JSON text) tests its elements.
+                if matches!(op, TextOp::Contains)
+                    && let Some(items) = elements(candidate, doc)
+                {
+                    return right.iter().any(|r| items.iter().any(|item| loose_eq(item, r)));
                 }
-                (TextOp::Contains, c) => patterns.iter().any(|p| c.text().contains(p.as_str())),
-                (TextOp::Like, c) => patterns.iter().any(|p| like(&c.text(), p, false)),
-                (TextOp::ILike, c) => patterns.iter().any(|p| like(&c.text(), p, true)),
+                let c = candidate.text();
+                match op {
+                    TextOp::Contains => patterns.iter().any(|p| c.contains(p.as_ref())),
+                    TextOp::Like => patterns.iter().any(|p| like(&c, p, false)),
+                    TextOp::ILike => patterns.iter().any(|p| like(&c, p, true)),
+                }
             })
         }
         Expr::In(left, items) => {
@@ -125,12 +153,8 @@ fn values<'a, R: Record + ?Sized>(operand: &Operand, doc: &'a Doc<R>) -> Vals<'a
                 let mut next = Vec::new();
                 for v in current {
                     match v {
-                        Cow::Borrowed(b) => step(b, segment, &mut next),
-                        Cow::Owned(o) => {
-                            let mut owned = Vec::new();
-                            step(&o, segment, &mut owned);
-                            next.extend(owned.into_iter().map(|c| Cow::Owned(c.into_owned())));
-                        }
+                        Cow::Borrowed(b) => step(doc, b, segment, &mut next),
+                        Cow::Owned(o) => step_detached(doc.record, &o, segment, &mut next),
                     }
                 }
                 current = next;
@@ -151,32 +175,35 @@ fn root_values<'a, R: Record + ?Sized>(root: Root, first: Option<&Segment>, doc:
             None => Vec::new(),
         },
         Root::Headers => {
-            let header = |value: Option<&str>| match value {
-                Some(text) => embedded_json(text).unwrap_or_else(|| Value::String(text.to_string())),
-                None => Value::Null,
+            // Header text lives in the record, so JSON in it can be cached and borrowed.
+            let header = |value: Option<&'a str>| -> Cow<'a, Value> {
+                match value {
+                    Some(text) => match doc.embedded(text) {
+                        Some(json) => Cow::Borrowed(json),
+                        None => Cow::Owned(Value::String(text.to_string())),
+                    },
+                    None => Cow::Owned(Value::Null),
+                }
             };
             match first {
                 None => {
-                    let map: Map<String, Value> = m.headers().map(|(k, v)| (k.to_string(), header(v))).collect();
+                    let map: Map<String, Value> =
+                        m.headers().map(|(k, v)| (k.to_string(), header(v).into_owned())).collect();
                     vec![Cow::Owned(Value::Object(map))]
                 }
                 Some(Segment::Field(name)) => {
-                    let exact: Vals =
-                        m.headers().filter(|(k, _)| k == name).map(|(_, v)| Cow::Owned(header(v))).collect();
+                    let exact: Vals = m.headers().filter(|(k, _)| k == name).map(|(_, v)| header(v)).collect();
                     if !exact.is_empty() {
                         return exact;
                     }
                     // Header names are case-insensitive by convention (HTTP habits).
-                    m.headers()
-                        .filter(|(k, _)| k.eq_ignore_ascii_case(name))
-                        .map(|(_, v)| Cow::Owned(header(v)))
-                        .collect()
+                    m.headers().filter(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| header(v)).collect()
                 }
-                Some(Segment::Each) => m.headers().map(|(_, v)| Cow::Owned(header(v))).collect(),
+                Some(Segment::Each) => m.headers().map(|(_, v)| header(v)).collect(),
                 Some(Segment::Index(i)) => usize::try_from(*i)
                     .ok()
                     .and_then(|i| m.headers().nth(i))
-                    .map(|(_, v)| Cow::Owned(header(v)))
+                    .map(|(_, v)| header(v))
                     .into_iter()
                     .collect(),
             }
@@ -194,31 +221,53 @@ fn parse_payload(payload: Payload) -> Value {
     Value::String(payload.text.to_string())
 }
 
+/// Cheap pre-check, so ordinary text is never handed to the JSON parser.
+fn looks_like_json(text: &str) -> bool {
+    matches!(text.trim_start().as_bytes().first(), Some(b'{' | b'['))
+}
+
 /// An object or array written inside a string, as some producers double-encode.
+/// Plain text, numbers and malformed JSON (`"{oops"`) stay strings.
 fn embedded_json(text: &str) -> Option<Value> {
-    let trimmed = text.trim_start();
-    if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
-        return None;
-    }
     serde_json::from_str(text).ok().filter(|v: &Value| v.is_object() || v.is_array())
 }
 
-fn step<'a>(value: &'a Value, segment: &Segment, out: &mut Vals<'a>) {
+/// The elements of an array, or of a JSON array written in a string. Only a
+/// borrowed string (one stored in the message) may use the cache.
+fn elements<'x, 'd: 'x, R: Record + ?Sized>(candidate: &'x Candidate<'d>, doc: &'d Doc<R>) -> Option<&'x Vec<Value>> {
+    match candidate {
+        Candidate::Value(Cow::Borrowed(Value::String(s))) => doc.embedded(s)?.as_array(),
+        Candidate::Value(v) => v.as_array(),
+        Candidate::Raw(_) => None,
+    }
+}
+
+/// `step` for a value computed during evaluation (not stored in the message).
+/// It can't use the message's cache, whose keys are addresses, so it gets a
+/// short-lived one and copies out what it finds. Rare: such values are scalars
+/// or plain header text, with nothing inside.
+fn step_detached<'d, R: Record + ?Sized>(record: &R, value: &Value, segment: &Segment, out: &mut Vals<'d>) {
+    let scratch = Doc::new(record);
+    let mut found = Vec::new();
+    step(&scratch, value, segment, &mut found);
+    out.extend(found.into_iter().map(|c| Cow::Owned(c.into_owned())));
+}
+
+fn step<'d, R: Record + ?Sized>(doc: &'d Doc<R>, value: &'d Value, segment: &Segment, out: &mut Vals<'d>) {
     match (value, segment) {
         (Value::Object(map), Segment::Field(name)) => out.extend(map.get(name).map(Cow::Borrowed)),
         // A name applied to an array looks inside every element: `value.items.sku`.
-        (Value::Array(items), Segment::Field(_)) => items.iter().for_each(|item| step(item, segment, out)),
+        (Value::Array(items), Segment::Field(_)) => items.iter().for_each(|item| step(doc, item, segment, out)),
         (Value::Array(items), Segment::Index(i)) => {
             let at = if *i < 0 { items.len().checked_sub(i.unsigned_abs() as usize) } else { Some(*i as usize) };
             out.extend(at.and_then(|at| items.get(at)).map(Cow::Borrowed));
         }
         (Value::Array(items), Segment::Each) => out.extend(items.iter().map(Cow::Borrowed)),
         (Value::Object(map), Segment::Each) => out.extend(map.values().map(Cow::Borrowed)),
+        // JSON written in a string: walk into it (parsed once, then borrowed).
         (Value::String(s), _) => {
-            if let Some(inner) = embedded_json(s) {
-                let mut found = Vec::new();
-                step(&inner, segment, &mut found);
-                out.extend(found.into_iter().map(|c| Cow::Owned(c.into_owned())));
+            if let Some(inner) = doc.embedded(s) {
+                step(doc, inner, segment, out);
             }
         }
         _ => {}
@@ -516,6 +565,79 @@ mod tests {
         assert!(matches("key = 42", &m));
         assert!(matches("type(value) = 'string'", &m));
         assert!(!matches("value.anything = 1", &m));
+    }
+
+    /// An analytics event whose `properties` is JSON written as a string, with
+    /// another JSON string (`context`) inside it, and arrays in both.
+    fn analytics_event() -> String {
+        let context = r#"{"ip": "10.0.0.7", "geo": {"cc": "VN", "city": "Hà Nội"}, "flags": [1, 2, 3]}"#;
+        let properties = serde_json::json!({
+            "page": {"url": "https://shop.example/cart?step=2", "title": "Say \"hi\""},
+            "cart": [{"sku": "A-1", "qty": 2, "opts": {"gift": true}}, {"sku": "B-2", "qty": 7}],
+            "tags": "[\"vip\", \"beta\"]",
+            "context": context,
+            "pretty": "\n  {\n    \"x\": 1\n  }",
+            "note": "{not json at all",
+            "label": "plain text",
+        });
+        serde_json::json!({"event": "checkout", "properties": properties.to_string()}).to_string()
+    }
+
+    #[test]
+    fn walks_json_written_in_strings() {
+        let m = message(None, &analytics_event(), &[("ctx", r#"{"tenant": {"id": 9}}"#)]);
+        assert!(matches("value.properties.page.title = 'Say \"hi\"'", &m));
+        assert!(matches("value.properties.page.url LIKE '%step=2'", &m));
+        assert!(matches("value.properties.cart[*].qty > 5 AND value.properties.cart[-1].sku = 'B-2'", &m));
+        assert!(matches("value.properties.cart.opts.gift", &m));
+        // Two levels deep: a string inside a string.
+        assert!(matches("value.properties.context.geo.cc = 'VN'", &m));
+        assert!(matches("value.properties.context.geo.city = 'Hà Nội'", &m));
+        assert!(matches("value.properties.context.flags[*] = 3", &m));
+        assert!(matches("value.properties.pretty.x = 1", &m));
+        assert!(matches("value.properties.missing IS NULL", &m));
+        assert!(matches("headers.ctx.tenant.id = 9", &m));
+        // The string itself is still text.
+        assert!(matches("value.properties CONTAINS 'shop.example'", &m));
+        assert!(matches("type(value.properties) = 'string'", &m));
+        // Plain or malformed text stays a string, with nothing inside.
+        assert!(matches("value.properties.label = 'plain text'", &m));
+        assert!(matches("value.properties.note = '{not json at all'", &m));
+        assert!(matches("value.properties.note.x IS NULL", &m));
+    }
+
+    #[test]
+    fn contains_tests_elements_of_arrays_written_in_strings() {
+        let m = message(None, &analytics_event(), &[("tags", r#"["a", "bc"]"#)]);
+        assert!(matches("value.properties.tags CONTAINS 'vip'", &m));
+        // Elements, like a real array, not a substring of the text.
+        assert!(!matches("value.properties.tags CONTAINS 'vi'", &m));
+        assert!(matches("value.properties.context.flags CONTAINS 2", &m));
+        assert!(matches("headers.tags CONTAINS 'bc' AND NOT headers.tags CONTAINS 'b'", &m));
+    }
+
+    #[test]
+    fn whole_payload_written_as_a_json_string() {
+        let doubled = serde_json::to_string(&analytics_event()).unwrap();
+        let m = message(None, &doubled, &[]);
+        assert!(matches("value.event = 'checkout'", &m));
+        assert!(matches("value.properties.context.geo.cc = 'VN'", &m));
+    }
+
+    #[test]
+    fn parses_each_json_string_once() {
+        let m = message(None, &analytics_event(), &[]);
+        let query = Query::parse(
+            "value.properties.cart[*].qty > 1 AND value.properties.page.url IS NOT NULL \
+             AND value.properties.context.geo.cc = 'VN' AND value.properties.context.ip LIKE '10.%' \
+             AND value.properties.label != 'x' AND value.properties.note.x IS NULL",
+        )
+        .unwrap();
+        let doc = Doc::new(&m);
+        assert!(evaluate(&query.expr, &doc));
+        // `properties`, `context` and the malformed `note`: one cache entry each,
+        // however many conditions read them. Plain `label` is never parsed.
+        assert_eq!(doc.embedded.len(), 3);
     }
 
     #[test]

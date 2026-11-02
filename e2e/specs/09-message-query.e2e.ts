@@ -79,4 +79,25 @@ describe("Message query", () => {
     await browser.keys(Key.Enter);
     await expect($("span*=9 matches")).toBeDisplayed();
   });
+
+  // demo.analytics: `properties` is JSON written as a string, with `context`, another
+  // JSON string, inside it. 10 of the 40 events are from VN.
+  it("goes inside JSON written as a string", async () => {
+    await goTo("Topics");
+    await $("span=demo.analytics").click();
+    await button("Messages").click();
+
+    await editor().click();
+    // Suggested like an object, two string levels down.
+    await browser.keys("value.properties.cont");
+    await expect(suggestion("context")).toBeDisplayed();
+    await browser.keys(Key.Escape);
+    if (await clearButton().isExisting()) await clearButton().click();
+
+    await editor().click();
+    await browser.keys("value.properties.context.geo.cc = 'VN'");
+    await browser.keys(Key.Escape);
+    await browser.keys(Key.Enter);
+    await expect($("span*=10 matches")).toBeDisplayed();
+  });
 });

@@ -42,6 +42,46 @@ describe("buildCatalog", () => {
   });
 });
 
+// `properties` is JSON written as a string, with another JSON string inside it.
+const analytics = buildCatalog([
+  msg({
+    event: "checkout",
+    properties: JSON.stringify({
+      cart: [{ sku: "A-1", qty: 2 }, { sku: "B-2", qty: 7 }],
+      tags: JSON.stringify(["vip", "beta"]),
+      context: JSON.stringify({ geo: { cc: "VN" } }),
+      note: "{not json",
+    }),
+  }),
+  msg({ event: "view", properties: JSON.stringify({ cart: [], tags: "[]", context: "{}", note: "plain" }) }),
+]);
+const analyticsLabels = (text: string) => complete(text, text.length, analytics).items;
+
+describe("JSON written in strings", () => {
+  test("is catalogued as the object or array it holds", () => {
+    const properties = analytics.fields.get("value.properties")!;
+    expect(describeField(properties)).toBe("object (JSON text)");
+    // The escaped JSON is never offered as a value.
+    expect(properties.values).toEqual([]);
+    expect(describeField(analytics.fields.get("value.properties.tags")!)).toBe("array (JSON text)");
+    expect(analytics.fields.get("value.properties.tags[*]")?.values.map((v) => v.value)).toEqual(["vip", "beta"]);
+    expect(analytics.fields.get("value.properties.context.geo.cc")?.values[0].value).toBe("VN");
+    // Malformed or plain text stays a string.
+    expect(describeField(analytics.fields.get("value.properties.note")!)).toBe("string");
+  });
+
+  test("completes into it like an object", () => {
+    const field = analyticsLabels("propert").find((i) => i.label === "value.properties");
+    expect(field?.insert).toBe("value.properties.");
+    expect(analyticsLabels("value.properties.").map((i) => i.label)).toEqual(["cart", "tags", "context", "note"]);
+    expect(analyticsLabels("value.properties.cart").find((i) => i.label === "cart")?.insert).toBe("cart[*].");
+    expect(analyticsLabels("value.properties.context.geo.cc = ").map((i) => i.label)).toContain("'VN'");
+    // An array in a string gets element operators and element values.
+    expect(analyticsLabels("value.properties.tags ").map((i) => i.label)).toContain("CONTAINS");
+    expect(analyticsLabels("value.properties.tags CONTAINS ").map((i) => i.label)).toEqual(["'vip'", "'beta'"]);
+  });
+});
+
 describe("complete", () => {
   test("starts with the message attributes and common fields", () => {
     const items = labels("");

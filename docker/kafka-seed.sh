@@ -3,6 +3,7 @@
 #   demo.orders     50 flat JSON orders; consumer group `demo-billing` has read 30 (so it shows lag)
 #   demo.customers  compacted, 7 customers
 #   demo.events     60 nested, mixed-shape events with headers, for trying the message query
+#   demo.analytics  40 tracking events whose `properties` is JSON written as a string
 # Each topic is created only if missing, so re-running adds new demo topics to an old broker.
 set -euo pipefail
 BIN=/opt/kafka/bin
@@ -82,4 +83,58 @@ else
   events | $BIN/kafka-console-producer.sh --bootstrap-server "$BOOTSTRAP" --topic demo.events \
     --reader-property parse.headers=true --reader-property parse.key=true --reader-property key.separator='|'
   echo "Seeded demo.events."
+fi
+
+# A JSON string literal holding $1, as producers that double-encode write it.
+# sed does the escaping: bash's ${s//…} is quadratic on the ~20 KB bulk payloads.
+json_string() {
+  local s
+  s=$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+  printf '"%s"' "${s//$'\n'/\\n}"
+}
+
+# One event per line: `headers<TAB>key|json`, headers as `name=value;…` (header values hold JSON).
+# Four shapes, by i % 4; `properties` is a string holding JSON except in shape 1:
+#   0  checkout   properties: cart[] of objects, page, tags (an array, itself a JSON string) and
+#                 context (a JSON string inside the JSON string); x-context header is JSON too
+#   1  checkout   older SDK: the same properties as a real object, so one field has both forms
+#   2  identify   traits: pretty-printed JSON string with quotes and accents; properties is
+#                 "[INFO] …" and note is "{draft" (they look like JSON but aren't, so stay strings)
+#   3  bulk       properties: 300 line items in one string (~20 KB), for checking filter speed
+analytics() {
+  local plans=(free pro team) countries=(VN DE US NG) skus=(SKU-1 SKU-2 SKU-3 SKU-4 SKU-5)
+  for i in $(seq 1 40); do
+    local n=$((i % 4)) user="user-$((i % 9))"
+    local context="{\"ip\":\"10.0.$n.$i\",\"geo\":{\"cc\":\"${countries[$n]}\",\"tz\":\"UTC+$n\"},\"device\":{\"os\":\"$([ $((i % 2)) = 0 ] && echo ios || echo android)\",\"build\":$((100 + i))}}"
+    local tags="[\"${plans[$((i % 3))]}\",\"$([ $((i % 5)) = 0 ] && echo beta || echo stable)\"]"
+    local cart="[{\"sku\":\"${skus[$((i % 5))]}\",\"qty\":$((i % 4 + 1)),\"price\":$((i * 7 % 90 + 10)).5,\"options\":{\"gift\":$([ $((i % 3)) = 0 ] && echo true || echo false)}},\
+{\"sku\":\"${skus[$(((i + 2) % 5))]}\",\"qty\":$((i % 6 + 1)),\"price\":$((i * 3 % 50 + 5)).0}]"
+    local props="{\"page\":{\"url\":\"https://shop.example/cart?step=$((i % 3 + 1))\",\"title\":\"Cart \\\"$i\\\"\"},\
+\"cart\":$cart,\"total\":$((i * 19 % 400 + 20)).25,\"currency\":\"USD\",\"tags\":$(json_string "$tags"),\"context\":$(json_string "$context")}"
+    local headers="x-sdk=$([ $n = 1 ] && echo analytics-js@1 || echo analytics-js@2);x-context=$context"
+    case $n in
+      0) printf '%s\tevt-%s|%s\n' "$headers" "$i" "{\"type\":\"track\",\"event\":\"Checkout Started\",\"userId\":\"$user\",\"properties\":$(json_string "$props")}" ;;
+      1) printf '%s\tevt-%s|%s\n' "$headers" "$i" "{\"type\":\"track\",\"event\":\"Checkout Started\",\"userId\":\"$user\",\"properties\":$props}" ;;
+      2) local traits
+        traits=$(printf '{\n  "name": "Nguyễn Văn %s",\n  "plan": "%s",\n  "quote": "says \\"hi\\"",\n  "address": {"city": "Hà Nội", "zip": "1000%s"}\n}' \
+          "$i" "${plans[$((i % 3))]}" "$((i % 10))")
+        printf '%s\tidt-%s|%s\n' "$headers" "$i" "{\"type\":\"identify\",\"userId\":\"$user\",\"traits\":$(json_string "$traits"),\
+\"properties\":\"[INFO] identify from settings page\",\"note\":\"{draft\"}" ;;
+      3) local items="" j
+        for j in $(seq 1 300); do items+="${items:+,}{\"line\":$j,\"sku\":\"BULK-$((j % 50))\",\"qty\":$(((i + j) % 9 + 1))}"; done
+        printf '%s\tblk-%s|%s\n' "$headers" "$i" "{\"type\":\"track\",\"event\":\"Order Imported\",\"userId\":\"$user\",\
+\"properties\":$(json_string "{\"batch\":$i,\"items\":[$items],\"context\":$(json_string "$context")}")}" ;;
+    esac
+  done
+}
+
+if has_topic demo.analytics; then
+  echo "demo.analytics already seeded."
+else
+  $BIN/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic demo.analytics --partitions 3
+  analytics | $BIN/kafka-console-producer.sh --bootstrap-server "$BOOTSTRAP" --topic demo.analytics \
+    --reader-property parse.headers=true --reader-property headers.separator=';' \
+    --reader-property headers.key.separator='=' \
+    --reader-property parse.key=true --reader-property key.separator='|'
+  echo "Seeded demo.analytics."
 fi

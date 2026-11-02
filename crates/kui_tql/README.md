@@ -105,7 +105,7 @@ Go inside JSON with paths:
 | `value.items[*].sku`        | **Every** element (the condition passes if any one of them matches)        |
 | `value.items.sku`           | Same as `[*]`: a name applied to an array looks inside each element        |
 | `headers.x-trace-id`        | Header names may contain `-`. Names are matched exactly, then ignoring case |
-| `value.meta.source`         | Also works when `meta` is a **string** holding JSON (`"{\"source\":\"web\"}"`) |
+| `value.meta.source`         | Also works when `meta` is a **string** holding JSON (`"{\"source\":\"web\"}"`), at any depth |
 
 ### Operators
 
@@ -1459,6 +1459,18 @@ The topic **`demo.events`** (from `docker/kafka-seed.sh`) is built for exercisin
 | plain-text logs       | `value LIKE 'WARN%'`, `type(value) = 'string'`                 |
 | every message         | `headers.x-source IN ('ios', 'android')`, `headers.X-TRACE-ID = 'trace-7'` |
 
+**`demo.analytics`** has 40 tracking events whose `properties` is JSON **written as a string**, the way
+some SDKs double-encode. Strings that only look like JSON (`"[INFO] …"`, `"{draft"`) stay strings:
+
+| Shape                 | Try                                                            |
+| --------------------- | -------------------------------------------------------------- |
+| checkout              | `value.properties.cart[*].qty > 5`, `value.properties.tags CONTAINS 'beta'` |
+| (string in a string)  | `value.properties.context.geo.cc = 'VN'`                       |
+| checkout, older SDK   | the same `properties` as a real object: the same queries match it |
+| identify              | `value.traits.address.city = 'Hà Nội'` (pretty-printed), `value.note = '{draft'` |
+| bulk import           | `value.properties.items[*].sku = 'BULK-7'` (300 items in a ~13 KB string) |
+| every message         | `headers.x-context.geo.cc = 'DE'` (a header holding JSON)      |
+
 #### Seeing the tree
 
 To check what the parser built, add a temporary test and print it:
@@ -1605,9 +1617,22 @@ The list semantics give every rule in [Messages of different shapes](#messages-o
 
 **Path steps** (`step()`): an object field, an array index (negative counts from the end), `Each` over array
 elements or object values, a field name applied to an array (fans out to each element), and a string that holds a
-JSON object or array, which is parsed and walked into (`embedded_json`). `headers` is special at the first step:
+JSON object or array, which is parsed and walked into (`Doc::embedded`). `headers` is special at the first step:
 `headers.name` collects **every** header with that name (Kafka allows duplicates), exactly or else ignoring case.
 Header values that look like JSON objects or arrays are parsed too.
+
+**JSON inside strings** is parsed lazily and at most once per message. `Doc::embedded` caches each parse in an
+append-only map (`elsa::FrozenMap`) keyed by the string's address and length. A query such as
+`value.properties.a = 1 AND value.properties.b = 2` parses `properties` once, and the walk borrows from the cache
+instead of cloning subtrees. The key is an address, so only strings that stay put for the whole evaluation may be
+looked up: the record's headers, the parsed key/value, or earlier cached JSON. A value computed during evaluation
+goes through `step_detached`, which uses a throwaway cache. Text that doesn't start with `{` or `[` never reaches
+the parser, and malformed JSON is cached as "not JSON", so it isn't tried again.
+
+To the operators, such a field is still a string (`type()` says `'string'`, `length()` counts characters, and
+`CONTAINS`/`LIKE` on the field itself search its text). The one exception is `CONTAINS` on a JSON array in a string,
+which tests elements as for a real array. That keeps it consistent with the completion, which lists these fields as
+`object (JSON text)` or `array (JSON text)`.
 
 **Comparison** (`compare() -> Option<Ordering>`, `None` = can't compare = no match):
 

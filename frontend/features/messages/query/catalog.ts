@@ -31,6 +31,8 @@ export interface FieldStats {
   manyValues: boolean;
   /** Built-in message attribute (partition, offset, timestamp) rather than payload data. */
   builtin?: boolean;
+  /** A string holding JSON (`"{\"a\":1}"`) in some messages: typed as the object/array inside. */
+  jsonText?: boolean;
 }
 
 export interface FieldCatalog {
@@ -69,10 +71,12 @@ export function jsonType(value: unknown): JsonType {
   return type === "string" || type === "number" || type === "boolean" ? type : "object";
 }
 
+const LOOKS_LIKE_JSON = /^\s*[{[]/;
+
 /** An object or array written inside a string; the Rust filter walks into these too. */
 function embeddedJson(text: string): unknown {
-  const trimmed = text.trimStart();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return undefined;
+  // The regex stops at the first non-space, so plain text costs almost nothing.
+  if (text.length > MAX_PAYLOAD_LENGTH || !LOOKS_LIKE_JSON.test(text)) return undefined;
   try {
     return JSON.parse(text);
   } catch {
@@ -130,14 +134,18 @@ function record(b: Builder, path: string, parent: string | null, segment: string
 
 /** Records `value` at `path` and everything inside it. */
 function walk(b: Builder, path: string, parent: string | null, segment: string, value: unknown, depth: number) {
-  record(b, path, parent, segment, value);
-  if (depth >= MAX_DEPTH) return;
-  if (typeof value === "string") {
-    const inner = embeddedJson(value);
-    if (inner !== undefined) walkChildren(b, path, inner, depth);
+  // JSON written in a string counts as the object/array it holds: that's how the
+  // filter walks it, and its escaped text would make a poor value suggestion.
+  const inner = typeof value === "string" && depth < MAX_DEPTH ? embeddedJson(value) : undefined;
+  if (inner !== undefined) {
+    record(b, path, parent, segment, inner);
+    const stats = b.fields.get(path);
+    if (stats) stats.jsonText = true;
+    walkChildren(b, path, inner, depth);
     return;
   }
-  walkChildren(b, path, value, depth);
+  record(b, path, parent, segment, value);
+  if (depth < MAX_DEPTH) walkChildren(b, path, value, depth);
 }
 
 function walkChildren(b: Builder, path: string, value: unknown, depth: number) {
@@ -220,5 +228,6 @@ export function typesOf(stats: FieldStats | undefined): JsonType[] {
 /** The field's types, e.g. `string`, `number | string`, or `time` for the timestamp. */
 export function describeField(stats: FieldStats): string {
   if (stats.builtin) return stats.path === "timestamp" ? "time" : "number";
-  return typesOf(stats).filter((t) => t !== "null" || Object.keys(stats.types).length === 1).join(" | ");
+  const types = typesOf(stats).filter((t) => t !== "null" || Object.keys(stats.types).length === 1).join(" | ");
+  return stats.jsonText ? `${types} (JSON text)` : types;
 }
