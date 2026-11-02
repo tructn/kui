@@ -1,37 +1,34 @@
 # Checks for pull requests and for pushes to main:
 # - lint and unit tests on Linux, on both (main also gets direct pushes);
-# - the PR title must be a Conventional Commit, because squash-merging makes it
-#   the commit on main that the release notes are built from;
 # - the app must compile on macOS and Windows, the platforms we ship, so that
 #   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
 #   release rather than during one. PRs only: installers are built when the
 #   release-please PR is merged (release.yml).
 #
 # The e2e suite (`bun run test:e2e`) runs locally, not here. Dependency audits
-# are in security.yml.
+# are in security.yml, and the PR title check in pr-title.yml.
+#
+# PR title edits don't trigger this workflow at all. If they did, its jobs would
+# have to be skipped for them, and a skipped required check counts as passed:
+# it could replace a failed result for the same commit.
 name: CI
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
   push:
     branches: [main]
 
 permissions:
   contents: read
 
-# Edits to the PR title or description (by people or bots) get their own
-# group, so they only re-check the title and never cancel a running build.
-# Runs on main always finish.
+# A new push to a PR cancels its outdated run; runs on main always finish.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     name: Lint and test
-    # Title edits don't change code.
-    if: github.event.action != 'edited'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -72,30 +69,10 @@ jobs:
       - name: Rust tests
         run: cargo test --locked --lib
 
-  pr-title:
-    name: Conventional PR title
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: amannn/action-semantic-pull-request@v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # Default Conventional Commit types; the same rules as
-          # scripts/git-hooks/commit-msg.sh: lowercase start
-          # (acronyms like "API" are fine) and no trailing period.
-          subjectPattern: ^(?![A-Z][a-z]).+[^.]$
-          subjectPatternError: |
-            The summary "{subject}" in "{title}" should start in lowercase and
-            not end with a period, e.g. "feat(messages): add live mode filter".
-
   build:
     name: Build (${{ matrix.os }})
-    # PRs only, and title edits don't change code; skip the slow builds for them.
-    if: github.event_name == 'pull_request' && github.event.action != 'edited'
+    # PRs only; main gets installers from release.yml.
+    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:

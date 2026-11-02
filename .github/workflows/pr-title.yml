@@ -1,0 +1,37 @@
+# The PR title must be a Conventional Commit, because squash-merging makes it
+# the commit on main that the release notes are built from.
+#
+# Its own workflow so that title edits re-run only this check, never the builds
+# and tests in ci.yml.
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    name: Conventional PR title
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Default Conventional Commit types; the same rules as
+          # scripts/git-hooks/commit-msg.sh: lowercase start
+          # (acronyms like "API" are fine) and no trailing period.
+          subjectPattern: ^(?![A-Z][a-z]).+[^.]$
+          subjectPatternError: |
+            The summary "{subject}" in "{title}" should start in lowercase and
+            not end with a period, e.g. "feat(messages): add live mode filter".
