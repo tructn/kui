@@ -81,7 +81,7 @@ describe("Message query", () => {
   });
 
   // demo.analytics: `properties` is JSON written as a string, with `context`, another
-  // JSON string, inside it. 10 of the 40 events are from VN.
+  // JSON string, inside it. 10 of the 40 events have device.os 'ios'.
   it("goes inside JSON written as a string", async () => {
     await goTo("Topics");
     await $("span=demo.analytics").click();
@@ -95,7 +95,8 @@ describe("Message query", () => {
     if (await clearButton().isExisting()) await clearButton().click();
 
     await editor().click();
-    await browser.keys("value.properties.context.geo.cc = 'VN'");
+    // (No doubled letters, so not `geo.cc`: the WebKitGTK driver drops the second one.)
+    await browser.keys("value.properties.context.device.os = 'ios'");
     await browser.keys(Key.Escape);
     await browser.keys(Key.Enter);
     await expect($("span*=10 matches")).toBeDisplayed();
