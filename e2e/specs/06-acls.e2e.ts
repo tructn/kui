@@ -18,7 +18,8 @@ describe("ACLs", () => {
 
     const row = $(`//tr[td[normalize-space()="${principal}"]]`);
     await expect(row).toHaveText(expect.stringContaining("Read"));
-    await expect(row).toHaveText(expect.stringContaining("demo."));
+    // WebKit's getText skips the truncated (overflow-hidden) resource name, so look for the element.
+    await expect(row.$("span=demo.")).toBeExisting();
 
     await row.$(`button[aria-label="Delete ACL for ${principal}"]`).click();
     await button("Delete", openAlertDialog()).click();
