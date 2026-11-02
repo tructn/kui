@@ -15,7 +15,7 @@ matching messages.
 
 The crate parses a query once, then tests it against each message. It has no Kafka or Tauri dependencies:
 messages come in through the `Record` trait, which KUI implements for its `Message` type in
-`app/src/features/messages/query.rs`.
+`crates/kui_desktop/src/features/messages/query.rs`.
 
 ```rust
 use kui_tql::Query;
@@ -285,7 +285,7 @@ value.status = 'SHIPPED' AND value.items[*].qty > 3
 The computer can't do anything useful with that line while it's just characters. It needs a structured
 description it can check against each message. Turning text into that structure, and then using it, is the
 job of the `kui_tql` crate in `crates/kui_tql/`. It knows nothing about Kafka: the app hands it
-messages through the `Record` trait (implemented in `app/src/features/messages/query.rs`).
+messages through the `Record` trait (implemented in `crates/kui_desktop/src/features/messages/query.rs`).
 
 > **Key idea.** A query is a *program* in a tiny language. Our code reads the program once, then runs it once
 > per message. That's all a "language implementation" is.
@@ -354,10 +354,10 @@ always does. [Section 9](#9-the-editor-side-typescript) explains why it exists.
 | `crates/kui_tql/src/lexer.rs`                    | Rust     | Stage 1: text → tokens                                                |
 | `crates/kui_tql/src/parser.rs`                   | Rust     | Stage 2: tokens → tree (`Expr`)                                       |
 | `crates/kui_tql/src/evaluate.rs`                 | Rust     | Stage 3: tree + message → bool                                        |
-| `app/src/features/messages/query.rs`                     | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter)          |
-| `app/src/features/messages/service.rs`                   | Rust     | Stage 4: the search loop (`browse_with`), live tail                   |
-| `app/src/features/messages/commands.rs`                  | Rust     | `check_message_query`: parse only, for error underlines               |
-| `app/src/features/messages/window.rs`                    | Rust     | `resume_after`: the cursor after part of a page                       |
+| `crates/kui_desktop/src/features/messages/query.rs`                     | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter)          |
+| `crates/kui_desktop/src/features/messages/service.rs`                   | Rust     | Stage 4: the search loop (`browse_with`), live tail                   |
+| `crates/kui_desktop/src/features/messages/commands.rs`                  | Rust     | `check_message_query`: parse only, for error underlines               |
+| `crates/kui_desktop/src/features/messages/window.rs`                    | Rust     | `resume_after`: the cursor after part of a page                       |
 | `frontend/features/messages/query/lexer.ts`              | TS       | Forgiving tokenizer for colors and suggestions                        |
 | `frontend/features/messages/query/catalog.ts`            | TS       | Learns which fields exist from sampled messages                       |
 | `frontend/features/messages/query/completion.ts`         | TS       | Decides what to suggest at the caret                                  |
@@ -1106,7 +1106,7 @@ never recurses, so a long text can't overflow the stack. `ILIKE` is the same wit
 ### 8. Stage 4: searching a topic (`service.rs`)
 
 `Query` (in `kui_tql`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
-the app side (`app/src/features/messages/query.rs`):
+the app side (`crates/kui_desktop/src/features/messages/query.rs`):
 
 ```rust
 Query::parse(text)          // Result<Query, QueryError>   (lexer + parser)

@@ -4,7 +4,7 @@ import { callCommand } from "./invoke";
 
 /**
  * Storage for zustand's `persist` middleware, backed by `settings.json` in the
- * app config directory (see `app/src/settings.rs`) instead of the
+ * app config directory (see `crates/kui_desktop/src/settings.rs`) instead of the
  * webview's localStorage, which can lose recent writes when the app quits.
  *
  * `loadSettings()` must finish before any persisted store is created (see

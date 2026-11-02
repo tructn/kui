@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/topics/commands.rs`.
+// Mirrors `crates/kui_desktop/src/features/topics/commands.rs`.
 import { callCommand } from "@/lib/invoke";
 
 import type { DeleteTopicResult, NewTopicRequest, TopicDetail, TopicSummary } from "./types";

@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/brokers/model.rs`.
+// Mirrors `crates/kui_desktop/src/features/brokers/model.rs`.
 
 export interface Broker {
   id: number;

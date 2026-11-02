@@ -2175,7 +2175,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kui"
+name = "kui_desktop"
 version = "0.1.0-alpha.17"
 dependencies = [
  "chrono",

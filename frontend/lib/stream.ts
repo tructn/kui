@@ -11,7 +11,7 @@ export interface StreamTask<R> {
 
 /**
  * Starts a long-running Rust command that pushes updates through a Tauri `Channel`
- * (live tail, data generation). See `app/src/tasks.rs`.
+ * (live tail, data generation). See `crates/kui_desktop/src/tasks.rs`.
  *
  * We pick the task id here so `cancel` works immediately, even before Rust replies.
  */

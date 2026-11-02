@@ -3,5 +3,5 @@ e2e/node_modules
 e2e/artifacts
 dist
 target
-app/gen
+crates/kui_desktop/gen
 .git

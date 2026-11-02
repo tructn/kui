@@ -17,8 +17,8 @@
   "packages": {
     ".": {
       "extra-files": [
-        { "type": "toml", "path": "app/Cargo.toml", "jsonpath": "$.package.version" },
-        { "type": "toml", "path": "Cargo.lock", "jsonpath": "$.package[?(@.name.value==='kui')].version" }
+        { "type": "toml", "path": "crates/kui_desktop/Cargo.toml", "jsonpath": "$.package.version" },
+        { "type": "toml", "path": "Cargo.lock", "jsonpath": "$.package[?(@.name.value==='kui_desktop')].version" }
       ]
     }
   }

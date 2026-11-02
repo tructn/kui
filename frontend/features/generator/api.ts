@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/generator/commands.rs`.
+// Mirrors `crates/kui_desktop/src/features/generator/commands.rs`.
 import { callCommand } from "@/lib/invoke";
 import { startStream } from "@/lib/stream";
 

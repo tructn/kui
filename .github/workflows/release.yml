@@ -12,7 +12,7 @@
 # pre-releases, and a plain vX.Y.Z (v0.1.0 included) a normal release.
 #
 # Every release also carries latest.json, the manifest the app's updater reads
-# (app/src/updates.rs), pointing at installers signed with the updater
+# (crates/kui_desktop/src/updates.rs), pointing at installers signed with the updater
 # key (TAURI_SIGNING_PRIVATE_KEY secret; public key in tauri.conf.json).
 #
 # Manual run (Actions -> Release -> Run workflow): builds the installers from
@@ -166,8 +166,8 @@ jobs:
             certificateThumbprint = $cert.Thumbprint
             timestampUrl = "http://timestamp.digicert.com"
           } } } | ConvertTo-Json -Depth 5
-          Set-Content -Path app/tauri.signing.conf.json -Value $overlay
-          "TAURI_SIGNING_ARGS=--config app/tauri.signing.conf.json" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Set-Content -Path crates/kui_desktop/tauri.signing.conf.json -Value $overlay
+          "TAURI_SIGNING_ARGS=--config crates/kui_desktop/tauri.signing.conf.json" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build installers
         shell: bash

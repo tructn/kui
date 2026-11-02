@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/consumer_groups/model.rs`.
+// Mirrors `crates/kui_desktop/src/features/consumer_groups/model.rs`.
 
 export interface GroupSummary {
   name: string;

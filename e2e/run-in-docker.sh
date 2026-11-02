@@ -9,7 +9,7 @@ echo "▶ Building KUI (debug)…"
 VITE_E2E=1 bun run tauri build --debug --no-bundle
 
 echo "▶ Rust unit + integration tests against ${KAFKA_BOOTSTRAP}…"
-KUI_TEST_BOOTSTRAP="$KAFKA_BOOTSTRAP" cargo test -p kui -- --include-ignored
+KUI_TEST_BOOTSTRAP="$KAFKA_BOOTSTRAP" cargo test -p kui_desktop -- --include-ignored
 
 echo "▶ UI end-to-end tests…"
 cd e2e

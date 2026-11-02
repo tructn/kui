@@ -10,7 +10,7 @@ declare global {
 /**
  * Calls a Rust `#[tauri::command]`.
  *
- * Rust errors arrive as plain strings (see `app/src/error.rs`);
+ * Rust errors arrive as plain strings (see `crates/kui_desktop/src/error.rs`);
  * this wraps them in `Error` so the UI can always read `error.message`.
  */
 export async function callCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {

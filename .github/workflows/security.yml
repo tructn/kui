@@ -2,7 +2,7 @@
 # audit) for the app. Runs weekly too, because new advisories appear without
 # any code change. Only the lockfiles are read, so nothing is built here.
 #
-# Tests, including the guards for the OWASP controls (app/src/security_tests.rs),
+# Tests, including the guards for the OWASP controls (crates/kui_desktop/src/security_tests.rs),
 # run in ci.yml.
 name: Security
 

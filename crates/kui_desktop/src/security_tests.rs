@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 fn repo() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
 fn tauri_config() -> Value {
-    let text = fs::read_to_string(repo().join("app/tauri.conf.json")).unwrap();
+    let text = fs::read_to_string(repo().join("crates/kui_desktop/tauri.conf.json")).unwrap();
     serde_json::from_str(&text).unwrap()
 }
 
@@ -99,7 +99,7 @@ fn security_only_style_src_skips_tauri_csp_hashing() {
 
 #[test]
 fn security_webview_capabilities_are_minimal() {
-    let text = fs::read_to_string(repo().join("app/capabilities/default.json")).unwrap();
+    let text = fs::read_to_string(repo().join("crates/kui_desktop/capabilities/default.json")).unwrap();
     let capability: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(capability["windows"], serde_json::json!(["main"]));
     // No plugins at all (no fs, shell, http, process or opener): the UI

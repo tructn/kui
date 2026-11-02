@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/consumer_groups/commands.rs`.
+// Mirrors `crates/kui_desktop/src/features/consumer_groups/commands.rs`.
 import { callCommand } from "@/lib/invoke";
 
 import type { GroupDetail, GroupLag, GroupSummary, OffsetChange, ResetRequest, TopicConsumer } from "./types";

@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/generator/model.rs`.
+// Mirrors `crates/kui_desktop/src/features/generator/model.rs`.
 
 export const LOCALES = [
   { value: "en", label: "English" },

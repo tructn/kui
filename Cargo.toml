@@ -1,8 +1,8 @@
-# The Rust workspace: the Tauri app (app/) and the crates it is built
-# from (crates/). Run cargo from here; Cargo.lock and target/ live here too.
+# The Rust workspace: the Tauri app (crates/kui_desktop) and the crates it is
+# built from (crates/*). Run cargo from here; Cargo.lock and target/ live here too.
 [workspace]
 resolver = "3"
-members = ["app", "crates/*"]
+members = ["crates/*"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

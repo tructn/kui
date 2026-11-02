@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/clusters/commands.rs`.
+// Mirrors `crates/kui_desktop/src/features/clusters/commands.rs`.
 import { callCommand } from "@/lib/invoke";
 
 import type { ClusterConfig } from "./types";

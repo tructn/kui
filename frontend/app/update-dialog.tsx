@@ -22,7 +22,7 @@ import { useUpdates } from "./stores/update-store";
 /** How often a running app looks for a new version, when automatic checks are on. */
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
-/** Mirrors `DownloadEvent` in `app/src/updates.rs`. */
+/** Mirrors `DownloadEvent` in `crates/kui_desktop/src/updates.rs`. */
 type DownloadEvent = { event: "progress"; downloaded: number; total: number | null } | { event: "installing" };
 
 type InstallState =

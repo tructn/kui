@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 import { callCommand } from "@/lib/invoke";
 import { settingsStorage } from "@/lib/settings-storage";
 
-/** Mirrors `AvailableUpdate` in `app/src/updates.rs`. */
+/** Mirrors `AvailableUpdate` in `crates/kui_desktop/src/updates.rs`. */
 export interface AvailableUpdate {
   version: string;
   currentVersion: string;

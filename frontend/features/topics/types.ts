@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/topics/model.rs`.
+// Mirrors `crates/kui_desktop/src/features/topics/model.rs`.
 
 export interface TopicSummary {
   name: string;

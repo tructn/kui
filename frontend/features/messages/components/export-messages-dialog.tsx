@@ -21,7 +21,7 @@ import { formatNumber } from "@/lib/format";
 import { useExportMessages } from "../queries";
 import type { BrowseRequest, ExportFormat, ExportSource, MessageRef } from "../types";
 
-/** Mirrors `MAX_EXPORT` in `app/src/features/messages/service.rs`. */
+/** Mirrors `MAX_EXPORT` in `crates/kui_desktop/src/features/messages/service.rs`. */
 const MAX_EXPORT = 100_000;
 const DEFAULT_LIMIT = "10000";
 

@@ -1,4 +1,4 @@
-// Mirrors `app/src/features/messages/model.rs`.
+// Mirrors `crates/kui_desktop/src/features/messages/model.rs`.
 
 export type StartFrom = "latest" | "earliest" | "offset" | "timestamp";
 

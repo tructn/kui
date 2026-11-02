@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "KUI",
-  "version": "../package.json",
+  "version": "../../package.json",
   "identifier": "io.github.tructn.kui",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build",
-    "frontendDist": "../dist"
+    "frontendDist": "../../dist"
   },
   "app": {
     "windows": [
