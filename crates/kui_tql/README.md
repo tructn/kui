@@ -232,6 +232,11 @@ plus whatever the table and live tail show, and learns:
 - **Values that actually occur**, most common first, with how often they appear. For `timestamp`, recent dates.
 - **`AND` / `OR` / `)`** once a condition is complete.
 
+Value suggestions are a summary, not every value in the sample. Each field shows at most its **30 most common
+values**. Text longer than 120 characters isn't suggested. Fields with a different value in nearly every message,
+like ids, only show the first values seen. So a `status` field with 4 values shows 4, even across 500 messages.
+To find a value outside the list, type it, or use `LIKE '%…%'`.
+
 Mistakes are underlined as you type, with the reason under the bar, and **Apply** stays disabled until the filter
 is valid.
 
@@ -1207,6 +1212,11 @@ Things to notice:
   you can watch the depth limit in action.
 - The result also has `children`: parent path → child fields, most common first. That's what powers
   "type `value.customer.` and see its fields".
+- **Values are capped twice.** Each field counts up to 200 distinct values (`MAX_TRACKED_VALUES`). A new value
+  after that isn't counted, and the field is marked `manyValues`. When the catalog is finished, only the
+  **30 most common** values are kept (`MAX_VALUES_KEPT`). That's why a field seen in 500 messages shows only a
+  few values: the list sums up the field, it doesn't list every message. Objects and arrays never become values;
+  their scalar children do.
 
 `use-field-catalog.ts` wraps this in a **getter** that builds the catalog only when suggestions are actually
 requested, and rebuilds it at most once a second while the live tail is changing.
@@ -1492,6 +1502,16 @@ cargo test show_tree -- --nocapture
 
 ### 13. FAQ and pitfalls
 
+**The search reads 500 messages at a time and the sample has 500 messages. Are they related?**
+No. They're two separate constants that happen to be equal. `SEARCH_CHUNK = 500` (Rust, `service.rs`) is how many
+raw messages a filtered search reads per round. `SAMPLE_SIZE = 500` (TypeScript, `queries.ts`) is how many of
+the newest messages the editor reads for suggestions, through an ordinary unfiltered `browse`. Suggestions never
+use the search loop, and changing one constant doesn't affect the other.
+
+**Why do value suggestions show so few values when 500 messages were sampled?**
+Each field keeps only its 30 most common values ([9.2](#92-learning-the-fields-catalogts)), and suggestions are
+narrowed further by what you've typed. A field with 4 distinct values shows 4.
+
 **Why not use a parser library or generator?**
 The language is small. A hand-written parser of about 300 lines gives us full control over error messages
 and their positions, which is what users see most. Generators tend to produce errors like
@@ -1672,6 +1692,9 @@ cursor from the messages actually looked at instead. Each partition moves to jus
 bound). Partitions not touched keep their previous position. This is correct because `merge_page` guarantees that
 each partition contributes **consecutive** offsets to a page.
 
+`SEARCH_CHUNK` (500) is used only here, for filtered reads. It has nothing to do with the 500-message sample
+behind suggestions (`SAMPLE_SIZE` in `frontend/features/messages/queries.ts`).
+
 Budgets (`SEARCH_SCAN_BUDGET = 50_000` messages, `SEARCH_TIME_BUDGET = 5s`) bound one request. The page reports
 `scanned`. A page can come back short or empty with `next` still set, and the UI says so. A "stuck" check (nothing
 read and the cursor didn't move) guarantees the loop always ends.
@@ -1712,9 +1735,25 @@ path it records:
 - `values`: the most common scalar values (up to 30 kept, of 200 tracked), with counts
 - `parent`/`segment`, and a `children` index for walking down paths
 
-Limits keep it cheap on odd data: depth 8, 2,000 fields, 200 keys per object, 120-character values, and
-payloads up to 512 KB. Paths are written the way a query writes them, quoting names that need it
+Limits keep it cheap on odd data. Paths are written the way a query writes them, quoting names that need it
 (`nameSegment`).
+
+| Constant              | Value  | Effect                                                                                     |
+| --------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `MAX_DEPTH`           | 8      | Levels walked below a root                                                                 |
+| `MAX_FIELDS`          | 2,000  | Distinct paths; later new paths are ignored                                                |
+| `MAX_KEYS_PER_OBJECT` | 200    | Keys (or array items, or headers) read per object                                          |
+| `MAX_VALUE_LENGTH`    | 120    | Longer strings aren't values; the field is marked `manyValues`                             |
+| `MAX_TRACKED_VALUES`  | 200    | Distinct values counted per field; after that, new values are dropped and `manyValues` set |
+| `MAX_VALUES_KEPT`     | 30     | Values kept per field after sorting by count                                               |
+| `MAX_PAYLOAD_LENGTH`  | 512 KB | Larger payloads (or JSON-in-string) aren't parsed                                          |
+
+`partition` values are tracked like any field. `offset` and `timestamp` are marked `manyValues` up front.
+
+At the caret, `valueItems` takes the field's kept values (element values for `CONTAINS` on an array), applies
+`lower`/`upper`/`trim` if the left side uses it (`length(…)` suggests none), removes duplicates, and adds `true` /
+`false` for booleans. Then it filters by what was typed: prefix matches first, then substring matches. To show
+more values, raise `MAX_VALUES_KEPT`. `MAX_TRACKED_VALUES` caps it in practice, so raise both together.
 
 Sources are the 500-message sample (`useMessageSample`, fetched on first focus and cached for a minute), the
 current page, and the live tail. `useFieldCatalog` returns a **getter** that rebuilds only when a source list
