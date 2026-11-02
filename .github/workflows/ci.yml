@@ -1,31 +1,80 @@
-# Pull request checks that complement security.yml (which lints and tests on
-# Linux):
+# Checks for pull requests and for pushes to main:
+# - lint and unit tests on Linux, on both (main also gets direct pushes);
 # - the PR title must be a Conventional Commit, because squash-merging makes it
 #   the commit on main that the release notes are built from;
 # - the app must compile on macOS and Windows, the platforms we ship, so that
 #   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
-#   release rather than during one.
+#   release rather than during one. PRs only: installers are built when the
+#   release-please PR is merged (release.yml).
 #
-# Merges to main don't rebuild here: the code was built on its PR, and the
-# installers are only built when the release-please PR is merged (release.yml).
+# The e2e suite (`bun run test:e2e`) runs locally, not here. Dependency audits
+# are in security.yml.
 name: CI
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 # Edits to the PR title or description (by people or bots) get their own
 # group, so they only re-check the title and never cancel a running build.
+# Runs on main always finish.
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'edit' || 'code' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  test:
+    name: Lint and test
+    # Title edits don't change code.
+    if: github.event.action != 'edited'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+
+      # Tauri's Linux webview, and CMake + headers for the bundled librdkafka
+      # (its OAuth code includes curl.h even when built without curl).
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config libcurl4-openssl-dev zlib1g-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+
+      - run: bun install --frozen-lockfile
+
+      # Type-checks the UI; `generate_context!` also needs the built dist/.
+      - run: bun run build
+
+      # Same checks as the git hooks (lefthook.yml), for commits made with --no-verify.
+      - name: Format and lint
+        run: bun run lint
+
+      - name: UI tests
+        run: bun test frontend
+
+      # Includes the guards for the OWASP controls (app/src/security_tests.rs).
+      - name: Rust tests
+        run: cargo test --locked --lib
+
   pr-title:
     name: Conventional PR title
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -45,8 +94,8 @@ jobs:
 
   build:
     name: Build (${{ matrix.os }})
-    # Title edits don't change code; skip the slow builds for them.
-    if: github.event.action != 'edited'
+    # PRs only, and title edits don't change code; skip the slow builds for them.
+    if: github.event_name == 'pull_request' && github.event.action != 'edited'
     strategy:
       fail-fast: false
       matrix:

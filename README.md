@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/tructn/kui/actions/workflows/release.yml"><img src="https://github.com/tructn/kui/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <a href="https://github.com/tructn/kui/actions/workflows/ci.yml"><img src="https://github.com/tructn/kui/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
   <a href="https://github.com/tructn/kui/actions/workflows/security.yml"><img src="https://github.com/tructn/kui/actions/workflows/security.yml/badge.svg" alt="Security" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
 </p>

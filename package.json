@@ -16,7 +16,7 @@
     "test": "bun test frontend && cargo test",
     "test:e2e": "docker compose --profile e2e rm --stop --force kafka-e2e kafka-seed-e2e && docker compose --profile e2e run --build --rm e2e",
     "lint": "cargo fmt --all --check && cargo clippy --all-targets --locked -- -D warnings",
-    "security": "bun audit --audit-level=moderate && bun test frontend && cargo test --lib && cargo audit",
+    "audit": "bun audit --audit-level=moderate && cargo audit",
     "kafka:up": "docker compose up -d",
     "kafka:down": "docker compose down"
   },

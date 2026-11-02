@@ -1,6 +1,9 @@
-# Security checks: guard tests for the OWASP controls,
-# behavioural tests, and dependency advisories (rustsec, GitHub advisories).
-# Runs weekly too, because new advisories appear without any code change.
+# Dependency advisories: GitHub's (bun audit) for the UI, RustSec's (cargo
+# audit) for the app. Runs weekly too, because new advisories appear without
+# any code change. Only the lockfiles are read, so nothing is built here.
+#
+# Tests, including the guards for the OWASP controls (app/src/security_tests.rs),
+# run in ci.yml.
 name: Security
 
 on:
@@ -20,9 +23,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The job name is a required check on main; keep it.
   security:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,33 +34,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: swatinem/rust-cache@v2
-
-      # Tauri's Linux webview, and CMake + headers for the bundled librdkafka
-      # (its OAuth code includes curl.h even when built without curl).
-      - name: System libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake pkg-config libcurl4-openssl-dev zlib1g-dev \
-            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
-
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
 
-      - run: bun install --frozen-lockfile
-
-      # The Rust tests read the built UI's config only, but `generate_context!` needs dist/.
-      - run: bun run build
-
-      # Same checks as the pre-commit / pre-push hooks (lefthook.yml), for commits made with --no-verify.
-      - name: Format and lint
-        run: bun run lint
-
-      - name: Guard tests, unit tests and dependency audits
-        run: bun run security
+      - name: Audit dependencies
+        run: bun run audit
