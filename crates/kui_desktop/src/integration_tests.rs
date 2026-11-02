@@ -3,13 +3,15 @@
 //!   docker compose up -d
 //!   cargo test -- --ignored
 //!
-//! Override the broker with `KUI_TEST_BOOTSTRAP=host:port`.
+//! Override the broker with `KUI_TEST_BOOTSTRAP=host:port`. The ACL test
+//! needs a broker with an authorizer, like the one in docker-compose.yml.
 
 use std::time::Duration;
 
 use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::{Offset, TopicPartitionList};
 
+use crate::features::acls::model::{Acl, Operation, PatternType, Permission, ResourceType};
 use crate::features::consumer_groups::model::{ResetRequest, ResetTo};
 use crate::features::generator::model::{GenerateRequest, HeaderTemplate, RecordTemplate};
 use crate::features::messages::model::{
@@ -17,7 +19,7 @@ use crate::features::messages::model::{
     StartFrom, TailRequest,
 };
 use crate::features::topics::model::NewTopicRequest;
-use crate::features::{brokers, clusters, consumer_groups, generator, messages, topics};
+use crate::features::{acls, brokers, clusters, consumer_groups, generator, messages, topics};
 use crate::tasks::Tasks;
 use kui_kafka::ClusterConfig;
 use kui_kafka::{KafkaClients, new_consumer};
@@ -441,4 +443,38 @@ async fn reset_consumer_group_offsets() {
 
     consumer_groups::service::delete(&clients, &group).await.ok();
     topics::service::delete(&clients, &[topic]).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "needs a running Kafka broker with an authorizer"]
+async fn acl_round_trip() {
+    let clients = KafkaClients::connect(local_cluster()).unwrap();
+    let acl = Acl {
+        principal: format!("User:kui-it-{}", uuid::Uuid::new_v4()),
+        host: "*".into(),
+        resource_type: ResourceType::Topic,
+        resource_name: "kui-it-".into(),
+        pattern_type: PatternType::Prefixed,
+        operation: Operation::Read,
+        permission: Permission::Allow,
+    };
+    let listed = || {
+        acls::service::list(&clients).unwrap().into_iter().filter(|a| a.principal == acl.principal).collect::<Vec<_>>()
+    };
+
+    acls::service::create(&clients, acl.clone()).unwrap();
+    // A sibling ACL that must survive deleting the first one.
+    let write = Acl { operation: Operation::Write, ..acl.clone() };
+    acls::service::create(&clients, write.clone()).unwrap();
+    // Kafka applies new ACLs asynchronously.
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while listed().len() < 2 && std::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    assert_eq!(listed(), [acl.clone(), write.clone()]);
+
+    acls::service::delete(&clients, &acl).unwrap();
+    assert_eq!(listed(), std::slice::from_ref(&write));
+    acls::service::delete(&clients, &write).unwrap();
+    assert!(acls::service::delete(&clients, &write).unwrap_err().to_string().contains("no matching ACL"));
 }

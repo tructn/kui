@@ -1,3 +1,4 @@
+import { AclsPage } from "@/features/acls";
 import { BrokersPage } from "@/features/brokers";
 import { ConsumerGroupsPage } from "@/features/consumer-groups";
 import { TopicPage, TopicsPage } from "@/features/topics";
@@ -32,5 +33,7 @@ function Page() {
       return <TopicPage key={`${clusterId}/${route.topic}`} topic={route.topic} />;
     case "consumer-groups":
       return <ConsumerGroupsPage key={clusterId} />;
+    case "acls":
+      return <AclsPage key={clusterId} />;
   }
 }

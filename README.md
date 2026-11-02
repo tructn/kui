@@ -87,6 +87,12 @@ in a few clicks.
 See every consumer group, whether it's caught up, and how far behind it is on each partition.
 When a group needs a fresh start, **reset its offsets** to the earliest message, the latest one, or a point in time.
 
+### Control who can do what
+
+The ACLs page lists every access control list on the cluster: which user may read, write or manage which
+topics, groups and transactional IDs. Add an ACL for one name or a whole prefix, or delete one you no longer
+need. ACLs only work on clusters whose brokers have an authorizer; if yours don't, KUI says so.
+
 ### Make it yours
 
 <img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />

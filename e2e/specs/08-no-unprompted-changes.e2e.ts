@@ -35,7 +35,10 @@ describe("Nothing changes without the user's consent", () => {
     // Brokers is the home page and already loaded, so visit pages that fetch on first open.
     await goTo("Topics");
     await goTo("Consumer groups");
-    expect(await commandsSent()).toEqual(expect.arrayContaining(["list_topics", "list_consumer_groups"]));
+    await goTo("ACLs");
+    expect(await commandsSent()).toEqual(
+      expect.arrayContaining(["list_topics", "list_consumer_groups", "list_acls"]),
+    );
   });
 
   it("browses every page, tab, message and group", async () => {

@@ -19,7 +19,7 @@ mod security_tests;
 
 use tauri::Manager;
 
-use features::{brokers, clusters, consumer_groups, generator, messages, topics};
+use features::{acls, brokers, clusters, consumer_groups, generator, messages, topics};
 use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -73,6 +73,9 @@ pub fn run() {
             consumer_groups::commands::delete_consumer_group,
             consumer_groups::commands::preview_offset_reset,
             consumer_groups::commands::reset_consumer_group_offsets,
+            acls::commands::list_acls,
+            acls::commands::create_acl,
+            acls::commands::delete_acl,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

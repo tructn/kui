@@ -7,6 +7,7 @@
 //! Features only depend on `kui_kafka` (shared infra), never on each other.
 //! Even `ClusterConfig`, which every feature takes as input, lives in `kafka`.
 
+pub mod acls;
 pub mod brokers;
 pub mod clusters;
 pub mod consumer_groups;

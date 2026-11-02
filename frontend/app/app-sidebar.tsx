@@ -3,6 +3,7 @@ import {
   SearchIcon,
   ServerIcon,
   SettingsIcon,
+  ShieldIcon,
   UsersIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -40,7 +41,7 @@ interface NavItem {
 }
 
 // Ordered the way a cluster is built up: the brokers, the topics they host,
-// then the consumer groups reading those topics.
+// then the consumer groups reading those topics, then who may do what (ACLs).
 const NAV_ITEMS: NavItem[] = [
   { label: "Brokers", icon: ServerIcon, page: "brokers", route: { page: "brokers" }, key: "1" },
   { label: "Topics", icon: ListTreeIcon, page: "topics", route: { page: "topics" }, key: "2" },
@@ -51,6 +52,7 @@ const NAV_ITEMS: NavItem[] = [
     route: { page: "consumer-groups" },
     key: "3",
   },
+  { label: "ACLs", icon: ShieldIcon, page: "acls", route: { page: "acls" }, key: "4" },
 ];
 
 export function AppSidebar() {
@@ -65,6 +67,7 @@ export function AppSidebar() {
   useShortcut("mod+1", () => navigate(NAV_ITEMS[0].route), clusterId !== null);
   useShortcut("mod+2", () => navigate(NAV_ITEMS[1].route), clusterId !== null);
   useShortcut("mod+3", () => navigate(NAV_ITEMS[2].route), clusterId !== null);
+  useShortcut("mod+4", () => navigate(NAV_ITEMS[3].route), clusterId !== null);
 
   return (
     <Sidebar collapsible="icon">

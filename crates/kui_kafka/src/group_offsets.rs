@@ -8,7 +8,7 @@
 //! broker connections and all of them are in flight at once.
 
 use std::collections::HashMap;
-use std::ffi::{CStr, CString, c_void};
+use std::ffi::{CString, c_void};
 use std::ptr;
 use std::time::{Duration, Instant};
 
@@ -19,6 +19,7 @@ use rdkafka::types::RDKafkaErrorCode;
 
 use super::TIMEOUT;
 use super::offsets::PartitionKey;
+use crate::admin::cstr;
 use crate::{Error, Result};
 
 /// Every offset each of `groups` has committed, in the order given. A group
@@ -115,8 +116,4 @@ unsafe fn read(event: *mut rd::rd_kafka_event_t) -> Result<HashMap<PartitionKey,
             .map(|p| ((cstr(p.topic), p.partition), p.offset))
             .collect())
     }
-}
-
-pub(super) unsafe fn cstr(s: *const std::ffi::c_char) -> String {
-    if s.is_null() { String::new() } else { unsafe { CStr::from_ptr(s) }.to_string_lossy().into_owned() }
 }

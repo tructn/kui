@@ -35,7 +35,7 @@ export async function expectToast(text: string) {
 }
 
 /** Opens a page from the sidebar. */
-export async function goTo(page: "Topics" | "Consumer groups" | "Brokers") {
+export async function goTo(page: "Topics" | "Consumer groups" | "Brokers" | "ACLs") {
   // A sheet or dialog that is still fading out covers the sidebar and would intercept the click.
   await openSheet().waitForExist({ reverse: true });
   await openDialog().waitForExist({ reverse: true });
@@ -99,6 +99,8 @@ export const CHANGING_COMMANDS = [
   "generate_records",
   "delete_consumer_group",
   "reset_consumer_group_offsets",
+  "create_acl",
+  "delete_acl",
   "install_update",
 ];
 
