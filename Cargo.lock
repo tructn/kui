@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "kui"
-version = "0.1.0-alpha.16"
+version = "0.1.0-alpha.17"
 dependencies = [
  "chrono",
  "fake",

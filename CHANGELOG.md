@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.17](https://github.com/tructn/kui/compare/v0.1.0-alpha.16...v0.1.0-alpha.17) (2026-11-02)
+
+
+### Added
+
+* **messages:** query into JSON written as a string ([6c24165](https://github.com/tructn/kui/commit/6c24165dbaae0d161b3a2a33352be301e709c2e1))
+
 ## [0.1.0-alpha.16](https://github.com/tructn/kui/compare/v0.1.0-alpha.15...v0.1.0-alpha.16) (2026-11-01)
 
 
