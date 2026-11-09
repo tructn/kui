@@ -1,6 +1,7 @@
 # Dependency advisories: GitHub's (bun audit) for the UI, RustSec's (cargo
 # audit) for the app. Runs weekly too, because new advisories appear without
 # any code change. Only the lockfiles are read, so nothing is built here.
+# The same job scans the full git history for committed secrets (gitleaks).
 #
 # Tests, including the guards for the OWASP controls (crates/kui_desktop/src/security_tests.rs),
 # run in ci.yml.
@@ -31,12 +32,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit
+          tool: cargo-audit,gitleaks
 
       - name: Audit dependencies
         run: bun run audit
+
+      - name: Scan history for secrets
+        run: gitleaks git --redact --verbose
