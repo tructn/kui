@@ -6,6 +6,7 @@
 #   demo.analytics  40 tracking events whose `properties` is JSON written as a string
 #   demo.catalog    30 wide product documents: dynamic-key maps, arrays of arrays, mixed arrays, edge-case numbers
 #   demo.webhooks   40 webhook envelopes whose payload is JSON encoded 2-3 levels deep, base64 or NDJSON
+#   demo.untrusted  6 messages carrying HTML/script payloads in keys, values, JSON keys and headers (e2e: they must render inert)
 # Each topic is created only if missing, so re-running adds new demo topics to an old broker.
 set -euo pipefail
 BIN=/opt/kafka/bin
@@ -212,4 +213,27 @@ else
     --reader-property headers.key.separator='=' \
     --reader-property parse.key=true --reader-property key.separator='|'
   echo "Seeded demo.webhooks."
+fi
+
+# Every payload sets window.__pwned if the UI ever lets it execute (see e2e/specs/10-untrusted-messages).
+# The producer splits headers and keys on `|`, `;` and `=`, so the header and key payloads (`bare`) avoid them.
+untrusted() {
+  local xss='<img src=x onerror="window.__pwned=1">' bare='<b id="injected">x</b><script>window.__pwned++</script>'
+  printf 'x-note=%s\t%s|%s\n' "$bare" "$bare" "{\"name\":\"$xss\",\"$xss\":\"key\"}"
+  printf 'x-note=ok\tk-2|%s\n' '{"html":"<script>window.__pwned=1</script>","link":"javascript:window.__pwned=1"}'
+  printf 'x-note=ok\tk-3|%s\n' '{"svg":"<svg onload=window.__pwned=1>","iframe":"<iframe srcdoc=\"<script>parent.__pwned=1</script>\">"}'
+  printf 'x-note=ok\tk-4|%s\n' '<b id="injected">plain text, not JSON</b><script>window.__pwned=1</script>'
+  printf 'x-note=ok\tk-5|%s\n' '{"embedded":"{\"deep\":\"<img src=x onerror=window.__pwned=1>\"}"}'
+  printf 'x-note=ok\tk-6|%s\n' '{"status":"<img src=x onerror=window.__pwned=1>"}'
+}
+
+if has_topic demo.untrusted; then
+  echo "demo.untrusted already seeded."
+else
+  $BIN/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic demo.untrusted --partitions 1
+  untrusted | $BIN/kafka-console-producer.sh --bootstrap-server "$BOOTSTRAP" --topic demo.untrusted \
+    --reader-property parse.headers=true --reader-property headers.separator=';' \
+    --reader-property headers.key.separator='=' \
+    --reader-property parse.key=true --reader-property key.separator='|'
+  echo "Seeded demo.untrusted."
 fi

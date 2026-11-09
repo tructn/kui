@@ -147,6 +147,18 @@ fn security_links_never_navigate_the_app_window() {
     }
 }
 
+#[test]
+fn security_ui_loads_nothing_from_dynamic_urls() {
+    // Message content must never pick a URL: `javascript:` and `data:` schemes run code, and any remote
+    // fetch from a message would also leak that the message was opened.
+    let attributes = ["src={", "href={", "srcDoc", "<iframe", "<embed", "<object", "window.open"];
+    for (path, text) in frontend_sources() {
+        for attribute in attributes {
+            assert!(!text.contains(attribute), "{} uses {attribute}", path.display());
+        }
+    }
+}
+
 // --- Behavioural controls tested next to their code -----------------------
 //
 // A01  internal topics are read-only ........ kui_kafka::metadata::tests::platform_topics_are_internal
