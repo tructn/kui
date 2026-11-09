@@ -29,3 +29,6 @@ e2e/artifacts
 
 # Rust build output (the Cargo workspace is at the repo root)
 /target/
+
+# security-team agent reports
+security/findings/
