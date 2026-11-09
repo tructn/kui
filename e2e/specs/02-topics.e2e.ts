@@ -41,6 +41,8 @@ describe("Topics and messages", () => {
     await expect(cell).toBeDisplayed();
 
     await cell.click();
+    // The sheet opens on the Tree view; the raw text is under JSON.
+    await button("JSON", openSheet()).click();
     await expect(openSheet().$("pre")).toHaveText(expect.stringContaining('"hello": "e2e"'));
     await button("Headers (1)", openSheet()).click();
     // WebKit's getText skips the truncated (overflow-hidden) key, so look for the element.
