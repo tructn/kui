@@ -15,7 +15,7 @@ import { formatBytes, formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { KafkaMessage, MessageRef, Payload } from "../types";
-import { encodingLabel, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
+import { encodingLabel, PayloadBody, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
 
 interface MessageTableProps {
   messages: KafkaMessage[];
@@ -256,7 +256,7 @@ const MessagePreview = memo(function MessagePreview({ message, colSpan }: { mess
   );
 });
 
-/** The value in the preview: its JSON / Base64 switch, encoding, size and a copy button, then the text. */
+/** The value in the preview: its Tree / JSON / Base64 switch, encoding, size and a copy button, then the text. */
 function PreviewValue({ payload }: { payload: Payload | null }) {
   const { views, shown, setView, text } = usePayloadView(payload);
   return (
@@ -276,9 +276,7 @@ function PreviewValue({ payload }: { payload: Payload | null }) {
               </span>
               <CopyButton value={text} label="Copy value" />
             </div>
-            <pre className="max-h-72 overflow-auto rounded-md border bg-background p-3 leading-relaxed break-all whitespace-pre-wrap">
-              {text}
-            </pre>
+            <PayloadBody view={shown} text={text} className="max-h-[70vh] min-h-48 rounded-md border bg-background" />
           </>
         )}
       </dd>

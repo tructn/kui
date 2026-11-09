@@ -1,18 +1,23 @@
 import { prettyJson } from "@/lib/format";
 
+import { parseTree } from "./json-tree";
 import type { Payload } from "./types";
 
 /** How the message panel shows a payload's bytes. */
-export type PayloadView = "json" | "base64";
+export type PayloadView = "tree" | "json" | "base64";
 
-/** The views a payload can be shown in; JSON (pretty-printed text) only when its bytes are UTF-8. */
+/**
+ * The views a payload can be shown in. JSON (pretty-printed text) needs UTF-8 bytes; the tree also
+ * needs that text to be a JSON object or array, or a string holding one.
+ */
 export function payloadViews(payload: Payload): PayloadView[] {
-  return payload.encoding === "utf8" ? ["json", "base64"] : ["base64"];
+  if (payload.encoding !== "utf8") return ["base64"];
+  return parseTree(payload.text) ? ["json", "tree", "base64"] : ["json", "base64"];
 }
 
-/** `payload` rendered as `view`, falling back to base64 when text isn't possible. */
+/** `payload` rendered as `view`, falling back to base64 when text isn't possible. The tree is drawn from the text. */
 export function renderPayload(payload: Payload, view: PayloadView): string {
-  if (view === "json" && payload.encoding === "utf8") return prettyJson(payload.text);
+  if (view !== "base64" && payload.encoding === "utf8") return prettyJson(payload.text);
   return toBase64(payloadBytes(payload));
 }
 

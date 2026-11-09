@@ -8,7 +8,7 @@ import { formatBytes, formatTimestamp } from "@/lib/format";
 
 import type { CopyTarget, KafkaMessage, Payload } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
-import { encodingLabel, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
+import { encodingLabel, PayloadBody, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
 
 interface MessageSheetProps {
   clusterId: string;
@@ -96,9 +96,7 @@ function PayloadView({ payload }: { payload: Payload | null }) {
           <CopyIndicator copied={copied} /> {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-muted p-3 font-mono text-code leading-relaxed break-all whitespace-pre-wrap">
-        {text}
-      </pre>
+      <PayloadBody view={shown} text={text} className="min-h-0 flex-1 rounded-lg bg-muted font-mono text-code" />
     </div>
   );
 }

@@ -24,6 +24,18 @@ describe("renderPayload", () => {
     expect(renderPayload(binary, "json")).toBe("AP8Q");
   });
 
+  test("tree view only for JSON objects, arrays and strings holding them", () => {
+    expect(payloadViews(utf8('{"a":1}'))).toEqual(["json", "tree", "base64"]);
+    expect(payloadViews(utf8("[1]"))).toEqual(["json", "tree", "base64"]);
+    expect(payloadViews(utf8(JSON.stringify('{"a":1}')))).toEqual(["json", "tree", "base64"]);
+    for (const text of ["42", '"hi"', "INFO ok", ""]) expect(payloadViews(utf8(text))).toEqual(["json", "base64"]);
+    expect(payloadViews(binary)).toEqual(["base64"]);
+  });
+
+  test("tree view copies as the pretty-printed JSON", () => {
+    expect(renderPayload(utf8('{"a":1}'), "tree")).toBe('{\n  "a": 1\n}');
+  });
+
   test("large payloads encode without overflowing the call stack", () => {
     const big = "x".repeat(200_000);
     expect(renderPayload(utf8(big), "base64")).toBe(btoa(big));

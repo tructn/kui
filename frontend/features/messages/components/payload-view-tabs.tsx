@@ -5,17 +5,19 @@ import { cn } from "@/lib/utils";
 
 import { type PayloadView, payloadViews, renderPayload } from "../payload-view";
 import type { Payload } from "../types";
+import { JsonTree, JsonTreeBoundary } from "./json-tree";
 
-const VIEW_LABELS: Record<PayloadView, string> = { json: "JSON", base64: "Base64" };
+const VIEW_LABELS: Record<PayloadView, string> = { json: "JSON", tree: "Tree", base64: "Base64" };
 
 /**
- * Which view (JSON / Base64) a payload is shown in, and its text in that view.
- * The choice is kept when `payload` changes; a binary payload always shows base64.
+ * Which view (Tree / JSON / Base64) a payload is shown in, and its text in that view.
+ * The choice is kept when `payload` changes, unless the new payload can't show it (plain text has no
+ * tree, binary only has base64); it then takes its first view.
  */
 export function usePayloadView(payload: Payload | null) {
-  const [view, setView] = useState<PayloadView>("json");
+  const [view, setView] = useState<PayloadView>("tree");
   const views = payload ? payloadViews(payload) : [];
-  const shown = views.includes(view) ? view : "base64";
+  const shown = views.includes(view) ? view : (views[0] ?? "base64");
   const text = useMemo(() => (payload ? renderPayload(payload, shown) : null), [payload, shown]);
   return { views, shown, setView, text };
 }
@@ -30,7 +32,7 @@ interface PayloadViewTabsProps {
   label?: string;
 }
 
-/** The JSON / Base64 switch above a payload. */
+/** The Tree / JSON / Base64 switch above a payload. */
 export function PayloadViewTabs({ views, value, onChange, compact, label = "Show as" }: PayloadViewTabsProps) {
   return (
     <Tabs value={value} onValueChange={(v) => onChange(v as PayloadView)}>
@@ -48,4 +50,19 @@ export function PayloadViewTabs({ views, value, onChange, compact, label = "Show
 /** "UTF-8" or "Binary": how the payload's bytes are encoded. */
 export function encodingLabel(payload: Payload) {
   return payload.encoding === "utf8" ? "UTF-8" : "Binary";
+}
+
+/** A payload's text in the chosen view: the JSON tree, or plain text. `className` styles either. */
+export function PayloadBody({ view, text, className }: { view: PayloadView; text: string; className?: string }) {
+  const plain = (
+    <pre className={cn("overflow-auto p-3 leading-relaxed break-all whitespace-pre-wrap", className)}>{text}</pre>
+  );
+  // `key` gives each payload a fresh boundary, so one failure doesn't stick to the next message.
+  return view === "tree" ? (
+    <JsonTreeBoundary key={text} fallback={plain}>
+      <JsonTree text={text} className={className} />
+    </JsonTreeBoundary>
+  ) : (
+    plain
+  );
 }
