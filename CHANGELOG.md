@@ -6,6 +6,14 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.19](https://github.com/tructn/kui/compare/v0.1.0-alpha.18...v0.1.0-alpha.19) (2026-11-09)
+
+
+### Added
+
+* **messages:** JSON tree view for message values ([829b93e](https://github.com/tructn/kui/commit/829b93e8e13b12f80fed3b6b1ea294ca9f0ef949))
+* **seed:** add nested catalog and multi-encoded webhook demo topics ([5d13b36](https://github.com/tructn/kui/commit/5d13b3637675fb1fb368b271f28b8ff74acfc91d))
+
 ## [0.1.0-alpha.18](https://github.com/tructn/kui/compare/v0.1.0-alpha.17...v0.1.0-alpha.18) (2026-11-02)
 
 
