@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use tauri::State;
 
+use crate::lock::lock;
 use crate::state::AppState;
 
 #[derive(Default)]
@@ -20,13 +21,13 @@ impl Tasks {
     /// Registers a task. It stays cancellable until the returned token is dropped.
     pub fn start(self: &Arc<Self>, id: &str) -> CancelToken {
         let flag = Arc::new(AtomicBool::new(false));
-        self.running.lock().unwrap().insert(id.to_string(), flag.clone());
+        lock(&self.running).insert(id.to_string(), flag.clone());
         CancelToken { flag, registry: Some((self.clone(), id.to_string())) }
     }
 
     /// Asks a task to stop. Returns false if it already finished.
     pub fn cancel(&self, id: &str) -> bool {
-        match self.running.lock().unwrap().get(id) {
+        match lock(&self.running).get(id) {
             Some(flag) => {
                 flag.store(true, Ordering::Relaxed);
                 true
@@ -57,7 +58,7 @@ impl CancelToken {
 impl Drop for CancelToken {
     fn drop(&mut self) {
         if let Some((tasks, id)) = &self.registry {
-            tasks.running.lock().unwrap().remove(id);
+            lock(&tasks.running).remove(id);
         }
     }
 }

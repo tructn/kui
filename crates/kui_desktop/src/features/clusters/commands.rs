@@ -3,24 +3,25 @@ use tauri::State;
 use super::service;
 use crate::blocking::run_blocking;
 use crate::error::Result;
+use crate::lock::lock;
 use crate::state::AppState;
 use kui_kafka::ClusterConfig;
 
 #[tauri::command]
 pub fn list_clusters(state: State<'_, AppState>) -> Vec<ClusterConfig> {
-    state.clusters.lock().unwrap().list()
+    lock(&state.clusters).list()
 }
 
 #[tauri::command]
 pub fn save_cluster(state: State<'_, AppState>, cluster: ClusterConfig) -> Result<ClusterConfig> {
-    let saved = state.clusters.lock().unwrap().save(cluster)?;
+    let saved = lock(&state.clusters).save(cluster)?;
     state.forget_clients(&saved.id);
     Ok(saved)
 }
 
 #[tauri::command]
 pub fn delete_cluster(state: State<'_, AppState>, cluster_id: String) -> Result<()> {
-    state.clusters.lock().unwrap().delete(&cluster_id)?;
+    lock(&state.clusters).delete(&cluster_id)?;
     state.forget_clients(&cluster_id);
     Ok(())
 }

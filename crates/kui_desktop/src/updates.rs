@@ -21,6 +21,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::error::{Error, Result};
+use crate::lock::lock;
 
 const RELEASES_URL: &str = "https://api.github.com/repos/tructn/kui/releases?per_page=30";
 const MANIFEST: &str = "latest.json";
@@ -86,7 +87,7 @@ pub async fn check_for_update(
         notes: u.body.clone(),
         prerelease: release.prerelease,
     });
-    *pending.0.lock().unwrap() = update;
+    *lock(&pending.0) = update;
     Ok(available)
 }
 
@@ -98,7 +99,7 @@ pub async fn install_update(
     pending: State<'_, PendingUpdate>,
     on_event: Channel<DownloadEvent>,
 ) -> Result<()> {
-    let update = pending.0.lock().unwrap().take().ok_or_else(|| Error::msg("No update to install; check again"))?;
+    let update = lock(&pending.0).take().ok_or_else(|| Error::msg("No update to install; check again"))?;
     let mut downloaded = 0u64;
     update
         .download_and_install(

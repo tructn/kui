@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::Result;
 use crate::features::clusters::store::ClusterStore;
+use crate::lock::lock;
 use crate::tasks::Tasks;
 use kui_kafka::KafkaClients;
 
@@ -20,17 +21,17 @@ impl AppState {
 
     /// Returns cached clients for a cluster, connecting on first use.
     pub fn clients(&self, cluster_id: &str) -> Result<Arc<KafkaClients>> {
-        if let Some(existing) = self.clients.lock().unwrap().get(cluster_id) {
+        if let Some(existing) = lock(&self.clients).get(cluster_id) {
             return Ok(existing.clone());
         }
-        let config = self.clusters.lock().unwrap().get(cluster_id)?;
+        let config = lock(&self.clusters).get(cluster_id)?;
         let created = Arc::new(KafkaClients::connect(config)?);
-        self.clients.lock().unwrap().insert(cluster_id.to_string(), created.clone());
+        lock(&self.clients).insert(cluster_id.to_string(), created.clone());
         Ok(created)
     }
 
     /// Drops cached clients so the next call reconnects with fresh settings.
     pub fn forget_clients(&self, cluster_id: &str) {
-        self.clients.lock().unwrap().remove(cluster_id);
+        lock(&self.clients).remove(cluster_id);
     }
 }

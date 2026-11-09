@@ -3,7 +3,7 @@
 //! rejected password, SSL against a PLAINTEXT listener) is reported to the
 //! client's context, which keeps it for the error message.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
 use rdkafka::ClientContext;
@@ -12,6 +12,11 @@ use rdkafka::error::KafkaError;
 use rdkafka::types::RDKafkaErrorCode;
 
 use crate::Error;
+
+/// Locks `mutex`, recovering the data if a panicking thread poisoned it.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// Every consumer KUI creates, so the offset and metadata helpers take any of them.
 pub type KafkaConsumer = BaseConsumer<ConnectionErrors>;
@@ -40,7 +45,7 @@ impl ConnectionErrors {
 impl ClientContext for ConnectionErrors {
     fn error(&self, error: KafkaError, reason: &str) {
         let error = ConnectionError { code: error.rdkafka_error_code(), reason: reason.to_string() };
-        *self.last.lock().unwrap() = Some(error);
+        *lock(&self.last) = Some(error);
     }
 }
 
@@ -91,7 +96,7 @@ pub fn describe(e: &KafkaError) -> String {
 /// failed, so any message it polls is not missed.
 fn last_error(consumer: &KafkaConsumer) -> Option<ConnectionError> {
     while consumer.poll(Duration::from_millis(10)).is_some() {}
-    consumer.context().last.lock().unwrap().clone()
+    lock(&consumer.context().last).clone()
 }
 
 /// The broker answered but turned the connection down: wrong credentials or

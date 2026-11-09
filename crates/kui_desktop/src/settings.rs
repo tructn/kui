@@ -15,6 +15,7 @@ use tauri::State;
 use crate::blocking::run_blocking;
 use crate::error::Result;
 use crate::json_file;
+use crate::lock::lock;
 
 /// Cheap to clone: clones share the same values, so a save can move one onto
 /// a blocking thread.
@@ -31,12 +32,12 @@ impl SettingsStore {
     }
 
     fn all(&self) -> Map<String, Value> {
-        self.values.lock().unwrap().clone()
+        lock(&self.values).clone()
     }
 
     /// Sets (or with `None`, removes) one key and writes the file.
     fn set(&self, key: String, value: Option<Value>) -> Result<()> {
-        let mut values = self.values.lock().unwrap();
+        let mut values = lock(&self.values);
         match value {
             Some(value) => values.insert(key, value),
             None => values.remove(&key),
@@ -62,6 +63,23 @@ pub async fn save_setting(store: State<'_, SettingsStore>, key: String, value: O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_poisoned_lock_does_not_break_later_calls() {
+        let path = std::env::temp_dir().join(format!("kui-settings-{}.json", uuid::Uuid::new_v4()));
+        let store = SettingsStore::load(path.clone()).unwrap();
+        let poisoner = store.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoner.values.lock();
+            panic!("poison the lock");
+        })
+        .join();
+        assert!(store.values.is_poisoned());
+
+        store.set("k".into(), Some(Value::Bool(true))).unwrap();
+        assert_eq!(store.all()["k"], Value::Bool(true));
+        std::fs::remove_file(path).ok();
+    }
 
     #[test]
     fn values_persist_across_loads() {

@@ -7,6 +7,7 @@ mod blocking;
 mod error;
 mod features;
 mod json_file;
+mod lock;
 mod settings;
 mod state;
 mod tasks;
