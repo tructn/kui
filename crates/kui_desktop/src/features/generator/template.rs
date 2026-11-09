@@ -63,6 +63,8 @@ pub const GENERATORS: &[(&str, &str, &str)] = &[
     ("date", "{{date}} / {{date 365}}", "Random date in the last N days (default 365), YYYY-MM-DD"),
 ];
 
+const MAX_DAYS: i64 = 36_500;
+
 pub fn generator_infos() -> Vec<GeneratorInfo> {
     GENERATORS
         .iter()
@@ -183,7 +185,7 @@ fn parse_placeholder(inner: &str) -> Result<Gen> {
     };
     let days = |default: i64| -> Result<i64> {
         let n = int(0, Some(default))?;
-        if n > 0 { Ok(n) } else { Err(bad("a positive number of days")) }
+        if (1..=MAX_DAYS).contains(&n) { Ok(n) } else { Err(bad("days between 1 and 36500")) }
     };
 
     Ok(match name.as_str() {
@@ -198,8 +200,9 @@ fn parse_placeholder(inner: &str) -> Result<Gen> {
         }
         "float" => {
             let (min, max) = (float(0)?, float(1)?);
-            if min > max {
-                return Err(bad("min <= max"));
+            // A non-finite bound or a span that overflows f64 makes random_range panic.
+            if !(min.is_finite() && max.is_finite() && min <= max && (max - min).is_finite()) {
+                return Err(bad("finite numbers with min <= max"));
             }
             Gen::Float(min, max, int(2, Some(2))?.clamp(0, 10) as usize)
         }
@@ -274,7 +277,7 @@ fn split_args(inner: &str) -> Result<Vec<String>> {
 impl Gen {
     fn value<L: CityNameGenFn, R: RngExt + ?Sized>(&self, index: u64, l: L, rng: &mut R) -> String {
         match self {
-            Gen::Seq(start) => (start + index as i64).to_string(),
+            Gen::Seq(start) => start.saturating_add(i64::try_from(index).unwrap_or(i64::MAX)).to_string(),
             Gen::Uuid => UUIDv4.fake_with_rng::<String, _>(rng),
             Gen::Int(min, max) => rng.random_range(*min..=*max).to_string(),
             Gen::Float(min, max, decimals) => {
@@ -408,6 +411,34 @@ mod tests {
         ] {
             assert!(Template::parse(bad).is_err(), "{bad} should fail");
         }
+    }
+
+    #[test]
+    fn hostile_numeric_arguments_are_errors_not_panics() {
+        for bad in [
+            "{{timestamp 9223372036854775807}}",
+            "{{date 9223372036854775807}}",
+            "{{datetime 200000000000}}",
+            "{{timestamp 36501}}",
+            "{{float nan 1}}",
+            "{{float 1 NaN}}",
+            "{{float inf 1}}",
+            "{{float -inf inf}}",
+            "{{float -1e308 1e308}}",
+        ] {
+            assert!(Template::parse(bad).is_err(), "{bad} should fail");
+        }
+    }
+
+    #[test]
+    fn extreme_but_valid_arguments_render_without_panicking() {
+        assert_eq!(render("{{seq 9223372036854775807}}", 5), "9223372036854775807");
+        assert_eq!(render("{{seq -9223372036854775808}}", 0), "-9223372036854775808");
+        assert!(!render("{{timestamp 36500}}{{datetime 36500}}{{date 36500}}", 0).is_empty());
+        let n: i64 = render("{{int -9223372036854775808 9223372036854775807}}", 0).parse().unwrap();
+        assert!(n != 0);
+        assert!(!render("{{float -1e300 1e300 0}}", 0).is_empty());
+        assert_eq!(render("{{float 5 5}}", 0), "5.00");
     }
 
     #[test]
