@@ -47,7 +47,7 @@ jobs:
       created: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           # A PAT rather than GITHUB_TOKEN: pull requests opened with
@@ -95,22 +95,22 @@ jobs:
         run: |
           [ "$HAS_UPDATER_KEY" = true ] || { echo "::error::Add the TAURI_SIGNING_PRIVATE_KEY secret; see CONTRIBUTING.md"; exit 1; }
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The tagged release commit; empty (the triggering ref) on a manual run.
           ref: ${{ env.TAG }}
           persist-credentials: false
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: ${{ matrix.target }}
 
       # Bump prefix-key when a C dependency changes where it comes from (e.g.
       # OpenSSL vcpkg -> preinstalled): the cache keeps librdkafka's CMake
       # cache, which remembers absolute library paths from the old source.
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           prefix-key: v1-rust
           key: ${{ matrix.target }}
@@ -186,7 +186,7 @@ jobs:
             --config "{\"bundle\":{\"createUpdaterArtifacts\":$updater}}" $TAURI_SIGNING_ARGS
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: kui-${{ matrix.target }}
           path: |
@@ -198,7 +198,7 @@ jobs:
       # Signed SLSA provenance, verifiable with `gh attestation verify`.
       - name: Attest build provenance
         if: env.TAG != ''
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             ${{ env.BUNDLE }}/dmg/*.dmg
@@ -225,7 +225,7 @@ jobs:
           gh release view "$TAG" --json body --jq .body | sed -e '1{/^## /d;}' -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: installers
           merge-multiple: true
