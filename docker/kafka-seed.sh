@@ -4,6 +4,8 @@
 #   demo.customers  compacted, 7 customers
 #   demo.events     60 nested, mixed-shape events with headers, for trying the message query
 #   demo.analytics  40 tracking events whose `properties` is JSON written as a string
+#   demo.catalog    30 wide product documents: dynamic-key maps, arrays of arrays, mixed arrays, edge-case numbers
+#   demo.webhooks   40 webhook envelopes whose payload is JSON encoded 2-3 levels deep, base64 or NDJSON
 # Each topic is created only if missing, so re-running adds new demo topics to an old broker.
 set -euo pipefail
 BIN=/opt/kafka/bin
@@ -137,4 +139,77 @@ else
     --reader-property headers.key.separator='=' \
     --reader-property parse.key=true --reader-property key.separator='|'
   echo "Seeded demo.analytics."
+fi
+
+# One document per line: `key|json`. Every product has the same wide shape; each fifth one also has
+# `reviews` nested ten levels deep through user.profile.social.links[].
+#   price.tiers[]            open-ended last tier (`max: null`)
+#   variants[].stock         warehouses is a map with dynamic keys, two levels below the array
+#   matrix, mixed            array of arrays; array mixing numbers, strings, null, bool, object, array
+#   attrs                    keys with a dot and a space, which the query catalog has to quote
+#   empty, numbers           empty containers, ints past 2^53, negatives, exponents, zero
+catalog() {
+  local cities=(hanoi berlin austin lagos) colors=(red green blue) sizes=(S M L XL)
+  for i in $(seq 1 30); do
+    local c=${colors[$((i % 3))]} w=$((i % 40 + 10)) reviews=""
+    if [ $((i % 5)) = 0 ]; then
+      reviews=",\"reviews\":[{\"stars\":$((i % 5 + 1)),\"user\":{\"id\":\"user-$((i % 9))\",\"profile\":{\"bio\":{\"lang\":\"vi\",\"text\":\"Rất tốt “${i}”\"},\
+\"social\":{\"links\":[{\"type\":\"web\",\"url\":\"https://example.com/u/$i\",\"meta\":{\"verified\":true,\"checks\":[{\"at\":\"2026-11-01\",\"by\":{\"bot\":\"v$i\"}}]}}]}}}}]"
+    fi
+    printf 'SKU-%s|%s\n' "$i" "{\"sku\":\"SKU-$i\",\"name\":\"Product $i – Ünïcode ☕ 🚀\",\"active\":$([ $((i % 7)) = 0 ] && echo false || echo true),\
+\"price\":{\"amount\":$((i * 13 % 200 + 5)).99,\"currency\":\"USD\",\"tiers\":[{\"min\":1,\"max\":9,\"unit\":$((i % 9 + 10)).5},{\"min\":10,\"max\":99,\"unit\":$((i % 9 + 8)).0},{\"min\":100,\"max\":null,\"unit\":$((i % 9 + 6)).25}]},\
+\"dimensions\":{\"cm\":{\"w\":$w,\"h\":$((w + 5)),\"d\":$((w / 2))},\"in\":{\"w\":$((w * 10 / 25)).$((w % 10)),\"h\":$(((w + 5) * 10 / 25)).$((w % 10))}},\
+\"variants\":[{\"id\":\"v1\",\"options\":{\"color\":\"$c\",\"size\":\"${sizes[$((i % 4))]}\"},\"stock\":{\"warehouses\":{\"${cities[$((i % 4))]}\":{\"onHand\":$((i * 3 % 50)),\"reserved\":$((i % 5)),\"bins\":[\"A-$((i % 9))\",\"B-$((i % 4))\"]},\"${cities[$(((i + 1) % 4))]}\":{\"onHand\":$((i * 7 % 80)),\"reserved\":0,\"bins\":[]}}}},\
+{\"id\":\"v2\",\"options\":{\"color\":\"${colors[$(((i + 1) % 3))]}\"},\"stock\":{\"warehouses\":{}}}],\
+\"matrix\":[[1,2,3],[4,$i,6],[7,8,[9,[10]]]],\"mixed\":[$i,\"two\",null,true,{\"k\":\"v\",\"n\":{\"deep\":[1,{\"x\":null}]}},[1,[2,[3]]]],\
+\"labels\":{\"en\":\"Product $i\",\"vi\":\"Sản phẩm $i\",\"de\":\"Produkt $i\"},\"attrs\":{\"a.b\":$i,\"with space\":\"x\",\"x-y\":[{\"z.z\":1}]},\
+\"empty\":{\"obj\":{},\"arr\":[],\"str\":\"\"},\"numbers\":{\"big\":9007199254740993,\"neg\":-0.$((i % 9 + 1)),\"exp\":1.5e$((i % 9 + 1)),\"zero\":0,\"float\":$i.000001}$reviews}"
+  done
+}
+
+if has_topic demo.catalog; then
+  echo "demo.catalog already seeded."
+else
+  $BIN/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic demo.catalog --partitions 3
+  catalog | $BIN/kafka-console-producer.sh --bootstrap-server "$BOOTSTRAP" --topic demo.catalog \
+    --reader-property parse.key=true --reader-property key.separator='|'
+  echo "Seeded demo.catalog."
+fi
+
+# One event per line: `headers<TAB>key|json`, same header format as analytics. Four shapes, by i % 4:
+#   0  billing   payload: JSON string; its data.object.metadata is another JSON string (three levels)
+#   1  vcs       payload: a real object, but `body` is that JSON, base64 encoded
+#   2  batch     records: NDJSON in one string (newline-separated documents, one with a nested string)
+#   3  misc      scalars written as strings ("42", "true", "null", "[1,2,3]") plus broken JSON that stays text
+webhooks() {
+  local evts=(invoice.paid charge.failed customer.created) countries=(VN DE US NG)
+  for i in $(seq 1 40); do
+    local n=$((i % 4)) ts="2026-11-$(printf %02d $((i % 28 + 1)))T$(printf %02d $((i % 24))):30:00Z" evt=${evts[$((i % 3))]}
+    local meta="{\"campaign\":{\"id\":\"cmp-$((i % 5))\",\"utm\":{\"source\":\"mail\",\"medium\":\"cpc\"}},\"seats\":$((i % 8 + 1))}"
+    local headers="x-event=$evt;x-delivery=dlv-$i;content-type=application/json"
+    case $n in
+      0) local inner="{\"type\":\"$evt\",\"data\":{\"object\":{\"id\":\"in_$i\",\"amount\":$((i * 137 % 9000 + 100)),\"lines\":[{\"sku\":\"SKU-$((i % 5))\",\"qty\":$((i % 3 + 1))}],\"metadata\":$(json_string "$meta")}}}"
+        printf '%s;x-meta=%s\twh-%s|%s\n' "$headers" "$meta" "$i" "{\"id\":\"wh-$i\",\"source\":\"billing\",\"receivedAt\":\"$ts\",\"payload\":$(json_string "$inner")}" ;;
+      1) local body b64
+        body="{\"ref\":\"refs/heads/main\",\"commits\":[{\"id\":\"c$i\",\"author\":{\"name\":\"Ada $i\",\"emails\":[\"ada$i@example.com\"]},\"files\":{\"added\":[\"a$i.rs\"],\"removed\":[]}}]}"
+        b64=$(printf '%s' "$body" | base64 | tr -d '\n')
+        printf '%s\twh-%s|%s\n' "$headers" "$i" "{\"id\":\"wh-$i\",\"source\":\"vcs\",\"receivedAt\":\"$ts\",\"payload\":{\"event\":\"push\",\"repo\":{\"owner\":{\"login\":\"acme\"},\"name\":\"kui\"}},\"body\":\"$b64\",\"encoding\":\"base64\"}" ;;
+      2) local records="" j
+        for j in 1 2 3; do records+="${records:+$'\n'}{\"seq\":$j,\"user\":\"user-$(((i + j) % 9))\",\"extra\":$(json_string "{\"k\":$j,\"ok\":true}")}"; done
+        printf '%s\twh-%s|%s\n' "$headers" "$i" "{\"id\":\"wh-$i\",\"source\":\"batch\",\"receivedAt\":\"$ts\",\"records\":$(json_string "$records")}" ;;
+      3) printf '%s\twh-%s|%s\n' "$headers" "$i" "{\"id\":\"wh-$i\",\"source\":\"misc\",\"receivedAt\":\"$ts\",\"count\":\"$i\",\"ok\":\"$([ $((i % 2)) = 0 ] && echo true || echo false)\",\"nothing\":\"null\",\
+\"ids\":$(json_string "[$i,$((i + 1)),$((i + 2))]"),\"region\":\"${countries[$((i % 4))]}\",\"empty\":\"\",\"truncated\":$(json_string "{\"a\":{\"b\":[1,2"),\"version\":\"1.$i.0\"}" ;;
+    esac
+  done
+}
+
+if has_topic demo.webhooks; then
+  echo "demo.webhooks already seeded."
+else
+  $BIN/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic demo.webhooks --partitions 3
+  webhooks | $BIN/kafka-console-producer.sh --bootstrap-server "$BOOTSTRAP" --topic demo.webhooks \
+    --reader-property parse.headers=true --reader-property headers.separator=';' \
+    --reader-property headers.key.separator='=' \
+    --reader-property parse.key=true --reader-property key.separator='|'
+  echo "Seeded demo.webhooks."
 fi
