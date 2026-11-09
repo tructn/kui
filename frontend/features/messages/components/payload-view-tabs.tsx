@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-import { type PayloadView, payloadViews, renderPayload } from "../payload-view";
+import { type PayloadView, payloadViews, renderPayload, truncationNotice } from "../payload-view";
 import type { Payload } from "../types";
 import { JsonTree, JsonTreeBoundary } from "./json-tree";
 
@@ -64,5 +65,25 @@ export function PayloadBody({ view, text, className }: { view: PayloadView; text
     </JsonTreeBoundary>
   ) : (
     plain
+  );
+}
+
+/** Warns that a payload is cut off, and where its full bytes are. Renders nothing for a complete one. */
+export function TruncationNotice({ payload, className }: { payload: Payload; className?: string }) {
+  const notice = truncationNotice(payload);
+  if (!notice) return null;
+  return (
+    <p
+      role="status"
+      className={cn(
+        "rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 font-sans text-xs text-foreground",
+        className,
+      )}
+    >
+      <Badge variant="outline" className="mr-2">
+        {notice}
+      </Badge>
+      Copy is off for a partial payload. Use Copy to topic or export for the full bytes.
+    </p>
   );
 }

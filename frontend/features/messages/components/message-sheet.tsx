@@ -8,7 +8,7 @@ import { formatBytes, formatTimestamp } from "@/lib/format";
 
 import type { CopyTarget, KafkaMessage, Payload } from "../types";
 import { CopyMessageDialog } from "./copy-message-dialog";
-import { encodingLabel, PayloadBody, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
+import { encodingLabel, PayloadBody, PayloadViewTabs, TruncationNotice, usePayloadView } from "./payload-view-tabs";
 
 interface MessageSheetProps {
   clusterId: string;
@@ -91,11 +91,14 @@ function PayloadView({ payload }: { payload: Payload | null }) {
         <Button
           variant="ghost"
           size="sm"
+          disabled={payload.truncated}
+          title={payload.truncated ? "Truncated payload: copy would give a partial value" : undefined}
           onClick={() => copy(text)}
         >
           <CopyIndicator copied={copied} /> {copied ? "Copied" : "Copy"}
         </Button>
       </div>
+      <TruncationNotice payload={payload} />
       <PayloadBody view={shown} text={text} className="min-h-0 flex-1 rounded-lg bg-muted font-mono text-code" />
     </div>
   );

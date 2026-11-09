@@ -56,6 +56,8 @@ export interface Payload {
   text: string;
   encoding: "utf8" | "hex";
   size: number;
+  /** `text` is only a prefix: the page's byte budget ran out. `size` is still the full length. */
+  truncated?: boolean;
 }
 
 export interface MessageHeader {

@@ -442,3 +442,263 @@ async fn reset_consumer_group_offsets() {
     consumer_groups::service::delete(&clients, &group).await.ok();
     topics::service::delete(&clients, &[topic]).await.unwrap();
 }
+
+/// Purple-team RA-001/RA-009: browse, search, tail and export must agree on which large
+/// messages match, whether or not the page's byte budget cut their displayed text.
+#[tokio::test]
+#[ignore = "needs a running Kafka broker"]
+async fn truncated_payloads_are_matched_whole_by_search_tail_and_export() {
+    use rdkafka::producer::FutureRecord;
+
+    let clients = std::sync::Arc::new(KafkaClients::connect(local_cluster()).unwrap());
+    let topic = format!("kui-it-trunc-{}", uuid::Uuid::new_v4());
+    let request =
+        NewTopicRequest { name: topic.clone(), partitions: 1, replication_factor: 1, configs: Default::default() };
+    topics::service::create(&clients, &request).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // 40 x ~900 KB is above the 32 MiB page budget; the field the query tests sits at the very end.
+    const COUNT: i64 = 40;
+    let body = |i: i64| {
+        let status = if i % 2 == 0 { "ok" } else { "bad" };
+        format!("{{\"pad\":\"{}\",\"status\":\"{status}\"}}", "x".repeat(900_000))
+    };
+    let produce_all = || async {
+        for i in 0..COUNT {
+            let value = body(i);
+            let record = FutureRecord::<str, str>::to(&topic).partition(0).key("k").payload(&value);
+            clients.producer.send(record, Duration::from_secs(30)).await.unwrap();
+        }
+    };
+
+    // Tail first (it only sees new messages), then produce.
+    let tasks = std::sync::Arc::new(Tasks::default());
+    let tail_cancel = tasks.start("tail");
+    let (tail_clients, tail_topic) = (clients.clone(), topic.clone());
+    let tail = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        let request = TailRequest { topic: tail_topic, partition: None, query: Some("value.status = 'ok'".into()) };
+        messages::service::tail(&tail_clients, &request, &tail_cancel, |batch| {
+            seen.extend(batch);
+            true
+        })
+        .unwrap();
+        seen
+    });
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    produce_all().await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    tasks.cancel("tail");
+    let tailed = tail.join().unwrap();
+
+    let browse = |query: &str| BrowseRequest {
+        topic: topic.clone(),
+        partition: None,
+        from: StartFrom::Earliest,
+        value: None,
+        page_size: 1000,
+        cursor: None,
+        query: Some(query.into()),
+    };
+    let offsets = |page: &messages::model::BrowsePage| page.messages.iter().map(|m| m.offset).collect::<Vec<_>>();
+    let evens: Vec<i64> = (0..COUNT).filter(|i| i % 2 == 0).collect();
+    let odds: Vec<i64> = (0..COUNT).filter(|i| i % 2 == 1).collect();
+
+    let ok = messages::service::browse(&clients, &browse("value.status = 'ok'")).unwrap();
+    assert_eq!(offsets(&ok), evens, "search = on whole payload");
+    let bad = messages::service::browse(&clients, &browse("value.status != 'ok'")).unwrap();
+    assert_eq!(offsets(&bad), odds, "search != on whole payload");
+    let not_ok = messages::service::browse(&clients, &browse("NOT value.status = 'ok'")).unwrap();
+    assert_eq!(offsets(&not_ok), odds, "search NOT on whole payload");
+
+    assert_eq!(tailed.iter().map(|m| m.offset).collect::<Vec<_>>(), evens, "tail agrees with search");
+
+    // Every shown payload is a prefix of the true one with the real size; some were cut.
+    let full = body(0).len();
+    for m in ok.messages.iter().chain(tailed.iter()) {
+        let v = m.value.as_ref().unwrap();
+        assert_eq!(v.size, full);
+        assert_eq!(v.truncated, v.text.len() < v.size, "offset {}", m.offset);
+        assert!(body(0).starts_with(&v.text[..v.text.len().min(1000)]));
+    }
+    assert!(ok.messages.iter().any(|m| m.value.as_ref().unwrap().truncated), "budget never kicked in");
+
+    // Export is complete and agrees.
+    let export = ExportRequest {
+        source: ExportSource::Range { browse: browse("value.status = 'ok'"), limit: 1000 },
+        format: ExportFormat::Ndjson,
+    };
+    let mut out = Vec::new();
+    let count = messages::service::export(&clients, &export, &mut out).unwrap();
+    assert_eq!(count as usize, evens.len());
+    for line in String::from_utf8(out).unwrap().lines() {
+        let v: serde_json::Value = serde_json::from_str(line).unwrap();
+        assert!(line.len() > full, "export line must hold the whole payload");
+        assert!(v["offset"].as_i64().is_some());
+    }
+
+    topics::service::delete(&clients, &[topic]).await.unwrap();
+}
+
+/// Purple round 3 (R2-001, tester R1): a hostile mix of ~900 KB and tiny messages over three
+/// partitions, more cut raw bytes than one search chunk retains. Following the cursors page by
+/// page must find every match exactly once, never match a cut prefix, and keep each page near
+/// the byte cap.
+#[tokio::test]
+#[ignore = "needs a running Kafka broker"]
+async fn search_cursor_walk_over_large_and_small_messages_misses_and_repeats_nothing() {
+    use rdkafka::producer::FutureRecord;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let clients = KafkaClients::connect(local_cluster()).unwrap();
+    let topic = format!("kui-it-walk-{}", uuid::Uuid::new_v4());
+    let configs = [("max.message.bytes".to_string(), "9000000".to_string())].into();
+    let request = NewTopicRequest { name: topic.clone(), partitions: 3, replication_factor: 1, configs };
+    topics::service::create(&clients, &request).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let producer: rdkafka::producer::FutureProducer =
+        kui_kafka::client_config(&local_cluster()).set("message.max.bytes", "9000000").create().unwrap();
+    // `late` sits after the padding, so only a whole-payload match sees it; `early` is in any prefix.
+    // 190 big messages: past the 32 MiB page budget and past the 64 MiB a chunk retains.
+    let mut truth: BTreeMap<(i32, i64), bool> = BTreeMap::new();
+    for i in 0..560i64 {
+        let late = if i % 2 == 0 { "ok" } else { "bad" };
+        let pad = if i % 4 == 1 || i % 7 == 3 { "x".repeat(900_000) } else { String::new() };
+        let body = format!("{{\"early\":\"ok\",\"pad\":\"{pad}\",\"late\":\"{late}\"}}");
+        let record = FutureRecord::<str, str>::to(&topic).partition((i % 3) as i32).payload(&body);
+        let delivered = producer.send(record, Duration::from_secs(30)).await.unwrap();
+        truth.insert((delivered.partition, delivered.offset), late == "ok");
+    }
+
+    let walk = |query: &str, size: usize| {
+        let (mut cursor, mut seen, mut biggest) = (None, Vec::new(), 0usize);
+        for _ in 0..200 {
+            let request = BrowseRequest {
+                topic: topic.clone(),
+                partition: None,
+                from: StartFrom::Earliest,
+                value: None,
+                page_size: size,
+                cursor: cursor.clone(),
+                query: Some(query.into()),
+            };
+            let page = messages::service::browse(&clients, &request).unwrap();
+            let shown: usize = page.messages.iter().map(|m| m.value.as_ref().map_or(0, |v| v.text.len())).sum();
+            biggest = biggest.max(shown);
+            seen.extend(page.messages.iter().map(|m| (m.partition, m.offset)));
+            match page.next {
+                Some(next) => cursor = Some(next),
+                None => return (seen, biggest),
+            }
+        }
+        panic!("the search never reached the end of the topic");
+    };
+    let cases = [
+        ("value.late = 'ok'", Some(true)),
+        ("NOT value.late = 'ok'", Some(false)),
+        ("value.late != 'ok'", Some(false)),
+        ("value.early = 'ok'", None),
+    ];
+    for (query, want_ok) in cases {
+        for size in [40, 1000] {
+            let (seen, biggest) = walk(query, size);
+            let found: BTreeSet<_> = seen.iter().copied().collect();
+            assert_eq!(found.len(), seen.len(), "{query} (page {size}) repeated a message");
+            let want: BTreeSet<_> =
+                truth.iter().filter(|(_, ok)| want_ok.is_none_or(|w| **ok == w)).map(|(k, _)| *k).collect();
+            assert_eq!(found, want, "{query} (page {size})");
+            // 32 MiB of hits, plus the one message that crosses the cap (cut to its preview or whole).
+            assert!(biggest <= 32 * 1024 * 1024 + 1_000_000, "{query} (page {size}) showed {biggest} bytes");
+        }
+    }
+    topics::service::delete(&clients, &[topic]).await.unwrap();
+}
+
+async fn hostile_topic(clients: &KafkaClients, max_message: &str) -> (String, rdkafka::producer::FutureProducer) {
+    let topic = format!("kui-it-hostile-{}", uuid::Uuid::new_v4());
+    let configs = [("max.message.bytes".to_string(), max_message.to_string())].into();
+    let request = NewTopicRequest { name: topic.clone(), partitions: 1, replication_factor: 1, configs };
+    topics::service::create(clients, &request).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let producer = kui_kafka::client_config(&local_cluster()).set("message.max.bytes", max_message).create().unwrap();
+    (topic, producer)
+}
+
+fn search_request(topic: &str, query: &str, cursor: Option<std::collections::BTreeMap<i32, i64>>) -> BrowseRequest {
+    BrowseRequest {
+        topic: topic.into(),
+        partition: None,
+        from: StartFrom::Earliest,
+        value: None,
+        page_size: 1000,
+        cursor,
+        query: Some(query.into()),
+    }
+}
+
+/// Purple round 3 (tester R1): the 32 MiB cap is for the whole page, not for each chunk of 500
+/// messages read to fill it. Half of 1,500 x 100 KB messages match, so no single chunk reaches the cap.
+#[tokio::test]
+#[ignore = "needs a running Kafka broker"]
+async fn a_search_page_stops_at_its_byte_cap_across_chunks() {
+    use rdkafka::producer::FutureRecord;
+
+    let clients = KafkaClients::connect(local_cluster()).unwrap();
+    let (topic, producer) = hostile_topic(&clients, "9000000").await;
+    for i in 0..1500 {
+        let late = if i % 2 == 0 { "ok" } else { "bad" };
+        let body = format!("{{\"pad\":\"{}\",\"late\":\"{late}\"}}", "x".repeat(100_000));
+        let record = FutureRecord::<str, str>::to(&topic).partition(0).payload(&body);
+        producer.send(record, Duration::from_secs(30)).await.unwrap();
+    }
+
+    let (mut cursor, mut seen, mut pages) = (None, Vec::new(), 0);
+    loop {
+        let page = messages::service::browse(&clients, &search_request(&topic, "value.late = 'ok'", cursor)).unwrap();
+        let shown: usize = page.messages.iter().map(|m| m.value.as_ref().map_or(0, |v| v.text.len())).sum();
+        assert!(shown <= 32 * 1024 * 1024 + 200_000, "page {pages} showed {shown} bytes");
+        seen.extend(page.messages.iter().map(|m| m.offset));
+        pages += 1;
+        match page.next {
+            Some(next) => cursor = Some(next),
+            None => break,
+        }
+    }
+    assert!(pages >= 2, "all 750 hits (~75 MB) came back in one page");
+    assert_eq!(seen, (0..1500).step_by(2).collect::<Vec<i64>>());
+    topics::service::delete(&clients, &[topic]).await.unwrap();
+}
+
+/// Purple round 3 (R2-001): a message bigger than the 64 MiB a chunk retains is still matched
+/// whole, both when it follows another message (the chunk ends before it) and when it starts a chunk.
+#[tokio::test]
+#[ignore = "needs a running Kafka broker"]
+async fn a_message_above_the_retained_limit_is_matched_whole() {
+    use rdkafka::producer::FutureRecord;
+
+    let clients = KafkaClients::connect(local_cluster()).unwrap();
+    let (topic, producer) = hostile_topic(&clients, "100000000").await;
+    for (i, big) in [false, true, false, true].into_iter().enumerate() {
+        let late = if i < 2 { "ok" } else { "bad" };
+        let pad = if big { "x".repeat(70_000_000) } else { String::new() };
+        let body = format!("{{\"early\":\"ok\",\"pad\":\"{pad}\",\"late\":\"{late}\"}}");
+        let record = FutureRecord::<str, str>::to(&topic).partition(0).payload(&body);
+        producer.send(record, Duration::from_secs(60)).await.unwrap();
+    }
+    let walk = |query: &str| {
+        let (mut cursor, mut seen) = (None, Vec::new());
+        for _ in 0..20 {
+            let page = messages::service::browse(&clients, &search_request(&topic, query, cursor)).unwrap();
+            seen.extend(page.messages.iter().map(|m| m.offset));
+            match page.next {
+                Some(next) => cursor = Some(next),
+                None => return seen,
+            }
+        }
+        panic!("the search never reached the end of the topic");
+    };
+    assert_eq!(walk("value.late = 'ok'"), [0, 1]);
+    assert_eq!(walk("NOT value.late = 'ok'"), [2, 3]);
+    topics::service::delete(&clients, &[topic]).await.unwrap();
+}

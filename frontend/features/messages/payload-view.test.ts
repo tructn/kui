@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { payloadViews, renderPayload } from "./payload-view";
+import { payloadViews, renderPayload, truncationNotice } from "./payload-view";
 import type { Payload } from "./types";
 
 const utf8 = (text: string): Payload => ({ text, encoding: "utf8", size: new TextEncoder().encode(text).length });
@@ -43,5 +43,26 @@ describe("renderPayload", () => {
 
   test("empty payload", () => {
     expect(renderPayload(utf8(""), "base64")).toBe("");
+  });
+});
+
+describe("truncated payloads", () => {
+  const cut: Payload = { text: '{"a":1', encoding: "utf8", size: 5000, truncated: true };
+
+  test("no tree view, since the prefix is not the document", () => {
+    expect(payloadViews(cut)).toEqual(["json", "base64"]);
+    expect(payloadViews({ ...cut, text: "[1]" })).toEqual(["json", "base64"]);
+  });
+
+  test("notice states shown and total bytes", () => {
+    expect(truncationNotice(cut)).toBe("Truncated: showing 6 B of 4.9 KB");
+    expect(truncationNotice({ text: "00 ff", encoding: "hex", size: 4096, truncated: true })).toBe(
+      "Truncated: showing 2 B of 4.0 KB",
+    );
+  });
+
+  test("complete payloads have no notice", () => {
+    expect(truncationNotice(utf8("x"))).toBeNull();
+    expect(truncationNotice({ ...utf8("x"), truncated: false })).toBeNull();
   });
 });

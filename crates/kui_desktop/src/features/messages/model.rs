@@ -68,6 +68,9 @@ pub struct Payload {
     /// `utf8` when the bytes were valid UTF-8, otherwise `hex`.
     pub encoding: &'static str,
     pub size: usize,
+    /// `text` is a prefix of the payload: the page's byte budget ran out. `size` is still the full length.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
 }
 
 #[derive(Serialize)]

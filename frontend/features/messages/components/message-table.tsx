@@ -1,4 +1,4 @@
-import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
+import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, CopyIcon } from "lucide-react";
 import { Fragment, memo, startTransition, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/copy-button";
@@ -15,7 +15,7 @@ import { formatBytes, formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { KafkaMessage, MessageRef, Payload } from "../types";
-import { encodingLabel, PayloadBody, PayloadViewTabs, usePayloadView } from "./payload-view-tabs";
+import { encodingLabel, PayloadBody, PayloadViewTabs, TruncationNotice, usePayloadView } from "./payload-view-tabs";
 
 interface MessageTableProps {
   messages: KafkaMessage[];
@@ -274,8 +274,21 @@ function PreviewValue({ payload }: { payload: Payload | null }) {
               <span>
                 {encodingLabel(payload)} · {formatBytes(payload.size)}
               </span>
-              <CopyButton value={text} label="Copy value" />
+              {payload.truncated ? (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled
+                  aria-label="Copy value (unavailable: payload is truncated)"
+                  title="Truncated payload: copy would give a partial value"
+                >
+                  <CopyIcon />
+                </Button>
+              ) : (
+                <CopyButton value={text} label="Copy value" />
+              )}
             </div>
+            <TruncationNotice payload={payload} />
             <PayloadBody view={shown} text={text} className="max-h-[70vh] min-h-48 rounded-md border bg-background" />
           </>
         )}

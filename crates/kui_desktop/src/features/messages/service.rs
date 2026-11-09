@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -7,12 +7,13 @@ use std::time::{Duration, Instant};
 
 use rdkafka::consumer::Consumer;
 use rdkafka::error::KafkaError;
-use rdkafka::message::{Header, Headers, OwnedHeaders, OwnedMessage};
+use rdkafka::message::{BorrowedMessage, Header, OwnedHeaders, OwnedMessage};
 use rdkafka::producer::FutureRecord;
 use rdkafka::{Message as _, Offset, TopicPartitionList};
 
-use super::codec::decode;
+use super::codec::{Budget, MAX_HEADERS, Mode, PAGE_BYTE_BUDGET, decode_within, headers_text, shrink};
 use super::export::ExportWriter;
+use super::headers;
 use super::model::{
     BrowsePage, BrowseRequest, CopyRequest, Delivered, ExportRequest, ExportSource, Message, MessageHeader,
     ProduceRequest, StartFrom, TailRequest,
@@ -27,9 +28,11 @@ use crate::tasks::CancelToken;
 use kui_kafka::connection::{ConnectionErrors, explain};
 use kui_kafka::metadata::{ensure_writable, partition_ids};
 use kui_kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
-use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config};
+use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config, created};
 
 const MAX_PAGE_SIZE: usize = 1000;
+/// Export pages hold full payloads (nothing is truncated in a file), so keep them small.
+const EXPORT_PAGE_SIZE: usize = 100;
 
 /// Reads one page of messages, continuing from `request.cursor` if given.
 ///
@@ -37,11 +40,11 @@ const MAX_PAGE_SIZE: usize = 1000;
 /// merged by time (see `window::merge_page`). Uses a fresh consumer with manual
 /// partition assignment and no commits, so browsing never affects a real consumer group.
 pub fn browse(clients: &KafkaClients, request: &BrowseRequest) -> Result<BrowsePage> {
-    browse_with(&browsing_consumer(clients)?, request)
+    browse_with(&browsing_consumer(clients)?, request, Mode::Page)
 }
 
 /// `browse` on an existing browsing consumer, so several pages can share one.
-fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<BrowsePage> {
+fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest, mode: Mode) -> Result<BrowsePage> {
     // Parse first: a typo should fail fast, before any reading.
     let query = query::optional(request.query.as_deref())?;
     let size = request.page_size.clamp(1, MAX_PAGE_SIZE);
@@ -53,10 +56,10 @@ fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<Brow
         .iter()
         .map(|p| (p.id, request.cursor.as_ref().and_then(|c| c.get(&p.id)).copied().unwrap_or(p.start)))
         .collect();
-    let reader = PageReader { consumer, topic: &request.topic, partitions: &partitions, backward };
+    let reader = PageReader { consumer, topic: &request.topic, partitions: &partitions, backward, mode };
 
     let Some(query) = query else {
-        let (messages, next) = reader.read(&start, size)?;
+        let (messages, next) = reader.read(&start, size, None)?;
         return Ok(BrowsePage { messages, total, next, scanned: None });
     };
 
@@ -65,22 +68,34 @@ fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<Brow
     let deadline = Instant::now() + SEARCH_TIME_BUDGET;
     let mut matches = Vec::with_capacity(size);
     let mut scanned = 0u64;
+    let mut page_bytes = 0usize;
+    let limits = ScanLimits { size, deadline, byte_cap: PAGE_BYTE_BUDGET };
+    // A file's chunks hold whole payloads, so they stay small.
+    let chunk = if mode == Mode::Export { EXPORT_PAGE_SIZE } else { SEARCH_CHUNK };
     let mut cursor = start;
     loop {
-        let (raw, next) = reader.read(&cursor, SEARCH_CHUNK)?;
-        let mut consumed = Vec::with_capacity(raw.len());
-        for message in raw {
-            scanned += 1;
-            consumed.push((message.partition, message.offset));
-            if query.matches(&message) {
-                matches.push(message);
-                if matches.len() == size {
-                    break;
-                }
-            }
+        let mut retained = Retained::new();
+        let (raw, next) = reader.read(&cursor, chunk, (mode != Mode::Export).then_some(&mut retained))?;
+        // The chunk's first message is always matched, so it is never left without its whole payload.
+        if let Some(first) = raw.first().map(|m| (m.partition, m.offset))
+            && retained.overflow.remove(&first)
+        {
+            let whole = fetch_one(consumer, &request.topic, first.0, first.1, |m| {
+                (m.key().map(<[u8]>::to_vec), m.payload().map(<[u8]>::to_vec))
+            })?;
+            retained.bytes.insert(first, whole);
         }
-        if matches.len() == size {
-            // Full mid-chunk: resume right after the last message looked at.
+        let (consumed, stop) = scan_chunk(
+            raw,
+            &mut matches,
+            &limits,
+            &mut page_bytes,
+            |m| retained.overflow.contains(&(m.partition, m.offset)),
+            |m| matches_full(&query, m, &retained),
+        );
+        scanned += consumed.len() as u64;
+        if stop != ScanStop::Exhausted {
+            // Page full or out of time mid-chunk: resume right after the last message looked at.
             let resumed = resume_after(&cursor, &consumed, backward);
             let more = partitions.iter().any(|p| remaining(resumed[&p.id], p.marks, backward) > 0);
             return Ok(BrowsePage { messages: matches, total, next: more.then_some(resumed), scanned: Some(scanned) });
@@ -97,6 +112,61 @@ fn browse_with(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<Brow
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum ScanStop {
+    Exhausted,
+    PageFull,
+    OutOfTime,
+    /// The next message's whole payload isn't held (see `Retained`).
+    Deferred,
+}
+
+struct ScanLimits {
+    size: usize,
+    deadline: Instant,
+    /// Displayed bytes the hits of a whole page may add up to.
+    byte_cap: usize,
+}
+
+/// Runs `matches` over `raw` in order, collecting hits until the page holds `size` or its
+/// hits add up to `byte_cap`. Checks the deadline after every message, since one evaluation
+/// can be slow, and stops before a message `defer` flags. At least one message is always
+/// looked at so a search can't stall. Returns the `(partition, offset)` of every message looked
+/// at; a hit is never dropped, the page just ends and its cursor resumes after them.
+fn scan_chunk(
+    raw: Vec<Message>,
+    found: &mut Vec<Message>,
+    limits: &ScanLimits,
+    page_bytes: &mut usize,
+    defer: impl Fn(&Message) -> bool,
+    matches: impl Fn(&Message) -> bool,
+) -> (Vec<(i32, i64)>, ScanStop) {
+    let mut consumed = Vec::with_capacity(raw.len());
+    for message in raw {
+        if !consumed.is_empty() && defer(&message) {
+            return (consumed, ScanStop::Deferred);
+        }
+        consumed.push((message.partition, message.offset));
+        if matches(&message) {
+            *page_bytes += displayed_bytes(&message);
+            found.push(message);
+            if found.len() == limits.size || *page_bytes >= limits.byte_cap {
+                return (consumed, ScanStop::PageFull);
+            }
+        }
+        if Instant::now() >= limits.deadline {
+            return (consumed, ScanStop::OutOfTime);
+        }
+    }
+    (consumed, ScanStop::Exhausted)
+}
+
+/// Text bytes a message adds to a page (what goes over IPC).
+fn displayed_bytes(m: &Message) -> usize {
+    let payloads = m.key.iter().chain(m.value.iter()).map(|p| p.text.len()).sum::<usize>();
+    payloads + m.headers.iter().map(|h| h.key.len() + h.value.as_ref().map_or(0, String::len)).sum::<usize>()
+}
+
 /// How many messages a search reads at a time.
 const SEARCH_CHUNK: usize = 500;
 /// Most messages one page of search results reads before handing back what it found.
@@ -110,12 +180,51 @@ struct PageReader<'a> {
     topic: &'a str,
     partitions: &'a [PartitionPlan],
     backward: bool,
+    mode: Mode,
+}
+
+/// Most displayed text an export read may hold at once, across all partitions.
+const EXPORT_READ_BYTES: usize = 64 * 1024 * 1024;
+
+/// Runs `attempt` with `size`, halving it each time the attempt reports it went over its byte
+/// cap (`None`). Size 1 is never refused, so every read takes at least one message per partition.
+fn within_bytes<T>(size: usize, mut attempt: impl FnMut(usize) -> Result<Option<T>>) -> Result<T> {
+    let mut size = size;
+    loop {
+        if let Some(done) = attempt(size)? {
+            return Ok(done);
+        }
+        size = (size / 2).max(1);
+    }
 }
 
 impl PageReader<'_> {
+    /// Displayed text one `read` may hold.
+    fn budget(&self) -> usize {
+        if self.mode == Mode::Export { usize::MAX } else { PAGE_BYTE_BUDGET }
+    }
+
     /// Up to `size` messages from `cursor` (a position for every partition), and
     /// the cursor after them, or `None` when nothing is left.
-    fn read(&self, cursor: &Cursor, size: usize) -> Result<(Vec<Message>, Option<Cursor>)> {
+    ///
+    /// An export holds whole payloads from every partition at once, so it retries with a smaller
+    /// page when a read goes over `EXPORT_READ_BYTES`; the page is then shorter, never skipped.
+    fn read(
+        &self,
+        cursor: &Cursor,
+        size: usize,
+        mut retained: Option<&mut Retained>,
+    ) -> Result<(Vec<Message>, Option<Cursor>)> {
+        within_bytes(size, |size| self.read_once(cursor, size, retained.as_deref_mut()))
+    }
+
+    /// `None` when an export read went over its byte cap (never at size 1).
+    fn read_once(
+        &self,
+        cursor: &Cursor,
+        size: usize,
+        retained: Option<&mut Retained>,
+    ) -> Result<Option<(Vec<Message>, Option<Cursor>)>> {
         let backward = self.backward;
         let windows: HashMap<i32, ReadWindow> = self
             .partitions
@@ -129,7 +238,19 @@ impl PageReader<'_> {
                 assignment.add_partition_offset(self.topic, *partition, Offset::Offset(window.start))?;
             }
             self.consumer.assign(&assignment)?;
-            for message in read_until_done(self.consumer, windows.clone())? {
+            let cap = if self.mode == Mode::Export && size > 1 { EXPORT_READ_BYTES } else { usize::MAX };
+            let Some(read) = read_until_done(
+                self.consumer,
+                windows.clone(),
+                &mut Budget::new(self.budget()),
+                self.mode,
+                retained,
+                cap,
+            )?
+            else {
+                return Ok(None);
+            };
+            for message in read {
                 by_partition.entry(message.partition).or_default().push(message);
             }
         }
@@ -149,7 +270,7 @@ impl PageReader<'_> {
             next.entry(p.id).or_insert_with(|| cursor[&p.id].clamp(p.marks.low, p.marks.high));
         }
         let more = self.partitions.iter().any(|p| remaining(next[&p.id], p.marks, backward) > 0);
-        Ok((messages, more.then_some(next)))
+        Ok(Some((messages, more.then_some(next))))
     }
 }
 
@@ -191,8 +312,8 @@ pub fn export(clients: &KafkaClients, request: &ExportRequest, out: impl Write) 
             let mut left = (*limit).clamp(1, MAX_EXPORT);
             let mut cursor = browse.cursor.clone();
             while left > 0 {
-                let page_request = BrowseRequest { page_size: left.min(MAX_PAGE_SIZE), cursor, ..browse.clone() };
-                let page = browse_with(&consumer, &page_request)?;
+                let page_request = BrowseRequest { page_size: left.min(EXPORT_PAGE_SIZE), cursor, ..browse.clone() };
+                let page = browse_with(&consumer, &page_request, Mode::Export)?;
                 for message in page.messages.iter().take(left) {
                     writer.write(message)?;
                 }
@@ -214,7 +335,9 @@ pub fn export(clients: &KafkaClients, request: &ExportRequest, out: impl Write) 
             refs.sort_unstable();
             refs.dedup();
             for (partition, offset) in refs {
-                writer.write(&to_message(&fetch_one(&consumer, topic, partition, offset)?))?;
+                writer.write(&fetch_one(&consumer, topic, partition, offset, |m| {
+                    to_message(m, &mut Budget::unlimited(), Mode::Export)
+                })?)?;
             }
         }
     }
@@ -249,14 +372,19 @@ pub fn tail(
     consumer.assign(&assignment)?;
 
     let mut batch = Vec::new();
+    let mut budget = Budget::new(PAGE_BYTE_BUDGET);
     let mut last_flush = Instant::now();
     while !cancel.is_cancelled() {
         match consumer.poll(Duration::from_millis(100)) {
             None | Some(Err(KafkaError::PartitionEOF(_))) => {}
             Some(Err(e)) => return Err(explain(&consumer, e).into()),
             Some(Ok(m)) => {
-                let message = to_message(&m);
+                // Filter on the whole payload; only a kept message is cut to the batch budget.
+                let mut message = to_message(&m, &mut budget, Mode::Tail);
                 if query.as_ref().is_none_or(|q| q.matches(&message)) {
+                    for payload in message.key.iter_mut().chain(message.value.iter_mut()) {
+                        shrink(payload, &mut budget);
+                    }
                     batch.push(message);
                 }
             }
@@ -267,17 +395,24 @@ pub fn tail(
                 break;
             }
             last_flush = Instant::now();
+            budget = Budget::new(PAGE_BYTE_BUDGET);
         }
     }
     Ok(())
 }
 
 fn browsing_consumer(clients: &KafkaClients) -> Result<KafkaConsumer> {
-    Ok(client_config(&clients.cluster)
-        .set("group.id", format!("kui-browser-{}", uuid::Uuid::new_v4()))
-        .set("enable.auto.commit", "false")
-        .set("enable.partition.eof", "true")
-        .create_with_context(ConnectionErrors::new(&clients.cluster.bootstrap_servers))?)
+    browsing_consumer_for(&clients.cluster)
+}
+
+fn browsing_consumer_for(cluster: &kui_kafka::ClusterConfig) -> Result<KafkaConsumer> {
+    Ok(created(
+        client_config(cluster)
+            .set("group.id", format!("kui-browser-{}", uuid::Uuid::new_v4()))
+            .set("enable.auto.commit", "false")
+            .set("enable.partition.eof", "true")
+            .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers)),
+    )?)
 }
 
 /// A requested partition, its watermarks, and where the first page starts in it.
@@ -320,8 +455,16 @@ fn plan_partitions(consumer: &KafkaConsumer, request: &BrowseRequest) -> Result<
 }
 
 /// Polls until every partition has reached the end of its window, or we time out.
-fn read_until_done(consumer: &KafkaConsumer, mut pending: HashMap<i32, ReadWindow>) -> Result<Vec<Message>> {
+fn read_until_done(
+    consumer: &KafkaConsumer,
+    mut pending: HashMap<i32, ReadWindow>,
+    budget: &mut Budget,
+    mode: Mode,
+    mut retained: Option<&mut Retained>,
+    byte_cap: usize,
+) -> Result<Option<Vec<Message>>> {
     let mut messages = Vec::new();
+    let mut held = 0usize;
     let deadline = Instant::now() + TIMEOUT;
 
     while !pending.is_empty() && Instant::now() < deadline {
@@ -336,7 +479,15 @@ fn read_until_done(consumer: &KafkaConsumer, mut pending: HashMap<i32, ReadWindo
                     continue;
                 };
                 if m.offset() < window.end {
-                    messages.push(to_message(&m));
+                    let message = to_message(&m, budget, mode);
+                    if let Some(retained) = retained.as_deref_mut() {
+                        retained.keep_if_cut(&message, &m);
+                    }
+                    held += displayed_bytes(&message);
+                    messages.push(message);
+                    if held > byte_cap {
+                        return Ok(None);
+                    }
                 }
                 // Compacted/transactional topics can skip offsets, so compare with `>=`.
                 if m.offset() + 1 >= window.end {
@@ -345,27 +496,76 @@ fn read_until_done(consumer: &KafkaConsumer, mut pending: HashMap<i32, ReadWindo
             }
         }
     }
-    Ok(messages)
+    Ok(Some(messages))
 }
 
-fn to_message<M: rdkafka::Message>(m: &M) -> Message {
+/// Raw key/value bytes of messages whose displayed text was cut, so a search can run on the
+/// whole payload. Dropped after every chunk. Holds at most `RETAINED_LIMIT`: a cut message that
+/// doesn't fit is listed in `overflow` instead, and the chunk ends before it (`scan_chunk`'s
+/// `defer`), so the next chunk starts there. Matching never uses a cut prefix.
+type RawKeyValue = (Option<Vec<u8>>, Option<Vec<u8>>);
+
+struct Retained {
+    left: usize,
+    bytes: HashMap<(i32, i64), RawKeyValue>,
+    overflow: HashSet<(i32, i64)>,
+}
+
+/// Raw bytes held per search chunk. A single message larger than this is still matched whole
+/// (fetched alone, bounded by the broker's message.max.bytes).
+const RETAINED_LIMIT: usize = 64 * 1024 * 1024;
+
+impl Retained {
+    fn new() -> Self {
+        Self { left: RETAINED_LIMIT, bytes: HashMap::new(), overflow: HashSet::new() }
+    }
+
+    fn keep_if_cut(&mut self, message: &Message, raw: &BorrowedMessage<'_>) {
+        if !message.key.iter().chain(message.value.iter()).any(|p| p.truncated) {
+            return;
+        }
+        let at = (message.partition, message.offset);
+        let size = raw.key().map_or(0, <[u8]>::len) + raw.payload().map_or(0, <[u8]>::len);
+        if size <= self.left {
+            self.left -= size;
+            self.bytes.insert(at, (raw.key().map(<[u8]>::to_vec), raw.payload().map(<[u8]>::to_vec)));
+        } else {
+            self.overflow.insert(at);
+        }
+    }
+}
+
+/// Evaluates `query` on the message's whole payloads, not the cut text the UI gets.
+fn matches_full(query: &query::Query, message: &Message, retained: &Retained) -> bool {
+    let Some((key, value)) = retained.bytes.get(&(message.partition, message.offset)) else {
+        return query.matches(message);
+    };
+    let whole = |bytes: &Option<Vec<u8>>| bytes.as_deref().map(|b| decode_within(b, &mut Budget::unlimited()));
+    query.matches(&Message {
+        partition: message.partition,
+        offset: message.offset,
+        timestamp: message.timestamp,
+        key: whole(key),
+        value: whole(value),
+        headers: message.headers.iter().map(|h| MessageHeader { key: h.key.clone(), value: h.value.clone() }).collect(),
+    })
+}
+
+fn to_message(m: &BorrowedMessage<'_>, budget: &mut Budget, mode: Mode) -> Message {
+    let mut whole = Budget::unlimited();
+    let payload_budget = if mode == Mode::Page { &mut *budget } else { &mut whole };
+    let key = m.key().map(|k| decode_within(k, payload_budget));
+    let value = m.payload().map(|v| decode_within(v, payload_budget));
+    let limit = if mode == Mode::Export { usize::MAX } else { MAX_HEADERS };
     let headers = m
         .headers()
         .map(|hs| {
-            hs.iter()
-                .map(|h| MessageHeader { key: h.key.to_string(), value: h.value.map(|v| decode(v).text) })
-                .collect()
+            let (raw, total) = headers::read(hs, limit);
+            headers_text(raw, total, mode, budget)
         })
         .unwrap_or_default();
 
-    Message {
-        partition: m.partition(),
-        offset: m.offset(),
-        timestamp: m.timestamp().to_millis(),
-        key: m.key().map(decode),
-        value: m.payload().map(decode),
-        headers,
-    }
+    Message { partition: m.partition(), offset: m.offset(), timestamp: m.timestamp().to_millis(), key, value, headers }
 }
 
 pub async fn produce(clients: &KafkaClients, request: &ProduceRequest) -> Result<Delivered> {
@@ -406,7 +606,9 @@ pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<V
     let reader = clients.clone();
     let originals: Vec<OwnedMessage> = run_blocking(move || {
         let consumer = browsing_consumer(&reader)?;
-        refs.into_iter().map(|(partition, offset)| fetch_one(&consumer, &topic, partition, offset)).collect()
+        refs.into_iter()
+            .map(|(partition, offset)| fetch_one(&consumer, &topic, partition, offset, |m| m.detach()))
+            .collect()
     })
     .await?;
 
@@ -444,7 +646,13 @@ fn copy_record<'a>(
 }
 
 /// Reads exactly one message, or fails if it was deleted or compacted away.
-fn fetch_one(consumer: &KafkaConsumer, topic: &str, partition: i32, offset: i64) -> Result<OwnedMessage> {
+fn fetch_one<T>(
+    consumer: &KafkaConsumer,
+    topic: &str,
+    partition: i32,
+    offset: i64,
+    convert: impl FnOnce(&BorrowedMessage<'_>) -> T,
+) -> Result<T> {
     let mut assignment = TopicPartitionList::new();
     assignment.add_partition_offset(topic, partition, Offset::Offset(offset))?;
     consumer.assign(&assignment)?;
@@ -453,11 +661,161 @@ fn fetch_one(consumer: &KafkaConsumer, topic: &str, partition: i32, offset: i64)
     while Instant::now() < deadline {
         match consumer.poll(Duration::from_millis(200)) {
             None => {}
-            Some(Ok(m)) if m.offset() == offset && m.partition() == partition => return Ok(m.detach()),
+            Some(Ok(m)) if m.offset() == offset && m.partition() == partition => return Ok(convert(&m)),
             // Landed somewhere else: the offset is gone (retention, compaction, deletion).
             Some(Ok(_)) | Some(Err(KafkaError::PartitionEOF(_))) => break,
             Some(Err(e)) => return Err(explain(consumer, e).into()),
         }
     }
     Err(Error::msg(format!("Message at partition {partition}, offset {offset} no longer exists")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::model::Payload;
+    use super::*;
+
+    fn far() -> Instant {
+        Instant::now() + Duration::from_secs(60)
+    }
+
+    fn limits(size: usize, deadline: Instant) -> ScanLimits {
+        ScanLimits { size, deadline, byte_cap: usize::MAX }
+    }
+
+    fn message_with_value(offset: i64, len: usize) -> Message {
+        let mut m = message(offset);
+        m.value = Some(Payload { text: "x".repeat(len), encoding: "utf8", size: len, truncated: false });
+        m
+    }
+
+    #[test]
+    fn a_read_over_its_byte_cap_is_retried_smaller_until_it_fits_and_size_one_always_goes_through() {
+        let mut tried = Vec::new();
+        let got = within_bytes(100, |size| {
+            tried.push(size);
+            Ok((size <= 12).then_some(size))
+        })
+        .unwrap();
+        assert_eq!((got, tried), (12, vec![100, 50, 25, 12]));
+        let mut tried = Vec::new();
+        let got = within_bytes(8, |size| {
+            tried.push(size);
+            Ok((size == 1).then_some(size))
+        })
+        .unwrap();
+        assert_eq!((got, tried), (1, vec![8, 4, 2, 1]));
+    }
+
+    #[test]
+    fn a_bad_property_never_echoes_its_value_when_creating_the_browsing_consumer() {
+        let cluster: kui_kafka::ClusterConfig = serde_json::from_value(serde_json::json!({
+            "name": "c", "bootstrapServers": "localhost:9092",
+            "properties": { "session.timeout.ms": "hunter2-not-a-number" }
+        }))
+        .unwrap();
+        let err = browsing_consumer_for(&cluster).err().expect("a bad property is rejected").to_string();
+        assert!(!err.contains("hunter2"), "{err}");
+        assert!(err.contains("session.timeout.ms"), "{err}");
+    }
+
+    #[test]
+    fn a_chunk_ends_before_a_message_whose_whole_payload_is_not_held() {
+        let raw: Vec<Message> = (0..5).map(message).collect();
+        let (consumed, stop) =
+            scan_chunk(raw, &mut Vec::new(), &limits(10, far()), &mut 0, |m| m.offset == 3, |_| false);
+        assert_eq!((consumed.len(), stop), (3, ScanStop::Deferred));
+    }
+
+    #[test]
+    fn a_deferred_first_message_is_still_scanned_so_the_search_cannot_stall() {
+        let raw: Vec<Message> = (0..5).map(message).collect();
+        let (consumed, stop) =
+            scan_chunk(raw, &mut Vec::new(), &limits(10, far()), &mut 0, |m| m.offset == 0, |_| false);
+        assert_eq!((consumed[0], consumed.len(), stop), ((0, 0), 5, ScanStop::Exhausted));
+    }
+
+    #[test]
+    fn headers_count_toward_a_hits_displayed_bytes() {
+        let mut m = message_with_value(0, 100);
+        m.headers = vec![MessageHeader { key: "k".repeat(10), value: Some("v".repeat(40)) }];
+        assert_eq!(displayed_bytes(&m), 150);
+        let limits = ScanLimits { size: 1000, deadline: far(), byte_cap: 120 };
+        let (consumed, stop) = scan_chunk(vec![m, message(1)], &mut Vec::new(), &limits, &mut 0, |_| false, |_| true);
+        assert_eq!((consumed.len(), stop), (1, ScanStop::PageFull));
+    }
+
+    #[test]
+    fn a_page_ends_at_its_byte_cap_keeping_every_hit() {
+        let raw: Vec<Message> = (0..10).map(|i| message_with_value(i, 100)).collect();
+        let mut found = Vec::new();
+        let limits = ScanLimits { size: 1000, deadline: far(), byte_cap: 250 };
+        let mut page_bytes = 0;
+        let (consumed, stop) = scan_chunk(raw, &mut found, &limits, &mut page_bytes, |_| false, |_| true);
+        assert_eq!((consumed.len(), found.len(), stop), (3, 3, ScanStop::PageFull));
+        assert_eq!(page_bytes, 300);
+    }
+
+    #[test]
+    fn the_byte_cap_carries_over_between_chunks() {
+        let limits = ScanLimits { size: 1000, deadline: far(), byte_cap: 250 };
+        let mut page_bytes = 200;
+        let raw = vec![message_with_value(0, 100), message_with_value(1, 100)];
+        let (consumed, stop) = scan_chunk(raw, &mut Vec::new(), &limits, &mut page_bytes, |_| false, |_| true);
+        assert_eq!((consumed.len(), stop), (1, ScanStop::PageFull));
+    }
+
+    fn message(offset: i64) -> Message {
+        Message { partition: 0, offset, timestamp: None, key: None, value: None, headers: Vec::new() }
+    }
+
+    #[test]
+    fn search_matches_the_whole_payload_not_the_cut_text() {
+        let q = query::optional(Some("value.status = 'ok'")).unwrap().unwrap();
+        let body = format!("{{\"pad\":\"{}\",\"status\":\"ok\"}}", "x".repeat(5000));
+        let mut shown = decode_within(body.as_bytes(), &mut Budget::new(0));
+        assert!(shown.truncated);
+        shown.size = body.len();
+        let mut m = message(7);
+        m.value = Some(shown);
+        assert!(!q.matches(&m), "the cut text alone must not match");
+
+        let mut retained = Retained::new();
+        assert!(!matches_full(&q, &m, &retained));
+        retained.bytes.insert((0, 7), (None, Some(body.into_bytes())));
+        assert!(matches_full(&q, &m, &retained));
+        let not = query::optional(Some("value.status != 'ok'")).unwrap().unwrap();
+        assert!(!matches_full(&not, &m, &retained));
+    }
+
+    #[test]
+    fn search_deadline_is_checked_per_message_not_per_chunk() {
+        let raw: Vec<Message> = (0..SEARCH_CHUNK as i64).map(message).collect();
+        let mut found = Vec::new();
+        let deadline = Instant::now() + Duration::from_millis(50);
+        let slow = |_: &Message| {
+            std::thread::sleep(Duration::from_millis(20));
+            false
+        };
+        let (consumed, stop) = scan_chunk(raw, &mut found, &limits(10, deadline), &mut 0, |_| false, slow);
+        assert_eq!(stop, ScanStop::OutOfTime);
+        assert!(consumed.len() < 10, "scanned {} of a 500-message chunk", consumed.len());
+        assert_eq!(consumed[0], (0, 0));
+    }
+
+    #[test]
+    fn an_expired_deadline_still_looks_at_one_message() {
+        let raw: Vec<Message> = (0..5).map(message).collect();
+        let (consumed, stop) =
+            scan_chunk(raw, &mut Vec::new(), &limits(10, Instant::now()), &mut 0, |_| false, |_| false);
+        assert_eq!((consumed.len(), stop), (1, ScanStop::OutOfTime));
+    }
+
+    #[test]
+    fn a_full_page_stops_at_the_last_hit() {
+        let raw: Vec<Message> = (0..5).map(message).collect();
+        let mut found = Vec::new();
+        let (consumed, stop) = scan_chunk(raw, &mut found, &limits(2, far()), &mut 0, |_| false, |m| m.offset % 2 == 0);
+        assert_eq!((consumed.len(), found.len(), stop), (3, 2, ScanStop::PageFull));
+    }
 }

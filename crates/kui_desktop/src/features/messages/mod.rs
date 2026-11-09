@@ -7,6 +7,7 @@
 mod codec;
 pub mod commands;
 mod export;
+mod headers;
 pub mod model;
 mod query;
 pub mod service;
