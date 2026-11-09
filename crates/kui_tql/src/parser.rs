@@ -128,7 +128,7 @@ const KEYWORDS: [&str; 13] =
 
 pub fn parse(input: &str) -> Result<Expr, QueryError> {
     let tokens = tokenize(input)?;
-    let mut p = Parser { tokens, at: 0 };
+    let mut p = Parser { tokens, at: 0, depth: 0, connectives: 0 };
     if p.peek().is_keyword("where") {
         p.at += 1;
     }
@@ -143,9 +143,19 @@ pub fn parse(input: &str) -> Result<Expr, QueryError> {
     Ok(expr)
 }
 
+/// Parentheses, `NOT` and function calls may nest this deep. Evaluation and `Drop` recurse over
+/// the tree, so unbounded input would overflow the stack, which aborts the app.
+const MAX_DEPTH: usize = 64;
+
+/// AND / OR / NOT nodes in one query. Chains grow the tree downwards without nesting, so
+/// `MAX_DEPTH` alone doesn't bound recursion.
+const MAX_CONNECTIVES: usize = 500;
+
 struct Parser {
     tokens: Vec<Token>,
     at: usize,
+    depth: usize,
+    connectives: usize,
 }
 
 impl Parser {
@@ -178,9 +188,28 @@ impl Parser {
         QueryError::new(message, token.start, token.end)
     }
 
+    fn nested<T>(&mut self, parse: impl FnOnce(&mut Self) -> Result<T, QueryError>) -> Result<T, QueryError> {
+        if self.depth >= MAX_DEPTH {
+            return Err(self.error_here(format!("Too deeply nested (at most {MAX_DEPTH} levels)")));
+        }
+        self.depth += 1;
+        let result = parse(self);
+        self.depth -= 1;
+        result
+    }
+
+    fn connective(&mut self) -> Result<(), QueryError> {
+        self.connectives += 1;
+        if self.connectives > MAX_CONNECTIVES {
+            return Err(self.error_here(format!("Too many AND / OR / NOT (at most {MAX_CONNECTIVES})")));
+        }
+        Ok(())
+    }
+
     fn or(&mut self) -> Result<Expr, QueryError> {
         let mut left = self.and()?;
         while self.eat_keyword("or") {
+            self.connective()?;
             left = Expr::Or(Box::new(left), Box::new(self.and()?));
         }
         Ok(left)
@@ -189,6 +218,7 @@ impl Parser {
     fn and(&mut self) -> Result<Expr, QueryError> {
         let mut left = self.not()?;
         while self.eat_keyword("and") {
+            self.connective()?;
             left = Expr::And(Box::new(left), Box::new(self.not()?));
         }
         Ok(left)
@@ -196,11 +226,12 @@ impl Parser {
 
     fn not(&mut self) -> Result<Expr, QueryError> {
         if self.eat_keyword("not") {
-            return Ok(Expr::Not(Box::new(self.not()?)));
+            self.connective()?;
+            return Ok(Expr::Not(Box::new(self.nested(Self::not)?)));
         }
         if self.peek().tok == Tok::LParen {
             self.next();
-            let inner = self.or()?;
+            let inner = self.nested(Self::or)?;
             self.expect(Tok::RParen, "')'")?;
             return Ok(inner);
         }
@@ -301,7 +332,7 @@ impl Parser {
                 QueryError::new(format!("Unknown function '{word}' (use {})", names.join(", ")), token.start, token.end)
             })?;
             self.next();
-            let arg = self.operand()?;
+            let arg = self.nested(Self::operand)?;
             self.expect(Tok::RParen, "')'")?;
             return Ok(Operand::Call(func, Box::new(arg)));
         }
@@ -423,5 +454,25 @@ mod tests {
         assert_eq!(parse("offset.x = 1").unwrap_err().message, "'offset' is a number and has no fields");
         assert!(parse("size(value) = 1").unwrap_err().message.starts_with("Unknown function"));
         assert!(parse("").is_err());
+    }
+
+    #[test]
+    fn hostile_nesting_is_a_parse_error_not_a_stack_overflow() {
+        let too_deep = |query: String| {
+            let e = parse(&query).unwrap_err();
+            assert!(e.message.starts_with("Too "), "{}", e.message);
+        };
+        too_deep("(".repeat(10_000) + "value.a");
+        too_deep("NOT ".repeat(10_000) + "value.a");
+        too_deep("lower(".repeat(10_000) + "value.a");
+        too_deep(vec!["value.a"; 100_000].join(" AND "));
+        too_deep(vec!["value.a"; 100_000].join(" OR "));
+    }
+
+    #[test]
+    fn ordinary_nesting_and_chains_still_parse() {
+        let nested = "(".repeat(MAX_DEPTH) + "value.a" + &")".repeat(MAX_DEPTH);
+        assert!(parse(&nested).is_ok());
+        assert!(parse(&vec!["value.a"; MAX_CONNECTIVES + 1].join(" AND ")).is_ok());
     }
 }

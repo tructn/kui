@@ -240,6 +240,16 @@ To find a value outside the list, type it, or use `LIKE '%…%'`.
 Mistakes are underlined as you type, with the reason under the bar, and **Apply** stays disabled until the filter
 is valid.
 
+### Limits
+
+A query may nest parentheses, `NOT` and function calls 64 levels deep and use at most 500 `AND` / `OR` / `NOT`
+operators; beyond that it is a normal syntax error. Comparing two multi-valued paths (`value.a[*] = value.b[*]`)
+tests every pair, so each message gets a budget of 1,000,000 comparisons. A message that exhausts it fails closed:
+it does not match the query at all, however the condition is combined (`NOT`, `!=`, `AND`, `OR`).
+`LIKE` and `ILIKE` draw on the same budget by text length times pattern length plus both lengths (a sixteenth of a
+comparison per step, so `value LIKE '%error%'` on a multi-megabyte message is unaffected), and `CONTAINS`, a
+linear search, by both lengths only. This includes patterns read from another field.
+
 ### Searching large topics
 
 A filter doesn't make Kafka do the work: KUI reads messages and tests each one. One page of results stops reading

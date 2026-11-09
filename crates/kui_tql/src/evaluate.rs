@@ -11,7 +11,7 @@
 //!   any depth. Each such string is parsed at most once per message (`Doc::embedded`).
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::cmp::Ordering;
 
 use elsa::FrozenMap;
@@ -29,11 +29,45 @@ pub struct Doc<'a, R: ?Sized> {
     /// condition that walks into the same string shares one parse, and the result
     /// is borrowed rather than cloned. Append-only, so references stay valid.
     embedded: FrozenMap<(usize, usize), Box<Option<Value>>>,
+    /// Value comparisons left for this message. Multi-valued paths compare pairwise, so a
+    /// hostile payload with huge arrays would otherwise cost quadratic time.
+    budget: Cell<usize>,
+    exhausted: Cell<bool>,
 }
+
+/// Far above any sensible query (`a[*] = b[*]` over two 1,000-element arrays), far below a hang.
+const MAX_COMPARISONS: usize = 1_000_000;
 
 impl<'a, R: Record + ?Sized> Doc<'a, R> {
     pub fn new(record: &'a R) -> Self {
-        Doc { record, key: OnceCell::new(), value: OnceCell::new(), embedded: FrozenMap::new() }
+        Doc {
+            record,
+            key: OnceCell::new(),
+            value: OnceCell::new(),
+            embedded: FrozenMap::new(),
+            budget: Cell::new(MAX_COMPARISONS),
+            exhausted: Cell::new(false),
+        }
+    }
+
+    /// Whether any condition ran out of budget. The message then never matches: a negation
+    /// (`NOT`, `!=`) of a condition that was not actually evaluated must not turn it into a match.
+    pub fn exhausted(&self) -> bool {
+        self.exhausted.get()
+    }
+
+    /// Reserves `pairs` comparisons; false (and no test should run) once the message is out.
+    fn charge(&self, pairs: usize) -> bool {
+        match self.budget.get().checked_sub(pairs) {
+            Some(left) => {
+                self.budget.set(left);
+                true
+            }
+            None => {
+                self.exhausted.set(true);
+                false
+            }
+        }
     }
 
     /// The JSON object or array written inside `text`, parsed on first use.
@@ -72,35 +106,48 @@ pub fn evaluate<R: Record + ?Sized>(expr: &Expr, doc: &Doc<R>) -> bool {
             let (left, right) = (values(left, doc), values(right, doc));
             match cmp {
                 // `!=` is "not equal to any", the negation of `=`, so a missing field passes.
-                Cmp::Ne => !any_pair(&left, &right, loose_eq),
-                _ => any_pair(&left, &right, |a, b| compare(a, b).is_some_and(|o| cmp_holds(*cmp, o))),
+                Cmp::Ne => any_pair(doc, &left, &right, loose_eq).is_some_and(|equal| !equal),
+                _ => any_pair(doc, &left, &right, |a, b| compare(a, b).is_some_and(|o| cmp_holds(*cmp, o)))
+                    .unwrap_or(false),
             }
         }
         Expr::Text(left, op, right) => {
             let right = values(right, doc);
             let patterns: Vec<Cow<str>> = right.iter().map(|v| text(v)).collect();
-            texts_or_values(left, doc).iter().any(|candidate| {
+            let candidates = texts_or_values(left, doc);
+            if !doc.charge(candidates.len().saturating_mul(patterns.len())) {
+                return false;
+            }
+            candidates.iter().any(|candidate| {
                 // CONTAINS on an array (also one written as JSON text) tests its elements.
                 if matches!(op, TextOp::Contains)
                     && let Some(items) = elements(candidate, doc)
                 {
-                    return right.iter().any(|r| items.iter().any(|item| loose_eq(item, r)));
+                    return doc.charge(items.len().saturating_mul(right.len()))
+                        && right.iter().any(|r| items.iter().any(|item| loose_eq(item, r)));
                 }
                 let c = candidate.text();
-                match op {
-                    TextOp::Contains => patterns.iter().any(|p| c.contains(p.as_ref())),
-                    TextOp::Like => patterns.iter().any(|p| like(&c, p, false)),
-                    TextOp::ILike => patterns.iter().any(|p| like(&c, p, true)),
-                }
+                patterns.iter().any(|p| {
+                    doc.charge(text_cost(*op, &c, p))
+                        && match op {
+                            TextOp::Contains => c.contains(p.as_ref()),
+                            TextOp::Like => like(&c, p, false),
+                            TextOp::ILike => like(&c, p, true),
+                        }
+                })
             })
         }
         Expr::In(left, items) => {
             let left = values(left, doc);
-            items.iter().any(|item| any_pair(&left, &values(item, doc), loose_eq))
+            items.iter().any(|item| any_pair(doc, &left, &values(item, doc), loose_eq).unwrap_or(false))
         }
         Expr::Between(value, low, high) => {
             let (low, high) = (values(low, doc), values(high, doc));
-            values(value, doc).iter().any(|v| {
+            let value = values(value, doc);
+            if !doc.charge(value.len().saturating_mul(low.len() + high.len())) {
+                return false;
+            }
+            value.iter().any(|v| {
                 low.iter().any(|l| compare(v, l).is_some_and(Ordering::is_ge))
                     && high.iter().any(|h| compare(v, h).is_some_and(Ordering::is_le))
             })
@@ -326,8 +373,27 @@ fn truthy(value: &Value) -> bool {
     }
 }
 
-fn any_pair(left: &Vals, right: &Vals, test: impl Fn(&Value, &Value) -> bool) -> bool {
-    left.iter().any(|l| right.iter().any(|r| test(l, r)))
+/// What testing `text` against `pattern` costs, in comparisons. A step is far cheaper than a
+/// value comparison, hence the 1/16. LIKE can backtrack up to text x pattern steps and always
+/// copies and parses the whole pattern, even for empty text. CONTAINS is a linear search.
+fn text_cost(op: TextOp, text: &str, pattern: &str) -> usize {
+    const STEPS_PER_COMPARISON: usize = 16;
+    let linear = text.len().saturating_add(pattern.len());
+    let steps = match op {
+        TextOp::Contains => linear,
+        TextOp::Like | TextOp::ILike => text.len().saturating_mul(pattern.len()).saturating_add(linear),
+    };
+    (steps / STEPS_PER_COMPARISON).saturating_add(1)
+}
+
+/// Whether any pair passes `test`, or `None` when the message's comparison budget can't cover it.
+fn any_pair<R: Record + ?Sized>(
+    doc: &Doc<R>,
+    left: &Vals,
+    right: &Vals,
+    test: impl Fn(&Value, &Value) -> bool,
+) -> Option<bool> {
+    doc.charge(left.len().saturating_mul(right.len())).then(|| left.iter().any(|l| right.iter().any(|r| test(l, r))))
 }
 
 fn cmp_holds(cmp: Cmp, order: Ordering) -> bool {
@@ -638,6 +704,113 @@ mod tests {
         // `properties`, `context` and the malformed `note`: one cache entry each,
         // however many conditions read them. Plain `label` is never parsed.
         assert_eq!(doc.embedded.len(), 3);
+    }
+
+    #[test]
+    fn hostile_chains_and_nesting_never_reach_evaluation() {
+        let m = message(None, r#"{"a": 1}"#, &[]);
+        assert!(Query::parse(&"(".repeat(10_000)).is_err());
+        assert!(Query::parse(&vec!["value.a"; 100_000].join(" AND ")).is_err());
+        let longest = vec!["value.a"; 501].join(" AND ");
+        assert!(Query::parse(&longest).unwrap().matches(&m));
+    }
+
+    #[test]
+    fn pairwise_comparison_cost_is_bounded_per_message() {
+        let evens: Vec<u32> = (0..50_000).map(|n| n * 2).collect();
+        let odds: Vec<u32> = (0..50_000).map(|n| n * 2 + 1).collect();
+        let hostile = serde_json::json!({"a": evens, "b": odds}).to_string();
+        let m = message(None, &hostile, &[]);
+        let started = std::time::Instant::now();
+        for query in [
+            "value.a[*] = value.b[*]",
+            "value.a[*] != value.b[*]",
+            "value.a[*] < value.b[*]",
+            "value.a[*] IN (value.b[*])",
+            "value.a[*] BETWEEN value.b[*] AND value.b[*]",
+            "value.a[*] CONTAINS value.b[*]",
+            "value.a CONTAINS value.b[*]",
+            "value.a[*] LIKE value.b[*]",
+        ] {
+            assert!(!matches(query, &m), "{query}");
+        }
+        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
+    }
+
+    #[test]
+    fn exhausting_the_budget_fails_closed_through_negations() {
+        let evens: Vec<u32> = (0..50_000).map(|n| n * 2).collect();
+        let odds: Vec<u32> = (0..50_000).map(|n| n * 2 + 1).collect();
+        let m = message(None, &serde_json::json!({"a": evens, "b": odds, "ok": 1}).to_string(), &[]);
+        let started = std::time::Instant::now();
+        for query in [
+            "NOT (value.a[*] = value.b[*])",
+            "NOT NOT NOT (value.a[*] = value.b[*])",
+            "value.a[*] != value.b[*]",
+            "value.a[*] NOT IN (value.b[*])",
+            "value.a[*] NOT LIKE value.b[*]",
+            "value.ok = 1 AND NOT (value.a[*] = value.b[*])",
+            "NOT (value.a[*] = value.b[*]) OR value.ok = 1",
+            "NOT (value.a[*] = value.b[*] AND value.ok = 2)",
+            "NOT (value.a[*] = value.b[*] OR value.ok = 2)",
+        ] {
+            assert!(!matches(query, &m), "{query}");
+        }
+        // Short-circuit: the exhausted branch is never evaluated, so it cannot poison the result.
+        assert!(matches("value.ok = 1 OR NOT (value.a[*] = value.b[*])", &m));
+        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
+    }
+
+    #[test]
+    fn text_matching_cost_is_charged_to_the_budget() {
+        let pattern = "%a".repeat(1_500) + "b";
+        let text = "a".repeat(100_000);
+        let started = std::time::Instant::now();
+
+        let raw = message(None, &text, &[]);
+        assert!(!matches(&format!("NOT (value LIKE '{pattern}')"), &raw));
+        assert!(!matches(&format!("NOT (value ILIKE '{pattern}')"), &raw));
+
+        let from_path = message(None, &serde_json::json!({"t": text, "p": pattern}).to_string(), &[]);
+        assert!(!matches("NOT (value.t LIKE value.p)", &from_path));
+        // CONTAINS is a linear search, so it is priced linearly and still gets evaluated.
+        assert!(matches("NOT (value.t CONTAINS value.p)", &from_path));
+        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
+    }
+
+    #[test]
+    fn a_huge_pattern_is_charged_even_against_empty_text() {
+        let doc = serde_json::json!({"a": vec![""; 2_000], "p": "%a".repeat(500_000)});
+        let m = message(None, &doc.to_string(), &[]);
+        let started = std::time::Instant::now();
+        assert!(!matches("NOT (value.a[*] LIKE value.p)", &m));
+        assert!(!matches("NOT (value.a[*] ILIKE value.p)", &m));
+        assert!(started.elapsed().as_secs() < 2, "{:?}", started.elapsed());
+    }
+
+    #[test]
+    fn contains_is_priced_as_the_linear_search_it_is() {
+        let m = message(None, &format!("{}failed", "x".repeat(1_000_000)), &[]);
+        assert!(matches("value CONTAINS 'qqqqq' OR value CONTAINS 'wwwww' OR value CONTAINS 'failed'", &m));
+        assert!(matches("value CONTAINS 'failed' AND value CONTAINS 'xxxxx' AND value CONTAINS 'xfail'", &m));
+    }
+
+    #[test]
+    fn ordinary_text_matching_on_large_messages_is_unchanged() {
+        let big = message(None, &format!("{}error", "x".repeat(1_000_000)), &[]);
+        assert!(matches("value CONTAINS 'error'", &big));
+        assert!(matches("value LIKE '%error'", &big));
+        assert!(matches("value ILIKE '%ERROR%'", &big));
+        assert!(!matches("NOT (value LIKE '%error')", &big));
+    }
+
+    #[test]
+    fn modest_multi_valued_comparisons_are_unchanged() {
+        let ids: Vec<u32> = (0..500).collect();
+        let m = message(None, &serde_json::json!({"a": ids, "b": ids}).to_string(), &[]);
+        assert!(matches("value.a[*] = value.b[*]", &m));
+        assert!(!matches("value.a[*] != value.b[*]", &m));
+        assert!(matches("value.a[*] IN (value.b[*])", &m));
     }
 
     #[test]

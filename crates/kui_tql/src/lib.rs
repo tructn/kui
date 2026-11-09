@@ -34,7 +34,8 @@ impl Query {
     }
 
     pub fn matches<R: Record + ?Sized>(&self, record: &R) -> bool {
-        evaluate::evaluate(&self.expr, &evaluate::Doc::new(record))
+        let doc = evaluate::Doc::new(record);
+        evaluate::evaluate(&self.expr, &doc) && !doc.exhausted()
     }
 }
 
