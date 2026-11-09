@@ -3,9 +3,11 @@ use rdkafka::admin::AdminClient;
 use rdkafka::client::DefaultClientContext;
 use rdkafka::producer::FutureProducer;
 
-use super::ClusterConfig;
+use super::cluster::denied_property;
 use super::connection::{ConnectionErrors, KafkaConsumer};
-use crate::Result;
+use super::{ClusterConfig, check_properties};
+use crate::{Error, Result};
+use rdkafka::error::{KafkaError, KafkaResult};
 
 /// Long-lived clients for one cluster, cached in `AppState` so we don't
 /// re-bootstrap the connection on every UI request.
@@ -19,11 +21,12 @@ pub struct KafkaClients {
 
 impl KafkaClients {
     pub fn connect(cluster: ClusterConfig) -> Result<Self> {
+        check_properties(&cluster.properties)?;
         let base = client_config(&cluster);
         Ok(Self {
-            admin: base.create()?,
+            admin: created(base.create())?,
             metadata: new_consumer(&cluster, "kui-metadata")?,
-            producer: base.clone().set("message.timeout.ms", "10000").create()?,
+            producer: created(base.clone().set("message.timeout.ms", "10000").create())?,
             cluster,
         })
     }
@@ -65,8 +68,10 @@ pub fn client_config(cluster: &ClusterConfig) -> ClientConfig {
             set_some(&mut cfg, "sasl.password", &cluster.sasl_password);
         }
     }
-    // User-supplied properties go last so they can override anything above.
-    for (k, v) in &cluster.properties {
+    // User-supplied properties go last so they can override the settings above.
+    // Denied keys are skipped as a backstop; callers reject them with an error
+    // first (`check_properties`), so a planted clusters.json never gets here.
+    for (k, v) in cluster.properties.iter().filter(|(k, _)| denied_property(k).is_none()) {
         cfg.set(k, v);
     }
     cfg
@@ -82,10 +87,22 @@ fn set_some(cfg: &mut ClientConfig, key: &str, value: &Option<String>) {
 /// A consumer that never auto-commits. Safe for reading data without
 /// affecting any real consumer group's progress.
 pub fn new_consumer(cluster: &ClusterConfig, group_id: &str) -> Result<KafkaConsumer> {
-    Ok(client_config(cluster)
-        .set("group.id", group_id)
-        .set("enable.auto.commit", "false")
-        .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers))?)
+    check_properties(&cluster.properties)?;
+    created(
+        client_config(cluster)
+            .set("group.id", group_id)
+            .set("enable.auto.commit", "false")
+            .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers)),
+    )
+}
+
+/// librdkafka's config errors repeat the rejected value, which may be a
+/// password in a mistyped key. Report the key and a generic reason only.
+pub fn created<T>(result: KafkaResult<T>) -> Result<T> {
+    result.map_err(|e| match e {
+        KafkaError::ClientConfig(_, _, key, _) => Error::msg(format!("The setting \"{key}\" is not valid.")),
+        other => other.into(),
+    })
 }
 
 #[cfg(test)]
@@ -165,6 +182,49 @@ mod tests {
     fn hostname_verification_is_on_by_default() {
         let cfg = client_config(&cluster(serde_json::json!({ "securityProtocol": "SSL" })));
         assert_eq!(cfg.get("ssl.endpoint.identification.algorithm"), None);
+    }
+
+    #[test]
+    fn denied_properties_never_reach_the_config() {
+        let cfg = client_config(&cluster(serde_json::json!({
+            "securityProtocol": "SASL_SSL",
+            "properties": {
+                "plugin.library.paths": "/tmp/evil.so",
+                "security.protocol": "PLAINTEXT",
+                "sasl.kerberos.kinit.cmd": "touch /tmp/x",
+                "client.id": "mine",
+            },
+        })));
+        assert_eq!(cfg.get("plugin.library.paths"), None);
+        assert_eq!(cfg.get("sasl.kerberos.kinit.cmd"), None);
+        assert_eq!(cfg.get("security.protocol"), Some("SASL_SSL"));
+        assert_eq!(cfg.get("client.id"), Some("mine"));
+    }
+
+    #[test]
+    fn creating_clients_rejects_denied_properties() {
+        for key in ["plugin.library.paths", "metadata.broker.list"] {
+            let planted = cluster(serde_json::json!({ "properties": { key: "/tmp/evil.so" } }));
+            assert!(new_consumer(&planted, "g").is_err(), "{key}");
+            assert!(KafkaClients::connect(planted).is_err(), "{key}");
+        }
+    }
+
+    #[test]
+    fn bad_property_errors_never_echo_the_value() {
+        let sentinel = "SENTINEL-hunter2";
+        for key in ["sasl.passwrd", "socket.timeout.ms"] {
+            let c = cluster(serde_json::json!({ "properties": { key: sentinel } }));
+            let errors = [
+                new_consumer(&c, "g").err().map(|e| e.to_string()),
+                KafkaClients::connect(c).err().map(|e| e.to_string()),
+            ];
+            for err in errors {
+                let err = err.expect("a bad property must fail client creation");
+                assert!(!err.contains(sentinel), "{err}");
+                assert!(err.contains(key), "{err}");
+            }
+        }
     }
 
     #[test]

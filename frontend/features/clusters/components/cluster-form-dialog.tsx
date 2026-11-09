@@ -327,7 +327,10 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
               test.reset();
             }}
           />
-          <FieldDescription>librdkafka settings, one key=value per line.</FieldDescription>
+          <FieldDescription>
+            librdkafka settings, one key=value per line. Known secret keys go to the system keychain; a misspelled one is stored as a plain setting. Plugin, interceptor
+            and command settings are refused.
+          </FieldDescription>
         </Field>
 
         {save.error && <FieldError>{save.error.message}</FieldError>}

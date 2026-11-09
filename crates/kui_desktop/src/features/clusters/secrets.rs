@@ -1,11 +1,14 @@
-//! Cluster secrets (SASL password, OAuth client secret, TLS key password) are
+//! Cluster secrets (SASL password, OAuth client secret, TLS key password, and
+//! secret-bearing advanced properties such as `ssl.key.pem`) are
 //! kept in the OS credential store rather than in `clusters.json`, so other
 //! programs running as the user, backups and synced folders don't see them.
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use kui_kafka::ClusterConfig;
+use kui_kafka::{ClusterConfig, is_secret_property};
 
 /// Holds one secret blob per cluster id.
 pub trait SecretStore: Send + Sync {
@@ -50,7 +53,7 @@ impl SecretStore for Keychain {
 }
 
 /// The secret fields of a cluster, moved in and out as one keychain item.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Secrets {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -59,13 +62,26 @@ pub struct Secrets {
     oauth_client_secret: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ssl_key_password: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    properties: BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for Secrets {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Secrets").field("empty", &self.is_empty()).finish_non_exhaustive()
+    }
 }
 
 impl Secrets {
     /// Moves the secrets out of `cluster`, leaving those fields empty.
     pub fn take(cluster: &mut ClusterConfig) -> Self {
         let nonblank = |v: Option<String>| v.filter(|s| !s.is_empty());
+        let (secret, plain): (BTreeMap<_, _>, BTreeMap<_, _>) = std::mem::take(&mut cluster.properties)
+            .into_iter()
+            .partition(|(k, v)| is_secret_property(k) && !v.is_empty());
+        cluster.properties = plain;
         Self {
+            properties: secret,
             sasl_password: nonblank(cluster.sasl_password.take()),
             oauth_client_secret: nonblank(cluster.oauth_client_secret.take()),
             ssl_key_password: nonblank(cluster.ssl_key_password.take()),
@@ -77,16 +93,23 @@ impl Secrets {
         cluster.sasl_password = self.sasl_password;
         cluster.oauth_client_secret = self.oauth_client_secret;
         cluster.ssl_key_password = self.ssl_key_password;
+        cluster.properties.extend(self.properties);
     }
 
     pub fn is_empty(&self) -> bool {
-        self.sasl_password.is_none() && self.oauth_client_secret.is_none() && self.ssl_key_password.is_none()
+        self.sasl_password.is_none()
+            && self.oauth_client_secret.is_none()
+            && self.ssl_key_password.is_none()
+            && self.properties.is_empty()
     }
 
     /// Reads a cluster's secrets; none stored reads as empty.
     pub fn load(store: &dyn SecretStore, id: &str) -> Result<Self> {
         match store.get(id)? {
-            Some(json) => Ok(serde_json::from_str(&json)?),
+            // Not `?`: serde errors can quote the secret they failed on.
+            Some(json) => {
+                serde_json::from_str(&json).map_err(|_| Error::msg("The keychain item for this cluster is unreadable."))
+            }
             None => Ok(Self::default()),
         }
     }
@@ -94,6 +117,35 @@ impl Secrets {
     /// Writes a cluster's secrets, or removes the item when there are none.
     pub fn save(&self, store: &dyn SecretStore, id: &str) -> Result<()> {
         if self.is_empty() { store.delete(id) } else { store.set(id, &serde_json::to_string(self)?) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_output_has_no_secrets() {
+        let mut c: ClusterConfig = serde_json::from_value(
+            serde_json::json!({ "name": "c", "bootstrapServers": "h:9092", "saslPassword": "pw-secret" }),
+        )
+        .unwrap();
+        c.properties.insert("sasl.oauthbearer.config".into(), "cfg-secret".into());
+        let secrets = Secrets::take(&mut c);
+        let text = format!("{secrets:?} {secrets:#?}");
+        assert!(!text.contains("pw-secret") && !text.contains("cfg-secret"), "{text}");
+    }
+
+    #[test]
+    fn oauthbearer_config_and_alias_move_to_secrets() {
+        let mut c: ClusterConfig =
+            serde_json::from_value(serde_json::json!({ "name": "c", "bootstrapServers": "h:9092" })).unwrap();
+        c.properties.insert("sasl.oauthbearer.config".into(), "a=b".into());
+        c.properties.insert("sasl.oauthbearer.client.credentials.client.secret".into(), "s".into());
+        let secrets = Secrets::take(&mut c);
+        assert!(c.properties.is_empty());
+        secrets.restore(&mut c);
+        assert_eq!(c.properties.len(), 2);
     }
 }
 

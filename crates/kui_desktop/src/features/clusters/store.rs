@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use super::secrets::{SecretStore, Secrets};
 use crate::error::{Error, Result};
 use crate::json_file;
-use kui_kafka::ClusterConfig;
+use kui_kafka::{ClusterConfig, check_properties};
 
 /// Cluster list persisted as a JSON file in the app config directory. The
 /// secret fields are kept in the OS keychain instead (see `secrets.rs`).
@@ -61,9 +61,14 @@ impl ClusterStore {
     }
 
     /// Inserts a new cluster (assigning an id) or replaces an existing one.
+    /// An id from the caller must name a cluster that already exists: ids are
+    /// only ever issued here, and double as the keychain account name.
     pub fn save(&mut self, mut cluster: ClusterConfig) -> Result<ClusterConfig> {
+        check_properties(&cluster.properties)?;
         if cluster.id.is_empty() {
             cluster.id = uuid::Uuid::new_v4().to_string();
+        } else if !is_plain_id(&cluster.id) || !self.clusters.iter().any(|c| c.id == cluster.id) {
+            return Err(Error::msg("Unknown cluster id."));
         }
         let mut stripped = cluster.clone();
         if Secrets::take(&mut stripped).save(&*self.keychain, &cluster.id).is_ok() {
@@ -104,6 +109,10 @@ impl ClusterStore {
             .collect();
         json_file::save(&self.path, &on_disk)
     }
+}
+
+fn is_plain_id(id: &str) -> bool {
+    id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 #[cfg(test)]
@@ -199,6 +208,94 @@ mod tests {
         assert_eq!(store.get("old-id").unwrap().sasl_password.as_deref(), Some("s3cret"));
         assert!(!file_text(&path).contains("s3cret"));
         assert!(keychain.0.lock().unwrap()["old-id"].contains("s3cret"));
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn secret_properties_go_to_the_keychain_not_the_file() {
+        let path = temp_path();
+        let keychain = MemoryKeychain::default();
+        let mut store = ClusterStore::load(path.clone(), Box::new(keychain.clone())).unwrap();
+
+        let mut c = cluster("prod");
+        c.properties.insert("sasl.password".into(), "pr0p-secret".into());
+        c.properties.insert("ssl.key.pem".into(), "PEM-secret".into());
+        c.properties.insert("ssl.ca.location".into(), "/ca.pem".into());
+        let saved = store.save(c).unwrap();
+
+        let text = file_text(&path);
+        assert!(!text.contains("pr0p-secret") && !text.contains("PEM-secret"));
+        assert!(text.contains("/ca.pem"));
+        assert!(keychain.0.lock().unwrap()[&saved.id].contains("pr0p-secret"));
+
+        let reloaded = ClusterStore::load(path.clone(), Box::new(keychain)).unwrap();
+        let back = reloaded.get(&saved.id).unwrap();
+        assert_eq!(back.properties["sasl.password"], "pr0p-secret");
+        assert_eq!(back.properties["ssl.key.pem"], "PEM-secret");
+        assert_eq!(back.properties["ssl.ca.location"], "/ca.pem");
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn secret_properties_in_an_old_file_move_to_the_keychain() {
+        let path = temp_path();
+        let mut old = cluster("prod");
+        old.id = "old-id".into();
+        old.properties.insert("ssl.keystore.password".into(), "ks-secret".into());
+        json_file::save(&path, &vec![old]).unwrap();
+
+        let keychain = MemoryKeychain::default();
+        let store = ClusterStore::load(path.clone(), Box::new(keychain.clone())).unwrap();
+        assert_eq!(store.get("old-id").unwrap().properties["ssl.keystore.password"], "ks-secret");
+        assert!(!file_text(&path).contains("ks-secret"));
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn without_a_keychain_secret_properties_stay_in_the_file() {
+        let path = temp_path();
+        let mut store = ClusterStore::load(path.clone(), Box::new(NoKeychain)).unwrap();
+        let mut c = cluster("prod");
+        c.properties.insert("sasl.password".into(), "pr0p-secret".into());
+        let saved = store.save(c).unwrap();
+        assert!(file_text(&path).contains("pr0p-secret"));
+        let reloaded = ClusterStore::load(path.clone(), Box::new(NoKeychain)).unwrap();
+        assert_eq!(reloaded.get(&saved.id).unwrap().properties["sasl.password"], "pr0p-secret");
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn save_rejects_denied_properties() {
+        let path = temp_path();
+        let mut store = ClusterStore::load(path.clone(), Box::new(MemoryKeychain::default())).unwrap();
+        let mut c = cluster("evil");
+        c.properties.insert("plugin.library.paths".into(), "/tmp/x.so".into());
+        assert!(store.save(c).is_err());
+        let mut alias = cluster("evil");
+        alias.properties.insert("metadata.broker.list".into(), "evil:9092".into());
+        assert!(store.save(alias).is_err());
+        assert!(store.list().is_empty());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn save_rejects_ids_that_do_not_exist() {
+        let path = temp_path();
+        let keychain = MemoryKeychain::default();
+        let mut store = ClusterStore::load(path.clone(), Box::new(keychain.clone())).unwrap();
+        let existing = store.save(cluster("a")).unwrap();
+
+        for id in ["no-such-cluster", "../etc", "x".repeat(65).as_str()] {
+            let mut c = with_password("b");
+            c.id = id.into();
+            assert!(store.save(c).is_err(), "{id}");
+        }
+        assert_eq!(store.list().len(), 1);
+        assert!(keychain.0.lock().unwrap().is_empty());
+
+        let mut update = cluster("a2");
+        update.id = existing.id.clone();
+        assert_eq!(store.save(update).unwrap().name, "a2");
         std::fs::remove_file(path).ok();
     }
 

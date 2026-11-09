@@ -23,7 +23,14 @@ pub fn load<T: DeserializeOwned + Default>(path: &Path) -> Result<T> {
         Ok(value) => Ok(value),
         Err(e) => {
             let backup = sibling(path, "corrupt");
-            eprintln!("kui: could not parse {}: {e}; moved it to {}", path.display(), backup.display());
+            // Position only: serde's message can quote the offending value, which may be a secret.
+            eprintln!(
+                "kui: could not parse {} (line {}, column {}); moved it to {}",
+                path.display(),
+                e.line(),
+                e.column(),
+                backup.display()
+            );
             fs::rename(path, backup)?;
             Ok(T::default())
         }
