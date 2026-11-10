@@ -44,6 +44,22 @@ Red and blue never approve their own work; purple does.
 7. Red team: `security-auditor` re-audits the modified code for regressions.
 8. Purple team: `final-reviewer` independently verifies everything.
 9. Repeat 5 to 8 until the completion criteria hold.
+10. Compile the final report (format below) and give me its path.
+
+## Final report
+
+Write `security/findings/report-YYYY-MM-DD.md` yourself from the agents' reports; no agent writes its own
+verdict into it. It follows the same format as the agents' reports (title, one-line header, emoji summary
+table, legend, bottom line):
+
+- Title, then `**What this is:** ... | **Written by:** security-engineering lead | **Date:** ...`.
+- Summary table, one row per finding: ID, title, severity (🔴🟠🟡🔵), validation (🐞🚫🔍), fix (✅❌⚠️⏸️), retest (✅❌⚠️).
+- Legend as in the agents' `## Report format` section, always the same.
+- Then detail per finding, severity-ordered: location (file:line), impact, proof of concept, fix and regression test, retest.
+- Verification: `bun run lint`, `cargo test`, `bun test frontend`, `bunx tsc --noEmit`, each ✅ or ❌.
+- Verdict from `final-reviewer`: ✅ SECURITY_APPROVED or ❌ SECURITY_NOT_APPROVED.
+- Areas not covered and accepted risks (⏸️) with reasons.
+- Bottom line in plain words: what failed, what passed, what is left.
 
 ## Rules
 

@@ -22,3 +22,16 @@ Review the audit, validation and test reports in `security/findings/`, `git diff
 6. No Critical or High finding remains.
 
 Do not modify application code, tests or docs. Return exactly one of `SECURITY_APPROVED` or `SECURITY_NOT_APPROVED`, then explain every outstanding issue and every area you could not verify. Save the verdict to `security/findings/final-review.md`.
+
+## Report format
+
+Reports are read by a person at a glance, so make status visible:
+
+- Start with a title, then one line: `**What this is:** ... | **Written by:** <agent> | **Date:** ...`.
+- Then a summary table (one row per area checked) with an emoji status, before any detail.
+- Legend, always the same:
+  - Severity: 🔴 Critical/High, 🟠 Medium, 🟡 Low (or Low-Medium), 🔵 Info
+  - Audit and validation: 🐞 CONFIRMED, 🚫 FALSE_POSITIVE, 🔍 NEEDS_INVESTIGATION
+  - Fix and test: ✅ PASS or FIXED, ❌ FAIL or NOT FIXED, ⚠️ BLOCKED, ⏸️ DEFERRED or ACCEPTED RISK
+  - Verdict: ✅ SECURITY_APPROVED, ❌ SECURITY_NOT_APPROVED
+- End with a short bottom line in plain words: what failed, what passed, what is left.

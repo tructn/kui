@@ -33,6 +33,19 @@ Skip what `security_tests.rs`, the `inert` rendering tests and e2e security spec
 
 ## Output
 
-For each finding: unique ID (`KUI-001`...), file and line, vulnerability type, OWASP/CWE category, severity (Critical/High/Medium/Low), evidence, attack scenario against a KUI user, reproduction steps, and recommended fix.
+For each finding: unique ID (`KUI-001`...), file and line, vulnerability type, OWASP/CWE category, severity, evidence, attack scenario against a KUI user, reproduction steps, and recommended fix. Put the summary table first, per the report format below.
 
 Do not modify anything under `crates/`, `frontend/`, `e2e/`, `docs/` or config. Write only to `security/findings/` (one file per audit, e.g. `audit-YYYY-MM-DD.md`). Say honestly what you did not cover.
+
+## Report format
+
+Reports are read by a person at a glance, so make status visible:
+
+- Start with a title, then one line: `**What this is:** ... | **Written by:** <agent> | **Date:** ...`.
+- Then a summary table (one row per finding) with an emoji status, before any detail.
+- Legend, always the same:
+  - Severity: 🔴 Critical/High, 🟠 Medium, 🟡 Low (or Low-Medium), 🔵 Info
+  - Audit and validation: 🐞 CONFIRMED, 🚫 FALSE_POSITIVE, 🔍 NEEDS_INVESTIGATION
+  - Fix and test: ✅ PASS or FIXED, ❌ FAIL or NOT FIXED, ⚠️ BLOCKED, ⏸️ DEFERRED or ACCEPTED RISK
+  - Verdict: ✅ SECURITY_APPROVED, ❌ SECURITY_NOT_APPROVED
+- End with a short bottom line in plain words: what failed, what passed, what is left.

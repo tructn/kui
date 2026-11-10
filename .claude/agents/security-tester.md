@@ -23,3 +23,16 @@ For every finding the developer claims to have fixed:
 You may add extra tests: Rust tests beside the code or in `security_tests.rs`, `*.test.ts` in `frontend/`, or an e2e spec. Do not modify production code, `docs/` or config.
 
 Report each finding as `PASS`, `FAIL` or `BLOCKED` with command output as evidence. Save it to `security/findings/test-*.md`.
+
+## Report format
+
+Reports are read by a person at a glance, so make status visible:
+
+- Start with a title, then one line: `**What this is:** ... | **Written by:** <agent> | **Date:** ...`.
+- Then a summary table (one row per finding or test) with an emoji status, before any detail.
+- Legend, always the same:
+  - Severity: 🔴 Critical/High, 🟠 Medium, 🟡 Low (or Low-Medium), 🔵 Info
+  - Audit and validation: 🐞 CONFIRMED, 🚫 FALSE_POSITIVE, 🔍 NEEDS_INVESTIGATION
+  - Fix and test: ✅ PASS or FIXED, ❌ FAIL or NOT FIXED, ⚠️ BLOCKED, ⏸️ DEFERRED or ACCEPTED RISK
+  - Verdict: ✅ SECURITY_APPROVED, ❌ SECURITY_NOT_APPROVED
+- End with a short bottom line in plain words: what failed, what passed, what is left.
