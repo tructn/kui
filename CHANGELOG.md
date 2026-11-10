@@ -6,6 +6,17 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0-alpha.20](https://github.com/tructn/kui/compare/v0.1.0-alpha.19...v0.1.0-alpha.20) (2026-11-10)
+
+
+### Fixed
+
+* **clusters:** filter advanced properties, keep secrets out of file ([708177f](https://github.com/tructn/kui/commit/708177f89234beee1b4f78fec945e50c49f495f7))
+* **desktop:** stop panicking on a poisoned lock ([dd40676](https://github.com/tructn/kui/commit/dd40676f109f8a403ec8aa4d18c12683d779f60d))
+* **generator:** reject template arguments that overflow ([71eb9ce](https://github.com/tructn/kui/commit/71eb9ce2e453db302344c5b766fa01241b8244eb))
+* **messages:** survive hostile records, bound memory per page ([1a9ab63](https://github.com/tructn/kui/commit/1a9ab63e664b8ab41739fb4bfd1348afb2e7903f))
+* **tql:** bound query nesting and evaluation cost ([7f186f1](https://github.com/tructn/kui/commit/7f186f1a4afe7512937e78ac48a9204cc89a38fc))
+
 ## [0.1.0-alpha.19](https://github.com/tructn/kui/compare/v0.1.0-alpha.18...v0.1.0-alpha.19) (2026-11-09)
 
 
