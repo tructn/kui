@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "kui_desktop"
-version = "0.1.0-alpha.19"
+version = "0.1.0-alpha.20"
 dependencies = [
  "chrono",
  "fake",
