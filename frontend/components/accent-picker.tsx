@@ -16,7 +16,7 @@ const SELECTED = "aria-checked:ring-2 aria-checked:ring-foreground/70";
 /** How long the color picker must rest before the color is committed. */
 const COMMIT_DELAY_MS = 150;
 /** Where the picker starts when no custom color is set yet. */
-const START_COLOR = "#e11d48";
+const START_COLOR = "#f59e0b";
 const RAINBOW = "bg-[conic-gradient(in_oklch_longer_hue,oklch(0.7_0.2_0),oklch(0.7_0.2_0))]";
 
 interface AccentPickerProps {

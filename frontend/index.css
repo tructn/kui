@@ -73,8 +73,8 @@
     --app-code-size: 13px;
     --app-code-ligatures: normal;
     /* Accent color, picked in Settings → Appearance; the blocks below swap it. */
-    --brand: oklch(0.586 0.253 17.585);
-    --brand-foreground: oklch(0.969 0.015 12.422);
+    --brand: oklch(0.555 0.163 48.998);
+    --brand-foreground: oklch(0.987 0.022 95.277);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -152,11 +152,14 @@
 
 /*
  * Accent color schemes, set as data-accent on <html> by the appearance store.
- * Rose is the default (:root above). Light mode uses a deeper Tailwind shade than dark,
- * so text on the accent stays readable in both. Every color but neutral keeps white text
- * in both modes, which is why green, teal and orange use their 600 shade in dark.
+ * Amber is the default (:root above), matching the app icon. Light mode uses a deeper Tailwind
+ * shade than dark, so text on the accent stays readable in both. Amber is the one color bright
+ * enough in dark mode to take dark text, as neutral does; the rest keep white text, which is
+ * why green, teal and orange use their 600 shade in dark.
  */
-.dark { --brand: oklch(0.645 0.246 16.439); }
+.dark { --brand: oklch(0.769 0.188 70.08); --brand-foreground: oklch(0.279 0.077 45.635); }
+[data-accent="rose"] { --brand: oklch(0.586 0.253 17.585); --brand-foreground: oklch(0.969 0.015 12.422); }
+.dark[data-accent="rose"] { --brand: oklch(0.645 0.246 16.439); }
 [data-accent="blue"] { --brand: oklch(0.546 0.245 262.881); --brand-foreground: oklch(0.97 0.014 254.604); }
 .dark[data-accent="blue"] { --brand: oklch(0.623 0.214 259.815); }
 [data-accent="violet"] { --brand: oklch(0.541 0.281 293.009); --brand-foreground: oklch(0.969 0.016 293.756); }

@@ -4,6 +4,7 @@
  * custom `#rrggbb` color picked by the user, applied as inline CSS variables.
  */
 export const ACCENTS = {
+  amber: { label: "Amber", swatch: "oklch(0.769 0.188 70.08)" },
   rose: { label: "Rose", swatch: "oklch(0.645 0.246 16.439)" },
   orange: { label: "Orange", swatch: "oklch(0.646 0.222 41.116)" },
   green: { label: "Green", swatch: "oklch(0.627 0.194 149.214)" },
@@ -17,7 +18,7 @@ export type AccentPreset = keyof typeof ACCENTS;
 /** A preset name, or a custom color as `#rrggbb`. */
 export type Accent = AccentPreset | `#${string}`;
 
-export const DEFAULT_ACCENT: AccentPreset = "rose";
+export const DEFAULT_ACCENT: AccentPreset = "amber";
 
 export const isPreset = (value: string): value is AccentPreset => Object.hasOwn(ACCENTS, value);
 export const isCustomColor = (value: string): value is `#${string}` => /^#[0-9a-f]{6}$/i.test(value);
