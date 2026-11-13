@@ -6,6 +6,19 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.0](https://github.com/tructn/kui/compare/v0.1.0-alpha.20...v0.1.0) (2026-11-13)
+
+
+### chore
+
+* graduate from alpha to stable releases ([3b8b96c](https://github.com/tructn/kui/commit/3b8b96c3368acaba5e9f20a6a2278e1589b03feb))
+
+
+### Added
+
+* **desktop:** navy and amber app icon, amber default accent ([2c8dec1](https://github.com/tructn/kui/commit/2c8dec163faaf7e9daf7a92443177a94171541af))
+* **desktop:** violet and cyan Pipeline K icon, violet accent ([f93399d](https://github.com/tructn/kui/commit/f93399dfdd411f0bda3b78402687fac3fe2170e4))
+
 ## [0.1.0-alpha.20](https://github.com/tructn/kui/compare/v0.1.0-alpha.19...v0.1.0-alpha.20) (2026-11-10)
 
 
