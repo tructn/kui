@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-KUI is in alpha. Only the [latest release](https://github.com/tructn/kui/releases/latest) gets security fixes, and the
+Only the [latest release](https://github.com/tructn/kui/releases/latest) gets security fixes, and the
 in-app updater delivers them.
 
 ## Reporting a vulnerability

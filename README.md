@@ -24,8 +24,8 @@
   <a href="#install">Install</a>
 </p>
 
-> [!WARNING]
-> **KUI is in early alpha and not yet ready for production.**
+> [!NOTE]
+> **KUI is pre-1.0**, so expect rough edges and occasional breaking changes between minor versions.
 > Found a bug? [Open an issue](https://github.com/tructn/kui/issues).
 
 <p align="center">

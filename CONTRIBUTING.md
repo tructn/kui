@@ -144,10 +144,10 @@ Releases are made by [release-please](https://github.com/googleapis/release-plea
    **Settings → Updates → Include release candidates**.
 
 Versioning is set in [release-please-config.json](release-please-config.json), and the last released version
-in [.release-please-manifest.json](.release-please-manifest.json). KUI is in alpha, so each release bumps the
-`-alpha.N` number. To change channel, add a `Release-As: 0.2.0-beta.1` footer to a commit (the next release PR
-uses that version) and set `prerelease-type` to `beta`; for stable releases, remove `versioning`, `prerelease`
-and `prerelease-type`. Before 1.0, breaking changes bump the minor.
+in [.release-please-manifest.json](.release-please-manifest.json). Releases are stable SemVer, and before 1.0
+breaking changes bump the minor. To ship a pre-release (say `0.2.0-beta.1`), add a `Release-As: 0.2.0-beta.1`
+footer to a commit (the next release PR uses that version) and set `"versioning": "prerelease"`, `"prerelease": true`
+and `"prerelease-type": "beta"` in the config; remove them again to go back to stable.
 
 The release PR is opened with the `RELEASE_PLEASE_TOKEN` secret: a fine-grained personal access token for this
 repo with **Contents** and **Pull requests** read and write. It can't use the workflow's `GITHUB_TOKEN`, because

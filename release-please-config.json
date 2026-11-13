@@ -3,9 +3,6 @@
   "release-type": "node",
   "include-component-in-tag": false,
   "bump-minor-pre-major": true,
-  "versioning": "prerelease",
-  "prerelease": true,
-  "prerelease-type": "alpha",
   "draft": true,
   "force-tag-creation": true,
   "changelog-sections": [
