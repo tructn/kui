@@ -44,51 +44,36 @@ KUI is neither. It's a desktop app: download it, add your cluster, and you're lo
 
 <img src="docs/screenshots/00_cluster.png" alt="The Add cluster dialog" width="820" />
 
-Add a cluster with its address, test the connection, and save it. Secure clusters work too:
-TLS with your own CA and client certificates (mutual TLS), plus SASL with PLAIN, SCRAM-SHA-256,
-SCRAM-SHA-512 (username and password) or OAUTHBEARER (OAuth 2.0 client credentials; macOS and Linux
-only for now). If a connection fails, KUI tells you why in plain words instead of showing a raw error.
+Add a cluster, test the connection and save it. TLS, mutual TLS and SASL (PLAIN, SCRAM, OAuth) are supported.
 
 ### Find any topic in seconds
 
-Search every topic from anywhere with <kbd>⌘</kbd> <kbd>K</kbd>, or filter the list with a regular expression.
-See each topic's partitions, replicas and message count at a glance, create and delete topics, and copy a
-topic's name with one click. A Brokers page shows the machines your cluster runs on.
+Search topics with <kbd>⌘</kbd> <kbd>K</kbd>, see partitions and message counts at a glance, and create or
+delete topics.
 
 ### Read and filter messages
 
 <img src="docs/screenshots/02_messages.png" alt="A topic's messages filtered with a query in the expanded editor" width="820" />
 
-- Start from the newest or oldest message, or **watch new ones arrive live**.
-- Expand any row to see its key, headers and value side by side. Values show as formatted JSON or Base64.
-- **Filter with SQL-like queries**, e.g. `value.status = 'shipped' AND value.items[*].qty > 3`. Suggestions for
-  fields, operators and values come from the topic's own messages, so they know every field even when messages
-  differ in shape. Press <kbd>Tab</kbd> or <kbd>Enter</kbd> to pick one, or <kbd>⌘</kbd> <kbd>L</kbd>
-  (<kbd>Ctrl</kbd> <kbd>Space</kbd> on Windows) to open the list. Mistakes are underlined as you type.
-- **Expand the filter** into a multi-line editor with line numbers for longer queries. There, <kbd>Enter</kbd>
-  adds a line and <kbd>⌘</kbd> <kbd>Enter</kbd> (<kbd>Ctrl</kbd> <kbd>Enter</kbd> on Windows) runs it. See the
-  [query guide](crates/kui_tql/README.md) for the full syntax.
-- **Export** messages to JSON, NDJSON or CSV.
-- **Copy** one or many messages to another topic, which is handy for replaying a message or moving test data.
+Browse from the newest or oldest message, or watch new ones arrive live. Filter with SQL-like queries such as
+`value.status = 'shipped'`, with suggestions as you type (see the [query guide](crates/kui_tql/README.md)).
+Export to JSON or CSV, or copy messages to another topic.
 
 ### Send messages and generate test data
 
-Write a message with its own key and headers and send it, or have KUI fill a topic with generated test data
-in a few clicks.
+Send a message with its own key and headers, or fill a topic with generated test data.
 
 ### Know which consumers are falling behind
 
 <img src="docs/screenshots/03_consumers.png" alt="A consumer group's progress on each partition" width="820" />
 
-See every consumer group, whether it's caught up, and how far behind it is on each partition.
-When a group needs a fresh start, **reset its offsets** to the earliest message, the latest one, or a point in time.
+See how far behind each consumer group is, and reset its offsets when it needs a fresh start.
 
 ### Make it yours
 
 <img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />
 
-Light, dark, or follow your system. Pick your own fonts. KUI also checks for updates when it starts and asks
-before installing them.
+Light or dark theme, your own fonts, and automatic update checks.
 
 ## Install
 
