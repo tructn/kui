@@ -119,19 +119,20 @@ pub fn check_properties(properties: &BTreeMap<String, String>) -> Result<()> {
 }
 
 /// Properties whose value is a secret, so they belong in the keychain.
+pub const SECRET_PROPERTIES: &[&str] = &[
+    "sasl.password",
+    "ssl.key.password",
+    "ssl.keystore.password",
+    "ssl.key.pem",
+    "sasl.oauthbearer.client.secret",
+    "sasl.oauthbearer.client.credentials.client.secret",
+    "sasl.oauthbearer.config",
+    "sasl.oauthbearer.assertion.private.key.pem",
+    "sasl.oauthbearer.assertion.private.key.passphrase",
+];
+
 pub fn is_secret_property(key: &str) -> bool {
-    matches!(
-        key.trim().to_ascii_lowercase().as_str(),
-        "sasl.password"
-            | "ssl.key.password"
-            | "ssl.keystore.password"
-            | "ssl.key.pem"
-            | "sasl.oauthbearer.client.secret"
-            | "sasl.oauthbearer.client.credentials.client.secret"
-            | "sasl.oauthbearer.config"
-            | "sasl.oauthbearer.assertion.private.key.pem"
-            | "sasl.oauthbearer.assertion.private.key.passphrase"
-    )
+    SECRET_PROPERTIES.contains(&key.trim().to_ascii_lowercase().as_str())
 }
 
 /// Hand-written so a stray `{:?}` can't print secrets: only whether each is set,
@@ -225,8 +226,26 @@ mod tests {
         }))
         .unwrap();
         let text = format!("{c:?} {c:#?}");
-        for secret in ["pw-secret", "oauth-secret", "key-secret", "pem-secret"] {
-            assert!(!text.contains(secret), "{secret} leaked");
+        for (field, value) in [
+            ("saslPassword", "pw-secret"),
+            ("oauthClientSecret", "oauth-secret"),
+            ("sslKeyPassword", "key-secret"),
+            ("ssl.key.pem", "pem-secret"),
+        ] {
+            assert!(!text.contains(value), "{field} leaked into Debug output");
+        }
+    }
+
+    #[test]
+    fn debug_output_has_no_secret_property_values() {
+        let mut c: ClusterConfig =
+            serde_json::from_value(serde_json::json!({ "name": "c", "bootstrapServers": "h:9092" })).unwrap();
+        for (i, key) in SECRET_PROPERTIES.iter().enumerate() {
+            c.properties.insert((*key).into(), format!("value-{i}"));
+        }
+        let text = format!("{c:?} {c:#?}");
+        for (i, key) in SECRET_PROPERTIES.iter().enumerate() {
+            assert!(!text.contains(&format!("value-{i}")), "{key} leaked into Debug output");
         }
     }
 

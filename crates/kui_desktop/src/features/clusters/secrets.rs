@@ -124,16 +124,40 @@ impl Secrets {
 mod tests {
     use super::*;
 
+    use super::testing::MemoryKeychain;
+    use kui_kafka::SECRET_PROPERTIES;
+
     #[test]
     fn debug_output_has_no_secrets() {
-        let mut c: ClusterConfig = serde_json::from_value(
-            serde_json::json!({ "name": "c", "bootstrapServers": "h:9092", "saslPassword": "pw-secret" }),
-        )
+        let mut c: ClusterConfig = serde_json::from_value(serde_json::json!({
+            "name": "c",
+            "bootstrapServers": "h:9092",
+            "saslPassword": "pw-secret",
+            "oauthClientSecret": "oauth-secret",
+            "sslKeyPassword": "key-secret",
+        }))
         .unwrap();
-        c.properties.insert("sasl.oauthbearer.config".into(), "cfg-secret".into());
+        for (i, key) in SECRET_PROPERTIES.iter().enumerate() {
+            c.properties.insert((*key).into(), format!("value-{i}"));
+        }
         let secrets = Secrets::take(&mut c);
         let text = format!("{secrets:?} {secrets:#?}");
-        assert!(!text.contains("pw-secret") && !text.contains("cfg-secret"), "{text}");
+        for (field, value) in
+            [("saslPassword", "pw-secret"), ("oauthClientSecret", "oauth-secret"), ("sslKeyPassword", "key-secret")]
+        {
+            assert!(!text.contains(value), "{field} leaked into Debug output");
+        }
+        for (i, key) in SECRET_PROPERTIES.iter().enumerate() {
+            assert!(!text.contains(&format!("value-{i}")), "{key} leaked into Debug output");
+        }
+    }
+
+    #[test]
+    fn unreadable_keychain_item_error_does_not_quote_it() {
+        let store = MemoryKeychain::default();
+        store.set("c", r#"{"saslPassword": 42, "oauthClientSecret": "oauth-secret""#).unwrap();
+        let err = Secrets::load(&store, "c").unwrap_err().to_string();
+        assert!(!err.contains("oauth-secret"), "keychain contents leaked into the error");
     }
 
     #[test]
