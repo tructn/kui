@@ -68,7 +68,8 @@ install-unsupported:
 	@echo "make install supports macOS and Windows only" >&2; exit 1
 
 # Runs release.yml by hand on a pushed branch: it builds every platform's installers without releasing
-# anything. GitHub builds what origin has, not your working tree. Ctrl-C stops watching, not the run;
+# anything. GitHub builds what origin has, not your working tree. `gh run watch` can exit 0 when the API
+# hiccups mid-run, so the result is checked before downloading. Ctrl-C stops watching, not the run;
 # fetch its installers later with `make release-artifacts RUN=<id>`.
 REF ?= $(shell git branch --show-current)
 DRY_RUN_DIR := target/release-dry-run
@@ -93,6 +94,10 @@ release-dry-run:
 	[ -n "$$run" ] || { echo "the run didn't start; check gh run list --workflow release.yml" >&2; exit 1; }; \
 	echo "Run $$run: $$(gh run view "$$run" --json url --jq .url)"; \
 	gh run watch "$$run" --exit-status; \
+	result=$$(gh run view "$$run" --json conclusion --jq .conclusion); \
+	[ "$$result" = success ] || { \
+	  echo "run $$run isn't a success ($${result:-still running}); once it is: make release-artifacts RUN=$$run" >&2; \
+	  exit 1; }; \
 	$(call download_artifacts,$$run)
 
 release-artifacts:
