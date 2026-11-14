@@ -33,7 +33,7 @@ Red and blue never approve their own work; purple does.
 
 1. Map the architecture from `CLAUDE.md` and the code. Note which controls `crates/kui_desktop/src/security_tests.rs` and the e2e security specs already pin.
 2. Red team: `security-auditor` audits the scope. Split independent areas (webview and message rendering,
-   IPC and capabilities, credentials, Kafka write paths, TQL/codec parsing, updater and supply chain) across
+   IPC and capabilities, credentials, Kafka write paths, MQL/codec parsing, updater and supply chain) across
    parallel auditors if the scope is large.
 3. Red team: `vulnerability-validator` verifies every finding independently.
 4. Prioritise `CONFIRMED` findings by severity. Show me the list before any code changes.

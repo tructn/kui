@@ -1,7 +1,7 @@
 [package]
-name = "kui_tql"
+name = "kui_mql"
 version = "0.1.0"
-description = "TQL, the topic query language: an interpreter for KUI's message filters"
+description = "MQL, the message query language: an interpreter for KUI's message filters"
 license = "MIT"
 readme = "README.md"
 edition = "2024"

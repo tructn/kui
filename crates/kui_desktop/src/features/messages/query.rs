@@ -1,6 +1,6 @@
-//! Connects messages to the TQL filter (the `kui_tql` crate).
+//! Connects messages to the MQL filter (the `kui_mql` crate).
 
-pub use kui_tql::{Query, QueryError};
+pub use kui_mql::{Query, QueryError};
 
 use super::model::{Message, Payload};
 use crate::error::{Error, Result};
@@ -13,7 +13,7 @@ pub fn optional(input: Option<&str>) -> Result<Option<Query>> {
     }
 }
 
-impl kui_tql::Record for Message {
+impl kui_mql::Record for Message {
     fn partition(&self) -> i32 {
         self.partition
     }
@@ -26,11 +26,11 @@ impl kui_tql::Record for Message {
         self.timestamp
     }
 
-    fn key(&self) -> Option<kui_tql::Payload<'_>> {
+    fn key(&self) -> Option<kui_mql::Payload<'_>> {
         self.key.as_ref().map(payload)
     }
 
-    fn value(&self) -> Option<kui_tql::Payload<'_>> {
+    fn value(&self) -> Option<kui_mql::Payload<'_>> {
         self.value.as_ref().map(payload)
     }
 
@@ -39,6 +39,6 @@ impl kui_tql::Record for Message {
     }
 }
 
-fn payload(p: &Payload) -> kui_tql::Payload<'_> {
-    kui_tql::Payload { text: &p.text, utf8: p.encoding == "utf8" }
+fn payload(p: &Payload) -> kui_mql::Payload<'_> {
+    kui_mql::Payload { text: &p.text, utf8: p.encoding == "utf8" }
 }

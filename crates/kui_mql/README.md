@@ -1,6 +1,6 @@
-# kui_tql
+# kui_mql
 
-The interpreter for **TQL**, the *topic query language*: the SQL-like filter KUI uses to search a Kafka topic's
+The interpreter for **MQL**, the *message query language*: the SQL-like filter KUI uses to search a Kafka topic's
 messages. A query is the part of SQL that would follow `WHERE`:
 
 ```sql
@@ -18,7 +18,7 @@ messages come in through the `Record` trait, which KUI implements for its `Messa
 `crates/kui_desktop/src/features/messages/query.rs`.
 
 ```rust
-use kui_tql::Query;
+use kui_mql::Query;
 
 let query = Query::parse("value.status = 'shipped' AND headers.source = 'web'")?; // Err(QueryError) on a typo
 if query.matches(&message) {                                                     // any `impl Record`
@@ -34,7 +34,7 @@ if query.matches(&message) {                                                    
 | `Payload { text, utf8 }` | A key or value as displayed; only `utf8` text is tried as JSON |
 
 ```sh
-cargo test -p kui_tql   # all lexer, parser and evaluator tests, in seconds
+cargo test -p kui_mql   # all lexer, parser and evaluator tests, in seconds
 ```
 
 File paths in this guide are relative to the repository root.
@@ -294,7 +294,7 @@ value.status = 'SHIPPED' AND value.items[*].qty > 3
 
 The computer can't do anything useful with that line while it's just characters. It needs a structured
 description it can check against each message. Turning text into that structure, and then using it, is the
-job of the `kui_tql` crate in `crates/kui_tql/`. It knows nothing about Kafka: the app hands it
+job of the `kui_mql` crate in `crates/kui_mql/`. It knows nothing about Kafka: the app hands it
 messages through the `Record` trait (implemented in `crates/kui_desktop/src/features/messages/query.rs`).
 
 > **Key idea.** A query is a *program* in a tiny language. Our code reads the program once, then runs it once
@@ -360,10 +360,10 @@ always does. [Section 9](#9-the-editor-side-typescript) explains why it exists.
 
 | File                                                     | Language | Job                                                                   |
 | -------------------------------------------------------- | -------- | --------------------------------------------------------------------- |
-| `crates/kui_tql/src/lib.rs`                      | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
-| `crates/kui_tql/src/lexer.rs`                    | Rust     | Stage 1: text → tokens                                                |
-| `crates/kui_tql/src/parser.rs`                   | Rust     | Stage 2: tokens → tree (`Expr`)                                       |
-| `crates/kui_tql/src/evaluate.rs`                 | Rust     | Stage 3: tree + message → bool                                        |
+| `crates/kui_mql/src/lib.rs`                      | Rust     | Public face: `Query::parse`, `Query::matches`, `Record`, `QueryError` |
+| `crates/kui_mql/src/lexer.rs`                    | Rust     | Stage 1: text → tokens                                                |
+| `crates/kui_mql/src/parser.rs`                   | Rust     | Stage 2: tokens → tree (`Expr`)                                       |
+| `crates/kui_mql/src/evaluate.rs`                 | Rust     | Stage 3: tree + message → bool                                        |
 | `crates/kui_desktop/src/features/messages/query.rs`                     | Rust     | `Record` for KUI's `Message`; `optional` (blank = no filter)          |
 | `crates/kui_desktop/src/features/messages/service.rs`                   | Rust     | Stage 4: the search loop (`browse_with`), live tail                   |
 | `crates/kui_desktop/src/features/messages/commands.rs`                  | Rust     | `check_message_query`: parse only, for error underlines               |
@@ -400,7 +400,7 @@ Learn these words once and the rest of the code will read much more easily.
 
 > **"Compiler" or "interpreter"?** A compiler translates a program into another language (often machine code).
 > An interpreter runs it directly. We do the front half of a compiler (lexing and parsing) and then interpret
-> the tree, never producing any other code. So TQL is interpreted, not compiled.
+> the tree, never producing any other code. So MQL is interpreted, not compiled.
 
 ---
 
@@ -1115,7 +1115,7 @@ never recurses, so a long text can't overflow the stack. `ILIKE` is the same wit
 
 ### 8. Stage 4: searching a topic (`service.rs`)
 
-`Query` (in `kui_tql`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
+`Query` (in `kui_mql`'s `lib.rs`) is the small public wrapper the rest of the app uses, plus one helper on
 the app side (`crates/kui_desktop/src/features/messages/query.rs`):
 
 ```rust
@@ -1452,7 +1452,7 @@ evaluator.
 #### Running tests
 
 ```sh
-cargo test -p kui_tql                  # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
+cargo test -p kui_mql                  # Rust: lexer, parser, evaluator tests (seconds, no Kafka/Tauri)
 bun test frontend/features/messages/query   # TypeScript: completion tests
 bun run test:e2e                            # the real app in Docker, against seeded Kafka
 ```
@@ -1831,9 +1831,9 @@ filter never reaches `browse`.
 
 | Where | Covers |
 | ----- | ------ |
-| `kui_tql/src/lexer.rs` | tokens, quotes, UTF-16 positions, errors |
-| `kui_tql/src/parser.rs` | precedence, paths, desugaring, error positions and messages |
-| `kui_tql/src/evaluate.rs` | paths and wildcards, embedded JSON, by-meaning comparison, missing fields, text operators, `LIKE`, dates |
+| `kui_mql/src/lexer.rs` | tokens, quotes, UTF-16 positions, errors |
+| `kui_mql/src/parser.rs` | precedence, paths, desugaring, error positions and messages |
+| `kui_mql/src/evaluate.rs` | paths and wildcards, embedded JSON, by-meaning comparison, missing fields, text operators, `LIKE`, dates |
 | `window.rs` | `resume_after` in both directions |
 | `integration_tests.rs` (needs Kafka) | search pages hold only matches and resume mid-chunk; invalid queries fail |
 | `query/completion.test.ts` | catalog stats; suggestions for each state on a topic with two message shapes |

@@ -1,4 +1,4 @@
-//! TQL, the topic query language: a SQL `WHERE`-style condition tested
+//! MQL, the message query language: a SQL `WHERE`-style condition tested
 //! against each message of a Kafka topic.
 //!
 //! ```text

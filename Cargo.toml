@@ -11,7 +11,7 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock", "s
 thiserror = "2"
 # Build features (static linking, TLS, compression) are set in crates/kui_kafka.
 rdkafka = "0.39"
-kui_tql = { path = "crates/kui_tql" }
+kui_mql = { path = "crates/kui_mql" }
 kui_kafka = { path = "crates/kui_kafka" }
 
 [workspace.lints.rust]

@@ -2182,7 +2182,7 @@ dependencies = [
  "fake",
  "keyring",
  "kui_kafka",
- "kui_tql",
+ "kui_mql",
  "rdkafka",
  "reqwest",
  "rustls",
@@ -2209,7 +2209,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kui_tql"
+name = "kui_mql"
 version = "0.1.0"
 dependencies = [
  "chrono",
