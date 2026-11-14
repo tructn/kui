@@ -33,6 +33,7 @@ body:
       label: Operating system
       options:
         - macOS (Apple silicon)
+        - macOS (Intel)
         - Windows 10
         - Windows 11
         - Other (built from source)

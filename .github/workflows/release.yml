@@ -68,13 +68,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Intel Macs aren't supported for now. To add them, build target
-          # x86_64-apple-darwin on macos-latest and smoke-test it under Rosetta.
-          # The app bundle is what the updater installs (as .app.tar.gz).
+          # The app bundle is what the updater installs (as .app.tar.gz). `arch`
+          # is the suffix Tauri gives the .dmg, reused for the update package.
           - name: macOS (Apple Silicon)
             runner: macos-latest
             target: aarch64-apple-darwin
             bundles: app,dmg
+            arch: aarch64
+          # Built natively rather than cross-compiled from Apple Silicon, which
+          # would also have to cross-build the vendored OpenSSL, curl and
+          # librdkafka. macos-15-intel is GitHub's last Intel image (supported
+          # until August 2027); after that this entry has to cross-compile.
+          - name: macOS (Intel)
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+            arch: x64
           - name: Windows (x64)
             runner: windows-latest
             target: x86_64-pc-windows-msvc
@@ -185,6 +194,17 @@ jobs:
           bun run tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} \
             --config "{\"bundle\":{\"createUpdaterArtifacts\":$updater}}" $TAURI_SIGNING_ARGS
 
+      # Tauri names the update package KUI.app.tar.gz on both architectures, so
+      # the two Macs' packages would overwrite each other in the release.
+      - name: Name update package by architecture
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in "$BUNDLE"/macos/*.app.tar.gz*; do
+            mv "$f" "${f/.app.tar.gz/_${{ matrix.arch }}.app.tar.gz}"
+          done
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -239,12 +259,15 @@ jobs:
             [ -f "$1" ] && [ -f "$1.sig" ] || { echo "::error::Missing update package or signature: ${1:-(none)}"; exit 1; }
             jq -n --arg sig "$(cat "$1.sig")" --arg url "$base/$(basename "$1")" '{signature: $sig, url: $url}'
           }
-          app=$(entry "$(find installers -name '*.app.tar.gz')")
+          arm=$(entry "$(find installers -name '*_aarch64.app.tar.gz')")
+          intel=$(entry "$(find installers -name '*_x64.app.tar.gz')")
           nsis=$(entry "$(find installers -name '*-setup.exe')")
           jq -n --arg version "${TAG#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --rawfile notes "$RUNNER_TEMP/notes.md" --argjson app "$app" --argjson nsis "$nsis" \
+            --rawfile notes "$RUNNER_TEMP/notes.md" \
+            --argjson arm "$arm" --argjson intel "$intel" --argjson nsis "$nsis" \
             '{version: $version, notes: $notes, pub_date: $date, platforms: {
-              "darwin-aarch64": $app, "darwin-aarch64-app": $app,
+              "darwin-aarch64": $arm, "darwin-aarch64-app": $arm,
+              "darwin-x86_64": $intel, "darwin-x86_64-app": $intel,
               "windows-x86_64": $nsis, "windows-x86_64-nsis": $nsis}}' \
             > "$RUNNER_TEMP/latest.json"
           cat "$RUNNER_TEMP/latest.json"

@@ -84,7 +84,11 @@ Download the installer from the [latest release](https://github.com/tructn/kui/r
 | Computer | File |
 | --- | --- |
 | Mac with Apple silicon (M1 or newer) | `KUI_<version>_aarch64.dmg` |
+| Mac with an Intel processor | `KUI_<version>_x64.dmg` |
 | Windows 10 or 11 | `KUI_<version>_x64-setup.exe` |
+
+Not sure which Mac you have? Open the Apple menu → **About This Mac**: it lists a **Chip** (Apple M1 or newer)
+on Apple silicon and a **Processor** (Intel) on an Intel Mac.
 
 KUI isn't signed with a paid Apple or Microsoft certificate yet, so both systems warn you the first time you open
 it. That's expected; you only need to allow it once.
@@ -95,6 +99,7 @@ it. That's expected; you only need to allow it once.
 1. Open the `.dmg` and drag KUI into **Applications**.
 2. Open KUI. When macOS says it can't verify the app, click **Done**.
 3. Go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to "KUI" was blocked.
+   On macOS 11 and 12 it's **System Preferences → Security & Privacy → General**.
 
    Or run this in Terminal instead, then open KUI again:
 
