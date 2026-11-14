@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.2.0](https://github.com/tructn/kui/compare/v0.1.1...v0.2.0) (2026-11-14)
+
+
+### Added
+
+* **release:** ship installers for Intel Macs ([72837fc](https://github.com/tructn/kui/commit/72837fc903aa11186ed5066eb00e0b12389d9c14))
+
 ## [0.1.1](https://github.com/tructn/kui/compare/v0.1.0...v0.1.1) (2026-11-14)
 
 
