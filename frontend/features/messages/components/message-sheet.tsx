@@ -13,7 +13,6 @@ import { encodingLabel, PayloadBody, PayloadViewTabs, TruncationNotice, usePaylo
 interface MessageSheetProps {
   clusterId: string;
   topic: string;
-  /** Topics the message can be copied to. */
   targets: CopyTarget[];
   /** Hides copy for internal topics. */
   readOnly?: boolean;

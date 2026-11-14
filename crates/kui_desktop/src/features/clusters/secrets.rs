@@ -88,7 +88,6 @@ impl Secrets {
         }
     }
 
-    /// Puts the secrets back into `cluster`.
     pub fn restore(self, cluster: &mut ClusterConfig) {
         cluster.sasl_password = self.sasl_password;
         cluster.oauth_client_secret = self.oauth_client_secret;

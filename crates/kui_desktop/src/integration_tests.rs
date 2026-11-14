@@ -39,7 +39,6 @@ async fn full_round_trip() {
     let clients = KafkaClients::connect(cluster.clone()).unwrap();
     let topic = format!("kui-it-{}", uuid::Uuid::new_v4());
 
-    // Create
     let request = NewTopicRequest {
         name: topic.clone(),
         partitions: 2,
@@ -49,7 +48,6 @@ async fn full_round_trip() {
     topics::service::create(&clients, &request).await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    // Produce 10 messages to partition 0
     for i in 0..10 {
         let delivered = messages::service::produce(
             &clients,
@@ -66,7 +64,6 @@ async fn full_round_trip() {
         assert_eq!(delivered.offset, i);
     }
 
-    // List + detail
     let listed = topics::service::list_topics(&clients).unwrap();
     let summary = listed.iter().find(|t| t.name == topic).unwrap();
     assert_eq!((summary.partitions, summary.message_count), (2, 10));
@@ -77,7 +74,6 @@ async fn full_round_trip() {
     let retention = configs.iter().find(|c| c.name == "retention.ms").unwrap();
     assert_eq!(retention.value.as_deref(), Some("3600000"));
 
-    // Browse
     let browse = |from, value, page_size| BrowseRequest {
         topic: topic.clone(),
         partition: None,
@@ -149,7 +145,6 @@ async fn full_round_trip() {
     assert_eq!(consumers[0].offsets[0].committed, Some(4));
     consumer_groups::service::delete(&clients, &group).await.unwrap();
 
-    // Overview
     let overview = brokers::service::cluster_overview(&clients).unwrap();
     assert!(!overview.brokers.is_empty() && overview.partition_count >= 2);
 
@@ -443,7 +438,7 @@ async fn reset_consumer_group_offsets() {
     topics::service::delete(&clients, &[topic]).await.unwrap();
 }
 
-/// Purple-team RA-001/RA-009: browse, search, tail and export must agree on which large
+/// Browse, search, tail and export must agree on which large
 /// messages match, whether or not the page's byte budget cut their displayed text.
 #[tokio::test]
 #[ignore = "needs a running Kafka broker"]
@@ -540,7 +535,7 @@ async fn truncated_payloads_are_matched_whole_by_search_tail_and_export() {
     topics::service::delete(&clients, &[topic]).await.unwrap();
 }
 
-/// Purple round 3 (R2-001, tester R1): a hostile mix of ~900 KB and tiny messages over three
+/// A hostile mix of ~900 KB and tiny messages over three
 /// partitions, more cut raw bytes than one search chunk retains. Following the cursors page by
 /// page must find every match exactly once, never match a cut prefix, and keep each page near
 /// the byte cap.
@@ -637,7 +632,7 @@ fn search_request(topic: &str, query: &str, cursor: Option<std::collections::BTr
     }
 }
 
-/// Purple round 3 (tester R1): the 32 MiB cap is for the whole page, not for each chunk of 500
+/// The 32 MiB cap is for the whole page, not for each chunk of 500
 /// messages read to fill it. Half of 1,500 x 100 KB messages match, so no single chunk reaches the cap.
 #[tokio::test]
 #[ignore = "needs a running Kafka broker"]
@@ -670,7 +665,7 @@ async fn a_search_page_stops_at_its_byte_cap_across_chunks() {
     topics::service::delete(&clients, &[topic]).await.unwrap();
 }
 
-/// Purple round 3 (R2-001): a message bigger than the 64 MiB a chunk retains is still matched
+/// A message bigger than the 64 MiB a chunk retains is still matched
 /// whole, both when it follows another message (the chunk ends before it) and when it starts a chunk.
 #[tokio::test]
 #[ignore = "needs a running Kafka broker"]

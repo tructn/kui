@@ -96,9 +96,6 @@ export function complete(text: string, caret: number, catalog: FieldCatalog): Co
   return { from, to, items: items.slice(0, MAX_ITEMS) };
 }
 
-// ---------------------------------------------------------------------------
-// Reading the tokens before the caret
-
 function run(tokens: Token[]): State {
   const s: State = { expect: "operand", stack: [], lhs: null, op: null, role: "single", path: null };
   if (isKeyword(tokens[0], "WHERE")) tokens = tokens.slice(1);
@@ -300,9 +297,6 @@ function isRoot(word: string) {
 function isFunction(word: string) {
   return (FUNCTIONS as readonly string[]).includes(word.toLowerCase());
 }
-
-// ---------------------------------------------------------------------------
-// Building suggestions
 
 function suggest(s: State, catalog: FieldCatalog, prefix: string, partial: Token | null): Suggestion[] {
   switch (s.expect) {

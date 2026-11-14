@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Where to start reading from.
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum StartFrom {
@@ -136,7 +135,6 @@ pub struct MessageRef {
     pub offset: i64,
 }
 
-/// File formats messages can be exported to.
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ExportFormat {
@@ -157,7 +155,6 @@ impl ExportFormat {
     }
 }
 
-/// Which messages to export.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum ExportSource {

@@ -43,6 +43,10 @@ $env:OPENSSL_LIBS = "libssl_static:libcrypto_static"; $env:OPENSSL_STATIC = "1"
 [vcpkg](https://vcpkg.io) works too: `vcpkg install openssl:x64-windows-static-md-release`, then set
 `OPENSSL_DIR` and `OPENSSL_ROOT_DIR` to its `installed\x64-windows-static-md-release` folder and `OPENSSL_STATIC=1`.
 
+## Code standards
+
+See [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md).
+
 ## Workflow
 
 KUI uses **trunk-based development**: `main` is always releasable, and every change reaches it through a

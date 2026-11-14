@@ -39,7 +39,6 @@ interface ExportMessagesDialogProps {
   request: BrowseRequest;
   /** Messages on the current page. */
   pageCount: number;
-  /** Checked rows, if any. */
   selected: MessageRef[];
   disabled?: boolean;
 }

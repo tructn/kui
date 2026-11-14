@@ -46,8 +46,6 @@ fn frontend_sources() -> Vec<(PathBuf, String)> {
     out
 }
 
-// --- A05 Security misconfiguration / A03 Injection (XSS) ----------------------
-
 #[test]
 fn security_csp_is_strict_in_production() {
     let csp = csp("csp");
@@ -95,8 +93,6 @@ fn security_only_style_src_skips_tauri_csp_hashing() {
     assert_eq!(disabled, &serde_json::json!(["style-src"]));
 }
 
-// --- A01 Broken access control --------------------------------------------
-
 #[test]
 fn security_webview_capabilities_are_minimal() {
     let text = fs::read_to_string(repo().join("crates/kui_desktop/capabilities/default.json")).unwrap();
@@ -116,8 +112,6 @@ fn security_no_remote_content_or_global_tauri() {
     let dist = config["build"]["frontendDist"].as_str().unwrap();
     assert!(!dist.starts_with("http"), "production must load the bundled UI, not {dist}");
 }
-
-// --- A03 Injection (DOM XSS) ----------------------------------------------
 
 #[test]
 fn security_ui_has_no_html_injection_sinks() {
@@ -192,7 +186,7 @@ fn e2e_changing_commands() -> Vec<String> {
 
 /// Commands that never change a cluster or saved connections. A new command must be
 /// classified here or in `CHANGING_COMMANDS`, so the "no unprompted changes" e2e
-/// spec cannot pass vacuously for it (KUI-K07).
+/// spec cannot pass vacuously for it.
 const READ_ONLY_COMMANDS: &[&str] = &[
     "load_settings",
     "save_setting",
@@ -237,7 +231,7 @@ fn security_every_command_is_classified_for_the_no_unprompted_changes_spec() {
 
 #[test]
 fn security_message_headers_never_go_through_rdkafkas_panicking_name_decoding() {
-    // rdkafka unwraps a UTF-8 conversion of every header name; one hostile record aborts the app (KUI-K01).
+    // rdkafka unwraps a UTF-8 conversion of every header name; one hostile record aborts the app.
     // Behaviour: messages::headers::tests::non_utf8_header_name_is_decoded_lossily_instead_of_panicking.
     let dir = repo().join("crates/kui_desktop/src/features");
     let mut files = Vec::new();
@@ -273,14 +267,13 @@ fn security_message_headers_never_go_through_rdkafkas_panicking_name_decoding() 
     }
 }
 
-// Purple team round 2: an old clusters.json with plaintext secret properties (IC-002, RA-003) and a
-// planted file with an aliased denied property (RA-002).
+// An old clusters.json with plaintext secret properties, and a planted file with an aliased denied property.
 #[test]
 fn security_old_plaintext_secret_properties_and_aliases_migrate_to_the_keychain() {
     use crate::features::clusters::secrets::testing::MemoryKeychain;
     use crate::features::clusters::store::ClusterStore;
 
-    let path = std::env::temp_dir().join(format!("kui-purple-{}.json", uuid::Uuid::new_v4()));
+    let path = std::env::temp_dir().join(format!("kui-legacy-{}.json", uuid::Uuid::new_v4()));
     let secret_keys = [
         "sasl.password",
         "ssl.key.password",
@@ -342,7 +335,7 @@ fn security_planted_alias_properties_cannot_reach_a_client() {
 
 #[test]
 fn security_ui_truncated_payloads_cannot_be_copied_and_say_so() {
-    // RA-001 UI half has no component tests; this fails if the guards are removed from the views.
+    // The UI guards for truncated payloads have no component tests; this fails if they are removed.
     let dir = repo().join("frontend/features/messages/components");
     let read = |name: &str| fs::read_to_string(dir.join(name)).unwrap();
     let (sheet, table, tabs) = (read("message-sheet.tsx"), read("message-table.tsx"), read("payload-view-tabs.tsx"));

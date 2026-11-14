@@ -102,7 +102,6 @@ export interface CopyRequest {
   targetPartition: number | null;
 }
 
-/** A topic a message can be copied to. */
 export interface CopyTarget {
   name: string;
   partitions: number;
@@ -110,7 +109,6 @@ export interface CopyTarget {
 
 export type ExportFormat = "json" | "ndjson" | "csv";
 
-/** Which messages to export. */
 export type ExportSource =
   /** Browse order from `browse` (cursor included) until `limit` messages or the end. */
   | { kind: "range"; browse: BrowseRequest; limit: number }

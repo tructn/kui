@@ -6,7 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
-// https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -15,7 +14,6 @@ export default defineConfig(() => ({
   // Assets load from disk inside the Tauri app, so bundle size warnings meant for the web don't apply.
   build: { chunkSizeWarningLimit: 2000 },
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   clearScreen: false,
   server: {
     port: 1420,

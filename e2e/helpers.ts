@@ -21,7 +21,6 @@ export const openDialog = () => $('[data-slot="dialog-content"]');
 export const openAlertDialog = () => $('[data-slot="alert-dialog-content"]');
 export const openSheet = () => $('[data-slot="sheet-content"]');
 
-/** Waits for a toast containing `text`. */
 export async function expectToast(text: string) {
   await browser.waitUntil(
     async () => {
@@ -34,7 +33,6 @@ export async function expectToast(text: string) {
   );
 }
 
-/** Opens a page from the sidebar. */
 export async function goTo(page: "Topics" | "Consumer groups" | "Brokers") {
   // A sheet or dialog that is still fading out covers the sidebar and would intercept the click.
   await openSheet().waitForExist({ reverse: true });

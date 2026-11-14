@@ -27,7 +27,6 @@ interface MessageBrowserProps {
   clusterId: string;
   topic: string;
   partitions: number[];
-  /** Topics a message can be copied to. */
   copyTargets: CopyTarget[];
   /** Hides copy: the topic is internal and must not be written to. */
   readOnly?: boolean;
