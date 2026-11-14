@@ -24,10 +24,6 @@
   <a href="#install">Install</a>
 </p>
 
-> [!NOTE]
-> **KUI is pre-1.0**, so expect rough edges and occasional breaking changes between minor versions.
-> Found a bug? [Open an issue](https://github.com/tructn/kui/issues).
-
 <p align="center">
   <img src="docs/screenshots/01_topics.png" alt="KUI showing the topics of a Kafka cluster" width="820" />
 </p>
