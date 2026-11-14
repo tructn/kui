@@ -1,10 +1,11 @@
 # Checks for pull requests and for pushes to main:
 # - lint and unit tests on Linux, on both (main also gets direct pushes);
-# - the app must compile on macOS and Windows, the platforms we ship, so that
-#   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
-#   release rather than during one. This runs on main too, because most work is
-#   pushed there directly and would otherwise first meet macOS and Windows in
-#   the release PR. Installers are built only by release.yml.
+# - the app must compile on macOS (Apple Silicon and Intel) and Windows, the
+#   platforms we ship, so that platform-only breakage (e.g. the Windows OpenSSL
+#   setup) shows up before a release rather than during one. This runs on main
+#   too, because most work is pushed there directly and would otherwise first
+#   meet macOS and Windows in the release PR. Installers are built only by
+#   release.yml.
 #
 # The e2e suite (`bun run test:e2e`) runs locally, not here. Dependency audits
 # are in security.yml, and the PR title check in pr-title.yml.
@@ -83,7 +84,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        # The three platforms release.yml ships (Apple Silicon, Intel Mac, Windows).
+        os: [macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
