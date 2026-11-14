@@ -38,10 +38,16 @@ Run lint, tests and `tsc --noEmit` for the side you changed before calling work 
   outside tests.
 - Operations that change a cluster (delete, reset offsets, produce) must be explicit user actions, and browsing
   must never send one.
-- Never log or serialize cluster credentials. They go through `clusters/secrets.rs`.
+- Never log or serialize cluster credentials. They go through `clusters/secrets.rs`. That includes `assert!`/`panic!`
+  messages in tests (CodeQL flags them): name the field that leaked, never print its value or a `Debug` dump.
+- `SECRET_PROPERTIES` in `kui_kafka/src/cluster.rs` is the single list of secret property keys. Leak tests iterate
+  it, so add new keys there rather than to a test.
 - Put pure frontend logic in `frontend/lib/` with a sibling `*.test.ts` (`bun:test`). Test files are excluded from
   `tsc`.
 - Use the `@/` import alias and Tailwind utilities with `cn()`.
 - Share Rust dependency versions via `[workspace.dependencies]`. CI audits dependencies, so avoid adding new ones.
-- Comments: only the non-obvious why (a constraint, gotcha or workaround). Don't restate the code, narrate steps or
-  label sections, and don't leave commented-out code.
+- `glib 0.18` (RUSTSEC-2024-0429, Dependabot) can't be upgraded: Tauri's Linux backend pins GTK3 / gtk-rs 0.18, the
+  fix is only in the GTK4-era 0.20, and glib isn't built for the macOS/Windows releases. Don't try to bump it.
+- Comments: only the non-obvious why (a constraint, gotcha or workaround), the kind a human maintainer would leave
+  for the next person. If good naming already says it, don't comment. Don't restate the code, narrate steps, label
+  sections, explain a change ("now uses X", "fixed Y"), or leave commented-out code.
