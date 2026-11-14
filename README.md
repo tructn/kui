@@ -55,8 +55,10 @@ delete topics.
 
 <img src="docs/screenshots/02_messages.png" alt="A topic's messages filtered with a query in the expanded editor" width="820" />
 
+<img src="docs/screenshots/02_messages_ql.png" alt="Query suggestions listing key values as you type a filter" width="820" />
+
 Browse from the newest or oldest message, or watch new ones arrive live. Filter with SQL-like queries such as
-`value.status = 'shipped'`, with suggestions as you type (see the [query guide](crates/kui_tql/README.md)).
+`value.status = 'shipped'`, with suggestions as you type (see the [query guide](crates/kui_mql/README.md)).
 Export to JSON or CSV, or copy messages to another topic.
 
 ### Send messages and generate test data
