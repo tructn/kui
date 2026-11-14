@@ -67,6 +67,38 @@ install-windows: node_modules
 install-unsupported:
 	@echo "make install supports macOS and Windows only" >&2; exit 1
 
+# Runs release.yml by hand on a pushed branch: it builds every platform's installers without releasing
+# anything. GitHub builds what origin has, not your working tree. Ctrl-C stops watching, not the run;
+# fetch its installers later with `make release-artifacts RUN=<id>`.
+REF ?= $(shell git branch --show-current)
+DRY_RUN_DIR := target/release-dry-run
+# Not a `$(MAKE) release-artifacts` call: make runs any line containing $(MAKE) even under `make -n`, which
+# would start a real run.
+download_artifacts = rm -rf $(DRY_RUN_DIR) && gh run download "$(1)" --dir $(DRY_RUN_DIR) && \
+	find $(DRY_RUN_DIR) -type f | sort
+
+.PHONY: release-dry-run release-artifacts
+
+release-dry-run:
+	@git fetch --quiet origin "$(REF)"
+	@local=$$(git rev-parse --verify --quiet "$(REF)" || true); \
+	[ -z "$$local" ] || [ "$$local" = "$$(git rev-parse FETCH_HEAD)" ] || \
+	  echo "warning: local $(REF) differs from origin/$(REF); GitHub builds origin/$(REF)" >&2
+	@list() { gh run list --workflow release.yml --branch "$(REF)" --event workflow_dispatch --limit 1 \
+	  --json databaseId --jq '.[0].databaseId // empty'; }; \
+	before=$$(list); \
+	gh workflow run release.yml --ref "$(REF)"; \
+	run=; \
+	for _ in {1..30}; do run=$$(list); [ -n "$$run" ] && [ "$$run" != "$$before" ] && break; run=; sleep 2; done; \
+	[ -n "$$run" ] || { echo "the run didn't start; check gh run list --workflow release.yml" >&2; exit 1; }; \
+	echo "Run $$run: $$(gh run view "$$run" --json url --jq .url)"; \
+	gh run watch "$$run" --exit-status; \
+	$(call download_artifacts,$$run)
+
+release-artifacts:
+	@[ -n "$(RUN)" ] || { echo "usage: make release-artifacts RUN=<run id>" >&2; exit 1; }
+	$(call download_artifacts,$(RUN))
+
 node_modules: package.json bun.lock
 	bun install --frozen-lockfile
 	@touch node_modules

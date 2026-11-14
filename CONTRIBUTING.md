@@ -20,6 +20,7 @@ make install          # build a release and install it (/Applications on macOS, 
 make package          # build this OS's installers into target/release/bundle
 make test             # unit tests (test-e2e for the Docker suite)
 make check            # lint + typecheck + unit tests, before calling a change done
+make release-dry-run  # build every platform's installers on GitHub without releasing (see Releasing)
 ```
 
 ### Tests
@@ -169,7 +170,9 @@ CI doesn't run on PRs opened with it, so the release PR could never pass the req
 expires, the release workflow fails until you replace the secret.
 
 To build the installers without releasing, run the workflow by hand (**Actions → Release → Run workflow**); they
-are attached to the run as artifacts.
+are attached to the run as artifacts. `make release-dry-run` does the same for the current branch (or
+`REF=<branch>`), watches the run and downloads the installers to `target/release-dry-run`. It builds what's
+pushed, so push first. `make release-artifacts RUN=<id>` downloads them from an earlier run.
 
 ### In-app updates
 
