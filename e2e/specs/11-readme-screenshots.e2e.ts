@@ -31,6 +31,8 @@ describe("README screenshots", () => {
     await $("#cluster-name").setValue("Production");
     // Keeps the default bootstrap address: the WebKitGTK driver drops most of a typed host name.
     await expect($("#cluster-bootstrap")).toHaveValue("localhost:9092");
+    // Moves focus off the name so it isn't shown selected.
+    await openDialog().$("h2=Add cluster").click();
     await settle();
     await snapshot("readme-00_cluster");
     await browser.keys(Key.Escape);
@@ -40,6 +42,8 @@ describe("README screenshots", () => {
     await openDialog().waitForExist({ reverse: true });
     await goTo("Topics");
     await expect($("span=demo.orders")).toBeDisplayed();
+    // Rows fade in one after another.
+    await settle();
     await snapshot("readme-01_topics");
   });
 
