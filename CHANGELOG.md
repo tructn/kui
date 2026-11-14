@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.1.1](https://github.com/tructn/kui/compare/v0.1.0...v0.1.1) (2026-11-14)
+
+
+### Fixed
+
+* **clusters:** keep secret values out of test assertion messages ([ff6fe50](https://github.com/tructn/kui/commit/ff6fe5043aa6ab59b6bd4e21d0c3442c49bd1741))
+
 ## [0.1.0](https://github.com/tructn/kui/compare/v0.1.0-alpha.20...v0.1.0) (2026-11-13)
 
 
