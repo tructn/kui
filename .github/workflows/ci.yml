@@ -2,11 +2,15 @@
 # - lint and unit tests on Linux, on both (main also gets direct pushes);
 # - the app must compile on macOS and Windows, the platforms we ship, so that
 #   platform-only breakage (e.g. the Windows OpenSSL setup) shows up before a
-#   release rather than during one. PRs only: installers are built when the
-#   release-please PR is merged (release.yml).
+#   release rather than during one. This runs on main too, because most work is
+#   pushed there directly and would otherwise first meet macOS and Windows in
+#   the release PR. Installers are built only by release.yml.
 #
 # The e2e suite (`bun run test:e2e`) runs locally, not here. Dependency audits
 # are in security.yml, and the PR title check in pr-title.yml.
+#
+# Docs-only pushes to main skip CI. PRs never use path filters: a required check
+# whose workflow didn't run stays pending and blocks the merge.
 #
 # PR title edits don't trigger this workflow at all. If they did, its jobs would
 # have to be skipped for them, and a skipped required check counts as passed:
@@ -17,6 +21,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**", ".github/ISSUE_TEMPLATE/**"]
 
 permissions:
   contents: read
@@ -42,7 +47,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      # Only main saves: PR caches can't be restored by other PRs and would
+      # crowd main's out of the repo's 10 GB cache budget.
       - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # Tauri's Linux webview, and CMake + headers for the bundled librdkafka
       # (its OAuth code includes curl.h even when built without curl).
@@ -71,8 +80,6 @@ jobs:
 
   build:
     name: Build (${{ matrix.os }})
-    # PRs only; main gets installers from release.yml.
-    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -91,10 +98,10 @@ jobs:
       # Bump prefix-key when a C dependency changes where it comes from (e.g.
       # OpenSSL vcpkg -> preinstalled): the cache keeps librdkafka's CMake
       # cache, which remembers absolute library paths from the old source.
-      # The cache is saved per PR, so later pushes to the same PR build warm.
       - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           prefix-key: v1-rust
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: ./.github/actions/windows-openssl
         if: runner.os == 'Windows'
