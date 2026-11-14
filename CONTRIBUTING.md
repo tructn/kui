@@ -12,6 +12,16 @@ bun run tauri dev     # first build compiles librdkafka; takes a few minutes
 
 Then add a cluster with bootstrap `localhost:9092`.
 
+The [Makefile](Makefile) wraps the common steps; on Windows, run it from Git Bash:
+
+```bash
+make dev              # bun install if needed, then tauri dev with hot reload
+make install          # build a release and install it (/Applications on macOS, the installer on Windows)
+make package          # build this OS's installers into target/release/bundle
+make test             # unit tests (test-e2e for the Docker suite)
+make check            # lint + typecheck + unit tests, before calling a change done
+```
+
 ### Tests
 
 ```bash
