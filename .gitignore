@@ -32,3 +32,6 @@ e2e/artifacts
 
 # security-team agent reports
 security/findings/
+
+# graphify knowledge graph, rebuilt locally by its git hooks
+graphify-out/
