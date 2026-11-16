@@ -74,8 +74,9 @@ See how far behind each consumer group is, and reset its offsets when it needs a
 ### Control who can access what
 
 List a cluster's ACLs and filter them by principal, resource or host. Grant or deny operations on topics,
-groups, transactional IDs or the cluster, and delete ACLs you no longer need. The brokers need an authorizer
-(`authorizer.class.name`).
+groups, transactional IDs or the cluster, and delete ACLs you no longer need. The brokers need an authorizer:
+on KRaft, set `authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer`, and add your
+admin principals to `super.users` first so they aren't locked out.
 
 ### Make it yours
 
