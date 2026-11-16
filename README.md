@@ -71,6 +71,12 @@ Send a message with its own key and headers, or fill a topic with generated test
 
 See how far behind each consumer group is, and reset its offsets when it needs a fresh start.
 
+### Control who can access what
+
+List a cluster's ACLs and filter them by principal, resource or host. Grant or deny operations on topics,
+groups, transactional IDs or the cluster, and delete ACLs you no longer need. The brokers need an authorizer
+(`authorizer.class.name`).
+
 ### Make it yours
 
 <img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />

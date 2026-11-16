@@ -1,7 +1,12 @@
 //! Shared Kafka infrastructure for KUI: cluster config, clients, metadata,
-//! offsets and consumer groups. Every app feature builds on this crate, but
+//! offsets, consumer groups and ACLs. Every app feature builds on this crate, but
 //! features never depend on each other.
 
+#[allow(unsafe_code)] // librdkafka calls rust-rdkafka does not wrap
+pub mod acl_admin;
+pub mod acls;
+#[allow(unsafe_code)] // librdkafka admin requests rust-rdkafka does not wrap
+mod admin_request;
 mod client;
 mod cluster;
 pub mod connection;
