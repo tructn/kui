@@ -8,9 +8,11 @@ mod error;
 mod features;
 mod json_file;
 mod lock;
+mod secret_store;
 mod settings;
 mod state;
 mod tasks;
+mod tray;
 mod updates;
 
 #[cfg(test)]
@@ -18,8 +20,11 @@ mod integration_tests;
 #[cfg(test)]
 mod security_tests;
 
+use std::sync::{Arc, Mutex};
+
 use tauri::Manager;
 
+use features::automations::{self, AutomationStore, Engine};
 use features::{brokers, clusters, consumer_groups, generator, messages, topics};
 use state::AppState;
 
@@ -37,11 +42,32 @@ pub fn run() {
             )?;
             app.manage(AppState::new(store));
             app.manage(settings::SettingsStore::load(config_dir.join("settings.json"))?);
+
+            let handle = app.handle().clone();
+            let engine = Engine::http(Arc::new(move |cluster_id| handle.state::<AppState>().clients(cluster_id)))?;
+            let automations =
+                AutomationStore::load(config_dir.join("automations.json"), Box::new(secret_store::Keychain))?;
+            for automation in automations.list().iter().filter(|a| a.enabled) {
+                engine.start(automation);
+            }
+            app.manage(engine);
+            app.manage(Mutex::new(automations));
+            tray::install(app.handle())?;
             // The version comes from package.json (via tauri.conf.json), so the title never drifts.
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title(&format!("KUI v{}", app.package_info().version))?;
             }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Keep running automations alive in the tray instead of quitting with the window.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && window.label() == "main"
+                && window.app_handle().state::<Engine>().running() > 0
+            {
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
@@ -74,7 +100,21 @@ pub fn run() {
             consumer_groups::commands::delete_consumer_group,
             consumer_groups::commands::preview_offset_reset,
             consumer_groups::commands::reset_consumer_group_offsets,
+            automations::commands::list_automations,
+            automations::commands::save_automation,
+            automations::commands::set_automation_enabled,
+            automations::commands::delete_automation,
+            automations::commands::automation_statuses,
+            automations::commands::test_automation,
+            automations::commands::preview_automation_body,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // Clicking the Dock icon brings back a window hidden in the tray.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                tray::show_window(_app);
+            }
+        });
 }

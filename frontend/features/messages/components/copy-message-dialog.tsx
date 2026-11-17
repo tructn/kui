@@ -15,10 +15,10 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { TopicPicker } from "@/components/topic-picker";
 
 import { useCopyMessages } from "../queries";
 import type { CopyTarget, MessageRef } from "../types";
-import { TopicPicker } from "./topic-picker";
 
 const AUTO_PARTITION = "auto";
 

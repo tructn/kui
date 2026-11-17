@@ -6,8 +6,7 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatNumber } from "@/lib/format";
 import { matchByName } from "@/lib/name-search";
-
-import type { CopyTarget } from "../types";
+import { cn } from "@/lib/utils";
 
 /** Rendering every match makes typing sluggish on clusters with thousands of topics. */
 const MAX_SHOWN = 100;
@@ -15,14 +14,16 @@ const MAX_SHOWN = 100;
 interface TopicPickerProps {
   id?: string;
   value: string;
-  options: CopyTarget[];
+  options: readonly { name: string }[];
   /** Labelled "(this topic)" in the list. */
-  currentTopic: string;
+  currentTopic?: string;
+  /** Shown while no topic is chosen. */
+  placeholder?: string;
   onChange: (topic: string) => void;
 }
 
 /** Topic select with a search box: type part of a name to narrow the list. */
-export function TopicPicker({ id, value, options, currentTopic, onChange }: TopicPickerProps) {
+export function TopicPicker({ id, value, options, currentTopic, placeholder, onChange }: TopicPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -58,7 +59,7 @@ export function TopicPicker({ id, value, options, currentTopic, onChange }: Topi
             }
           }}
         >
-          <span className="truncate">{value}</span>
+          <span className={cn("truncate", !value && "font-sans text-muted-foreground")}>{value || placeholder}</span>
           <ChevronsUpDownIcon className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
@@ -85,7 +86,7 @@ export function TopicPicker({ id, value, options, currentTopic, onChange }: Topi
                 className="font-mono"
               >
                 <span className="min-w-0 [overflow-wrap:anywhere]">{t.name}</span>
-                {t.name === currentTopic && (
+                {currentTopic !== undefined && t.name === currentTopic && (
                   <span className="shrink-0 font-sans whitespace-nowrap text-muted-foreground">(this topic)</span>
                 )}
               </CommandItem>

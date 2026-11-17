@@ -98,6 +98,10 @@ export const CHANGING_COMMANDS = [
   "delete_consumer_group",
   "reset_consumer_group_offsets",
   "install_update",
+  "save_automation",
+  "set_automation_enabled",
+  "delete_automation",
+  "test_automation",
 ];
 
 declare global {

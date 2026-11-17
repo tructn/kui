@@ -71,6 +71,10 @@ Send a message with its own key and headers, or fill a topic with generated test
 
 See how far behind each consumer group is, and reset its offsets when it needs a fresh start.
 
+### React to new messages
+
+An automation watches a topic, optionally filters with the same query language as the message browser, and calls a webhook for each match. Use it for Slack or Teams alerts, n8n or Zapier flows, or your own API. The body is the message as JSON, a template (`{{value.order.id | json}}`), or a field mapping that rebuilds the message into the shape the other system expects (rename, nest, convert types, set defaults), with a live preview, and the URL and header values are kept in the system keychain. Automations run while KUI is open, and closing the window keeps them running from the system tray. They handle only messages published while they run.
+
 ### Make it yours
 
 <img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />

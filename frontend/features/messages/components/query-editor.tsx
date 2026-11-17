@@ -36,6 +36,8 @@ interface QueryEditorProps {
   onProblem: (problem: QueryProblem | null) => void;
   /** First focus: a chance to load a bigger sample for suggestions. */
   onFocus?: () => void;
+  /** Open the suggestions when the empty editor gets focus, so a form field shows what it can filter on. */
+  suggestOnFocus?: boolean;
   /** Editor mode: several lines with line numbers; Enter adds a line and Mod-Enter submits. */
   multiline?: boolean;
   disabled?: boolean;
@@ -47,12 +49,12 @@ interface QueryEditorProps {
  * `query/completion.ts`, and errors underlined by the Rust parser. One line
  * by default; `multiline` turns it into a small SQL-style editor.
  */
-export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, onFocus, multiline = false, disabled, className }: QueryEditorProps) {
+export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, onFocus, suggestOnFocus = false, multiline = false, disabled, className }: QueryEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   // Extensions are built once; they read the latest props through this ref.
-  const props = useRef({ onChange, onSubmit, getCatalog, onProblem, onFocus, multiline });
-  props.current = { onChange, onSubmit, getCatalog, onProblem, onFocus, multiline };
+  const props = useRef({ onChange, onSubmit, getCatalog, onProblem, onFocus, suggestOnFocus, multiline });
+  props.current = { onChange, onSubmit, getCatalog, onProblem, onFocus, suggestOnFocus, multiline };
   // Swaps the one-line and multi-line extensions without rebuilding the editor (keeps undo and focus).
   const mode = useRef(new Compartment());
   // Typing reports to the parent at most every CHANGE_DELAY_MS; Enter and blur report right away.
@@ -173,9 +175,12 @@ export function QueryEditor({ value, onChange, onSubmit, getCatalog, onProblem, 
               pendingChange.current = setTimeout(() => flushChange(v), CHANGE_DELAY_MS);
             }
             if (update.focusChanged) {
-              // Focus only prepares suggestions (loads a sample); it doesn't open them.
-              if (update.view.hasFocus) props.current.onFocus?.();
-              else flushChange(update.view);
+              // Focus loads a sample for suggestions; it opens them only when `suggestOnFocus` is set.
+              if (update.view.hasFocus) {
+                props.current.onFocus?.();
+                // Not inside the update: a transaction can't start while this one is being applied.
+                if (props.current.suggestOnFocus && update.state.doc.length === 0) queueMicrotask(() => startCompletion(update.view));
+              } else flushChange(update.view);
             }
           }),
           EditorView.contentAttributes.of({ "aria-label": "Message filter", spellcheck: "false", autocapitalize: "off" }),

@@ -208,6 +208,9 @@ const READ_ONLY_COMMANDS: &[&str] = &[
     "consumer_group_lags",
     "topic_consumer_groups",
     "preview_offset_reset",
+    "list_automations",
+    "automation_statuses",
+    "preview_automation_body",
 ];
 
 #[test]
