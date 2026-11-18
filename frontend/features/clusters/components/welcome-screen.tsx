@@ -2,9 +2,11 @@ import { DatabaseIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useNavigation } from "@/app/stores/navigation-store";
+import { usePrivacy } from "@/app/stores/privacy-store";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { maskClusterName } from "@/lib/mask";
 
 import { useClusters } from "../queries";
 import { ClusterFormDialog } from "./cluster-form-dialog";
@@ -13,6 +15,7 @@ import { ClusterFormDialog } from "./cluster-form-dialog";
 export function WelcomeScreen() {
   const selectCluster = useNavigation((s) => s.selectCluster);
   const { data: clusters = [] } = useClusters();
+  const maskNames = usePrivacy((s) => s.maskClusterNames);
   const [adding, setAdding] = useState(false);
 
   return (
@@ -34,9 +37,9 @@ export function WelcomeScreen() {
         </EmptyHeader>
         <EmptyContent>
           <div className="flex flex-wrap justify-center gap-2">
-            {clusters.map((c) => (
+            {clusters.map((c, i) => (
               <Button key={c.id} variant="outline" onClick={() => selectCluster(c.id)}>
-                <DatabaseIcon /> {c.name}
+                <DatabaseIcon /> {maskClusterName(c.name, i, maskNames)}
               </Button>
             ))}
             <Button onClick={() => setAdding(true)}>

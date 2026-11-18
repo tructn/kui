@@ -10,6 +10,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { useNavigation } from "@/app/stores/navigation-store";
+import { usePrivacy } from "@/app/stores/privacy-store";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { maskAddress, maskClusterName } from "@/lib/mask";
 
 import { useClusters, useDeleteCluster } from "../queries";
 import type { ClusterConfig } from "../types";
@@ -52,12 +54,17 @@ export function ClusterSwitcher() {
   const [dialog, setDialog] = useState<DialogState>({ kind: "closed" });
   const close = () => setDialog({ kind: "closed" });
 
+  const maskNames = usePrivacy((s) => s.maskClusterNames);
+  const maskServers = usePrivacy((s) => s.maskBootstrapServers);
+
   const active = clusters.find((c) => c.id === clusterId);
+  const label = (c: ClusterConfig) =>
+    maskClusterName(c.name, clusters.findIndex((x) => x.id === c.id), maskNames);
 
   function confirmDelete(cluster: ClusterConfig) {
     deleteCluster.mutate(cluster.id, {
       onSuccess: () => {
-        toast.success(`Removed ${cluster.name}`);
+        toast.success(`Removed ${label(cluster)}`);
         if (cluster.id === clusterId) selectCluster(null);
       },
       onError: (e) => toast.error(e.message),
@@ -74,10 +81,12 @@ export function ClusterSwitcher() {
                 <img src="/logo.svg" alt="" className="size-8 shrink-0" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">
-                    {active?.name ?? "KUI"}
+                    {active ? label(active) : "KUI"}
                   </span>
                   <span className="truncate font-mono text-xs text-muted-foreground">
-                    {active?.bootstrapServers ?? "No cluster selected"}
+                    {active
+                      ? maskAddress(active.bootstrapServers, maskServers)
+                      : "No cluster selected"}
                   </span>
                 </div>
                 <ChevronsUpDownIcon className="ml-auto" />
@@ -95,7 +104,7 @@ export function ClusterSwitcher() {
                   onSelect={() => selectCluster(c.id)}
                 >
                   <DatabaseIcon />
-                  <span className="flex-1 truncate">{c.name}</span>
+                  <span className="flex-1 truncate">{label(c)}</span>
                   {c.id === clusterId && <CheckIcon />}
                 </DropdownMenuItem>
               ))}
@@ -110,7 +119,7 @@ export function ClusterSwitcher() {
                       setDialog({ kind: "edit", cluster: active })
                     }
                   >
-                    <PencilIcon /> Edit {active.name}
+                    <PencilIcon /> Edit {label(active)}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
@@ -118,7 +127,7 @@ export function ClusterSwitcher() {
                       setDialog({ kind: "delete", cluster: active })
                     }
                   >
-                    <Trash2Icon /> Remove {active.name}
+                    <Trash2Icon /> Remove {label(active)}
                   </DropdownMenuItem>
                 </>
               )}
@@ -141,7 +150,7 @@ export function ClusterSwitcher() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Remove {dialog.kind === "delete" && dialog.cluster.name}?
+              Remove {dialog.kind === "delete" && label(dialog.cluster)}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This only removes the saved connection from KUI. Nothing on the

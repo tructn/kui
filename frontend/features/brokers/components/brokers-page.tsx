@@ -1,6 +1,7 @@
 import { RotateCwIcon } from "lucide-react";
 
 import { useClusterId } from "@/app/stores/navigation-store";
+import { usePrivacy } from "@/app/stores/privacy-store";
 import { PageHeader } from "@/components/page-header";
 import { emptyText, ErrorState } from "@/components/query-states";
 import { SortableTableHead } from "@/components/sortable-table-head";
@@ -13,6 +14,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
 import { formatNumber } from "@/lib/format";
+import { MASK, maskAddress } from "@/lib/mask";
 
 import { useClusterOverview } from "../queries";
 import type { Broker } from "../types";
@@ -29,6 +31,7 @@ const COLUMNS: SortColumns<Broker, "id" | "host" | "port" | "leaders" | "replica
 
 export function BrokersPage() {
   const clusterId = useClusterId();
+  const maskServers = usePrivacy((s) => s.maskBootstrapServers);
   const overview = useClusterOverview(clusterId);
   const data = overview.data;
   const sorter = useSort("brokers", data?.brokers ?? NO_BROKERS, COLUMNS);
@@ -87,8 +90,8 @@ export function BrokersPage() {
               {pager.items.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell>{b.id}</TableCell>
-                  <TableCell>{b.host}</TableCell>
-                  <TableCell>{b.port}</TableCell>
+                  <TableCell>{maskAddress(b.host, maskServers)}</TableCell>
+                  <TableCell>{maskServers ? MASK : b.port}</TableCell>
                   <TableCell className="text-right">{formatNumber(b.leaderPartitions)}</TableCell>
                   <TableCell className="text-right">{formatNumber(b.replicaPartitions)}</TableCell>
                 </TableRow>
