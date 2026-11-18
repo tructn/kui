@@ -56,6 +56,11 @@ pub fn run() {
             // The version comes from package.json (via tauri.conf.json), so the title never drifts.
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title(&format!("KUI v{}", app.package_info().version))?;
+                // Created hidden and laid out here: window managers don't reliably honour `maximized` from the
+                // config, and centring first means un-maximizing lands the window in the middle of the screen.
+                window.center()?;
+                window.maximize()?;
+                window.show()?;
             }
             Ok(())
         })
