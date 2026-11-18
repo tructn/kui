@@ -10,7 +10,9 @@ bun run kafka:up      # optional: Kafka on localhost:9092 with demo data
 bun run tauri dev     # first build compiles librdkafka; takes a few minutes
 ```
 
-Then add a cluster with bootstrap `localhost:9092`.
+Then add a cluster with bootstrap `localhost:9092`. [docs/LOCAL_KAFKA.md](docs/LOCAL_KAFKA.md) lists the demo
+topics and ACLs, explains the broker's authorizer setup, and shows how to add seed data. `bun run kafka:acl-demo`
+logs in as the demo users and checks the broker enforces the seeded ACLs.
 
 The [Makefile](Makefile) wraps the common steps; on Windows, run it from Git Bash:
 

@@ -18,7 +18,8 @@
     "lint": "cargo fmt --all --check && cargo clippy --all-targets --locked -- -D warnings",
     "audit": "bun audit --audit-level=moderate && cargo audit",
     "kafka:up": "docker compose up -d",
-    "kafka:down": "docker compose down"
+    "kafka:down": "docker compose down",
+    "kafka:acl-demo": "cd examples/acl-demo && bun install --frozen-lockfile && bun run check"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
