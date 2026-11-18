@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { automationsApi } from "./api";
-import type { Automation, Body, PreviewSample } from "./types";
+import type { Automation, Body, ConnectOptions, ConnectTarget, PreviewSample, ReplaySource } from "./types";
 
 // Automations belong to the app, not to one cluster, so they live outside `clusterKeys.scope`.
 export const automationKeys = {
@@ -60,5 +60,29 @@ export function useBodyPreview(name: string, body: Body, split: string | null, s
     enabled,
     placeholderData: keepPreviousData,
     retry: false,
+  });
+}
+
+export function useReplay() {
+  return useMutation({
+    mutationFn: ({ automation, source, send }: { automation: Automation; source: ReplaySource; send: boolean }) =>
+      send ? automationsApi.replay(automation, source) : automationsApi.dryRun(automation, source),
+  });
+}
+
+/** The connectors publishing would create, recomputed as the options change. */
+export function useConnectPreview(automation: Automation, options: ConnectOptions) {
+  return useQuery({
+    queryKey: [...automationKeys.all, "connect-preview", automation, options] as const,
+    queryFn: () => automationsApi.previewConnect(automation, options),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
+export function usePublishConnect() {
+  return useMutation({
+    mutationFn: ({ automation, target, options }: { automation: Automation; target: ConnectTarget; options: ConnectOptions }) =>
+      automationsApi.publishConnect(automation, target, options),
   });
 }

@@ -1,6 +1,8 @@
 # Local Kafka for development and testing.
 #
 #   docker compose up -d                          Kafka on localhost:9092 + demo data
+#   docker compose --profile connect up -d        also Kafka Connect on localhost:8083 with the
+#                                                 Confluent HTTP Sink, to publish pipelines to
 #   bun run test:e2e                              full end-to-end test run (own fresh Kafka)
 #   docker compose down                           stop and remove everything
 #
@@ -45,6 +47,42 @@ services:
     volumes:
       - ./docker/kafka-seed.sh:/kafka-seed.sh:ro
     entrypoint: ["bash", "/kafka-seed.sh"]
+
+  # Kafka Connect for trying "Publish to Kafka Connect" locally. In KUI use http://localhost:8083,
+  # bootstrap servers kafka:29092 and replication factor 1. A webhook on your Mac is
+  # http://host.docker.internal:<port> from inside the container.
+  connect:
+    profiles: ["connect"]
+    image: confluentinc/cp-kafka-connect:7.9.0
+    container_name: kui-connect
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_GROUP_ID: kui-connect
+      CONNECT_CONFIG_STORAGE_TOPIC: _kui-connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: _kui-connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: _kui-connect-status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
+    # The HTTP Sink isn't in the image; installing it on start keeps this file the only setup.
+    # 1.7.10 is pinned because later releases no longer bundle Confluent's licensing classes, and
+    # fail to start on this image with NoClassDefFoundError: io/confluent/license/...
+    command:
+      - bash
+      - -c
+      - confluent-hub install --no-prompt confluentinc/kafka-connect-http:1.7.10 && /etc/confluent/docker/run
 
   # Builds the app on Linux and drives it with WebdriverIO + tauri-driver.
   # The e2e run gets its own throwaway Kafka on a private network, so specs see

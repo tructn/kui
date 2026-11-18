@@ -10,11 +10,10 @@ use std::time::{Duration, Instant};
 
 use kui_kafka::KafkaClients;
 
-use kui_pipeline::body::{self, Bodies};
+use kui_pipeline::body::Bodies;
+use kui_pipeline::router::{self, RouteRun, Router};
 use kui_pipeline::template::Event;
 use kui_pipeline::throttle::Throttle;
-
-use kui_mql::Query;
 
 use super::model::{Action, Automation, Route, RunState, Status};
 use super::webhook::{Sender, http_sender};
@@ -110,9 +109,10 @@ impl Engine {
     /// try a webhook before enabling it. The route's filter is skipped, and when the message splits
     /// into items, only the first is sent.
     pub fn test(&self, automation: &Automation, route: usize, event: Option<&Event<'_>>) -> Result<u16> {
-        let route = automation.routes.get(route).ok_or_else(|| Error::msg("Unknown route."))?;
+        let pipeline = &automation.pipeline;
+        let route = pipeline.routes.get(route).ok_or_else(|| Error::msg("Unknown route."))?;
         let made_up = Event {
-            topic: &automation.topic,
+            topic: &pipeline.topic,
             partition: 0,
             offset: 0,
             timestamp: Some(chrono::Utc::now().timestamp_millis()),
@@ -121,7 +121,7 @@ impl Engine {
             headers: vec![("x-kui-test", Some("1"))],
             truncated: false,
         };
-        let Bodies { bodies, .. } = bodies(automation, route, event.unwrap_or(&made_up)).map_err(Error::msg)?;
+        let Bodies { bodies, .. } = router::bodies(pipeline, route, event.unwrap_or(&made_up)).map_err(Error::msg)?;
         let first = bodies.into_iter().next().ok_or_else(|| {
             Error::msg(format!(
                 "The test message has no items in \"{}\", so nothing would be sent.",
@@ -130,24 +130,11 @@ impl Engine {
         })?;
         self.shared.send(route, first).map_err(Error::msg)
     }
-}
 
-fn bodies(automation: &Automation, route: &Route, event: &Event<'_>) -> std::result::Result<Bodies, String> {
-    match &route.action {
-        Action::Webhook(webhook) => body::render_all(&webhook.body, &automation.name, route.split.as_deref(), event),
+    /// Sends one body for `route` the way a running automation would, for a replay.
+    pub fn send(&self, route: &Route, body: String) -> std::result::Result<u16, String> {
+        self.shared.send(route, body)
     }
-}
-
-/// Each route's own filter, parsed once per worker. `validate` already accepted them.
-fn route_filters(automation: &Automation) -> std::result::Result<Vec<Option<Query>>, String> {
-    automation
-        .routes
-        .iter()
-        .map(|r| match r.query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
-            Some(q) => Query::parse(q).map(Some).map_err(|e| format!("Invalid route filter: {e}")),
-            None => Ok(None),
-        })
-        .collect()
 }
 
 impl Shared {
@@ -185,10 +172,11 @@ impl Shared {
 }
 
 fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken) {
-    let request = TailRequest { topic: automation.topic.clone(), partition: None, query: automation.query.clone() };
-    let mut throttle = Throttle::new(automation.max_per_minute);
-    let filters = match route_filters(automation) {
-        Ok(filters) => filters,
+    let pipeline = &automation.pipeline;
+    let request = TailRequest { topic: pipeline.topic.clone(), partition: None, query: pipeline.query.clone() };
+    let mut throttle = Throttle::new(pipeline.max_per_minute);
+    let router = match Router::new(pipeline) {
+        Ok(router) => router,
         Err(why) => {
             return shared.update(&automation.id, run, |s| {
                 s.state = RunState::Stopped;
@@ -209,7 +197,7 @@ fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken
                     if token.is_cancelled() {
                         return false;
                     }
-                    handle(shared, automation, &filters, run, &mut throttle, message);
+                    handle(shared, automation, &router, run, &mut throttle, message);
                 }
                 !token.is_cancelled()
             })
@@ -218,7 +206,7 @@ fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken
             failures += 1;
             shared.update(&automation.id, run, |s| {
                 s.state = RunState::Retrying;
-                s.last_error = Some(format!("Can't read \"{}\": {e}", automation.topic));
+                s.last_error = Some(format!("Can't read \"{}\": {e}", pipeline.topic));
             });
         }
         // After an error, and also if the reader returned without being asked to stop.
@@ -230,23 +218,22 @@ fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken
 fn handle(
     shared: &Shared,
     automation: &Automation,
-    filters: &[Option<Query>],
+    router: &Router,
     run: &str,
     throttle: &mut Throttle,
     message: &Message,
 ) {
-    let event = event_of(&automation.topic, message);
+    let pipeline = &automation.pipeline;
+    let event = event_of(&pipeline.topic, message);
     let mut dropped = 0;
-    for (index, (route, filter)) in automation.routes.iter().zip(filters).enumerate() {
-        if filter.as_ref().is_some_and(|q| !q.matches(message)) {
-            continue;
-        }
+    for RouteRun { route: index, bodies } in router.route(pipeline, message, &event) {
+        let route = &pipeline.routes[index];
         // Only name the route when there is more than one to tell apart.
-        let label = |why: String| match automation.routes.len() {
+        let label = |why: String| match pipeline.routes.len() {
             1 => why,
             _ => format!("Route {}: {why}", index + 1),
         };
-        let Bodies { bodies, skipped } = match bodies(automation, route, &event) {
+        let Bodies { bodies, skipped } = match bodies {
             Ok(rendered) => rendered,
             Err(why) => {
                 shared.record(automation, run, Err(label(why)));
@@ -267,7 +254,7 @@ fn handle(
     }
 }
 
-fn event_of<'a>(topic: &'a str, message: &'a Message) -> Event<'a> {
+pub(super) fn event_of<'a>(topic: &'a str, message: &'a Message) -> Event<'a> {
     let text = |p: &'a Option<crate::features::messages::model::Payload>| p.as_ref().map(|p| p.text.as_str());
     Event {
         topic,
@@ -296,7 +283,7 @@ fn sleep_unless_cancelled(token: &CancelToken, total: Duration) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::automations::model::{Body, HttpMethod, Webhook};
+    use crate::features::automations::model::{Body, HttpMethod, Pipeline, Webhook};
 
     fn route(id: &str, body: Body) -> Route {
         Route {
@@ -318,18 +305,20 @@ mod tests {
     fn automation(body: Body, max_per_minute: u32) -> Automation {
         Automation {
             id: "a".into(),
-            name: "Alert".into(),
             enabled: true,
             cluster_id: "c".into(),
-            topic: "orders".into(),
-            query: None,
-            max_per_minute,
-            routes: vec![route("r1", body)],
+            pipeline: Pipeline {
+                name: "Alert".into(),
+                topic: "orders".into(),
+                query: None,
+                max_per_minute,
+                routes: vec![route("r1", body)],
+            },
         }
     }
 
     fn handle(engine: &Engine, a: &Automation, throttle: &mut Throttle, message: &Message) {
-        super::handle(&engine.shared, a, &route_filters(a).unwrap(), "run", throttle, message);
+        super::handle(&engine.shared, a, &Router::new(&a.pipeline).unwrap(), "run", throttle, message);
     }
 
     fn message(offset: i64, value: &str) -> Message {
@@ -375,7 +364,7 @@ mod tests {
             60,
         );
         register(&engine, &a);
-        let mut throttle = Throttle::new(a.max_per_minute);
+        let mut throttle = Throttle::new(a.pipeline.max_per_minute);
 
         handle(&engine, &a, &mut throttle, &message(1, r#"{"id": 7}"#));
 
@@ -475,7 +464,7 @@ mod tests {
     fn a_split_message_sends_one_request_per_item_within_the_rate_limit() {
         let (engine, sent) = engine(Ok(200));
         let mut a = automation(Body::Template { text: "{{item.sku}}".into() }, 2);
-        a.routes[0].split = Some("value.items".into());
+        a.pipeline.routes[0].split = Some("value.items".into());
         register(&engine, &a);
         let mut throttle = Throttle::new(2);
         handle(&engine, &a, &mut throttle, &message(1, r#"{"items":[{"sku":"a"},{"sku":"b"},{"sku":"c"}]}"#));
@@ -489,7 +478,7 @@ mod tests {
     fn test_with_a_split_sends_only_the_first_item_and_explains_an_empty_list() {
         let (engine, sent) = engine(Ok(200));
         let mut a = automation(Body::Template { text: "{{item}}".into() }, 60);
-        a.routes[0].split = Some("value.items".into());
+        a.pipeline.routes[0].split = Some("value.items".into());
         let mut sample = message(0, "");
         let event = Event { value: Some(r#"{"items":[1,2]}"#), ..event_of("orders", &sample) };
         engine.test(&a, 0, Some(&event)).unwrap();
@@ -506,7 +495,7 @@ mod tests {
         let mut a = automation(Body::Template { text: "all:{{value.id}}".into() }, 60);
         let mut failed = route("r2", Body::Template { text: "failed:{{value.id}}".into() });
         failed.query = Some("value.status = 'failed'".into());
-        a.routes.push(failed);
+        a.pipeline.routes.push(failed);
         register(&engine, &a);
         let mut throttle = Throttle::new(60);
         handle(&engine, &a, &mut throttle, &message(1, r#"{"id":1,"status":"paid"}"#));

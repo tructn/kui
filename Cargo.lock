@@ -2224,6 +2224,7 @@ name = "kui_pipeline"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "kui_mql",
  "serde",
  "serde_json",
 ]

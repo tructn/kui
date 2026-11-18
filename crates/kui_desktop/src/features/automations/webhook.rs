@@ -7,7 +7,7 @@ use std::time::Duration;
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Client, StatusCode, Url};
 
-use super::model::Webhook;
+use super::model::{Webhook, as_reqwest};
 use crate::error::Result;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -77,7 +77,7 @@ pub async fn send(client: &Client, webhook: &Webhook, body: String) -> std::resu
             tokio::time::sleep(RETRY_AFTER).await;
         }
         let request =
-            client.request(webhook.method.as_reqwest(), url.clone()).headers(headers.clone()).body(body.clone());
+            client.request(as_reqwest(webhook.method), url.clone()).headers(headers.clone()).body(body.clone());
         match request.send().await {
             Ok(response) => match classify(response.status()) {
                 Attempt::Done(code) => return Ok(code),
@@ -100,7 +100,7 @@ fn classify(status: StatusCode) -> Attempt {
     }
 }
 
-fn describe(error: reqwest::Error) -> String {
+pub fn describe(error: reqwest::Error) -> String {
     let error = error.without_url();
     if error.is_timeout() {
         format!("The server didn't answer within {} seconds", TIMEOUT.as_secs())

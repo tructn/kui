@@ -1,7 +1,7 @@
 [package]
 name = "kui_pipeline"
 version = "0.1.0"
-description = "The transform step of KUI's pipelines: message templates, field mappings and request splitting"
+description = "KUI's pipelines: routing, message templates and field mappings, replay, pipeline files and export to Kafka Connect"
 license = "MIT"
 readme = "README.md"
 edition = "2024"
@@ -11,6 +11,7 @@ publish = false
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+kui_mql = { workspace = true }
 
 [lints]
 workspace = true

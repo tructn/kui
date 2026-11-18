@@ -1,4 +1,13 @@
-import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  EllipsisIcon,
+  FileDownIcon,
+  FileUpIcon,
+  HistoryIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  UploadCloudIcon,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -7,14 +16,24 @@ import { PageHeader } from "@/components/page-header";
 import { emptyText, ErrorState } from "@/components/query-states";
 import { TableFrame } from "@/components/table-frame";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { formatNumber } from "@/lib/format";
 
+import { automationsApi } from "../api";
 import { useAutomations, useAutomationStatuses, useSetAutomationEnabled } from "../queries";
 import { emptyAutomation, type Automation } from "../types";
 import { AutomationFormDialog } from "./automation-form-dialog";
 import { DeleteAutomationDialog } from "./delete-automation-dialog";
+import { KafkaConnectDialog } from "./kafka-connect-dialog";
+import { ReplayDialog } from "./replay-dialog";
 import { StatusBadge } from "./status-badge";
 
 export function AutomationsPage() {
@@ -24,6 +43,8 @@ export function AutomationsPage() {
   const setEnabled = useSetAutomationEnabled();
   const [editing, setEditing] = useState<Automation | null>(null);
   const [deleting, setDeleting] = useState<Automation | null>(null);
+  const [replaying, setReplaying] = useState<Automation | null>(null);
+  const [publishing, setPublishing] = useState<Automation | null>(null);
 
   const statusById = useMemo(() => new Map((statuses.data ?? []).map((s) => [s.id, s])), [statuses.data]);
   const visible = useMemo(
@@ -38,15 +59,41 @@ export function AutomationsPage() {
     );
   }
 
+  async function importFile() {
+    try {
+      const imported = await automationsApi.importFile(clusterId);
+      if (imported) {
+        toast.info(`Opened ${imported.name}`, { description: "Fill in the webhook URLs and headers, then save." });
+        setEditing(imported);
+      }
+    } catch (e) {
+      toast.error("Could not open the pipeline", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function exportFile(automation: Automation) {
+    try {
+      const path = await automationsApi.exportFile(automation);
+      if (path) toast.success(`Saved ${automation.name}`, { description: path });
+    } catch (e) {
+      toast.error("Could not save the pipeline", { description: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="Pipelines"
         description={automations.data ? `${visible.length} for this cluster` : undefined}
         actions={
-          <Button size="sm" onClick={() => setEditing(emptyAutomation(clusterId))}>
-            <PlusIcon /> New pipeline
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={() => void importFile()}>
+              <FileUpIcon /> Open file
+            </Button>
+            <Button size="sm" onClick={() => setEditing(emptyAutomation(clusterId))}>
+              <PlusIcon /> New pipeline
+            </Button>
+          </>
         }
       />
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
@@ -98,9 +145,28 @@ export function AutomationsPage() {
                         <Button variant="ghost" size="icon-sm" aria-label={`Edit ${a.name}`} onClick={() => setEditing(a)}>
                           <PencilIcon />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" aria-label={`Delete ${a.name}`} onClick={() => setDeleting(a)}>
-                          <Trash2Icon />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label={`More for ${a.name}`}>
+                              <EllipsisIcon />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => setReplaying(a)}>
+                              <HistoryIcon /> Replay messages…
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => void exportFile(a)}>
+                              <FileDownIcon /> Save as file…
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setPublishing(a)}>
+                              <UploadCloudIcon /> Publish to Kafka Connect…
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(a)}>
+                              <Trash2Icon /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -126,6 +192,8 @@ export function AutomationsPage() {
         />
       )}
       <DeleteAutomationDialog automation={deleting} onClose={() => setDeleting(null)} />
+      <ReplayDialog automation={replaying} onClose={() => setReplaying(null)} />
+      <KafkaConnectDialog automation={publishing} onClose={() => setPublishing(null)} />
     </>
   );
 }

@@ -211,6 +211,11 @@ const READ_ONLY_COMMANDS: &[&str] = &[
     "list_automations",
     "automation_statuses",
     "preview_automation_body",
+    "export_pipeline_file",
+    "import_pipeline_file",
+    "load_replay_file",
+    "dry_run_automation",
+    "preview_kafka_connect",
 ];
 
 #[test]

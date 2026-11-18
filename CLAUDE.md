@@ -2,7 +2,8 @@
 
 Desktop Kafka UI: Tauri 2 (Rust, rdkafka) backend with a React 19 + TypeScript frontend built by Vite.
 
-- `crates/kui_kafka` Kafka client layer, `crates/kui_mql` message query language, `crates/kui_desktop` Tauri app
+- `crates/kui_kafka` Kafka client layer, `crates/kui_mql` message query language, `crates/kui_pipeline` pipeline IR,
+  engine and export backends (Kafka Connect), `crates/kui_desktop` Tauri app
 - `frontend/` UI, `e2e/` WebdriverIO suite (runs in Docker)
 - The Cargo workspace root is the repo root. Run `cargo` and `bun` from there.
 
@@ -11,6 +12,7 @@ Desktop Kafka UI: Tauri 2 (Rust, rdkafka) backend with a React 19 + TypeScript f
 ```bash
 bun run tauri dev      # first build compiles librdkafka, takes minutes
 bun run kafka:up       # local Kafka on :9092 with demo data
+bun run kafka:connect  # adds Kafka Connect on :8083 with the HTTP Sink
 bun run lint           # cargo fmt --check + clippy -D warnings
 bun run test           # bun test frontend && cargo test
 bunx tsc --noEmit      # frontend typecheck (not part of `bun run test`)

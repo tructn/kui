@@ -1,44 +1,19 @@
-use std::fmt;
-
 use serde::{Deserialize, Serialize};
 
-pub use kui_pipeline::{Body, BodyPreview};
+pub use kui_pipeline::model::default_max_per_minute;
+pub use kui_pipeline::{Action, Body, BodyPreview, HttpMethod, Pipeline, Route, Webhook, WebhookHeader};
 
-/// A saved pipeline: for each new message on `topic` that matches `query`, run every route.
+/// A saved pipeline: what it does (`pipeline`) plus where and whether it runs in this app.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", from = "Stored")]
 pub struct Automation {
     /// Empty for a new automation; the store assigns one on save.
     #[serde(default)]
     pub id: String,
-    pub name: String,
     pub enabled: bool,
     pub cluster_id: String,
-    pub topic: String,
-    /// MQL filter for every route; blank fires on every message.
-    #[serde(default)]
-    pub query: Option<String>,
-    /// Requests beyond this many a minute, across all routes, are dropped, so a busy topic can't
-    /// flood the targets.
-    #[serde(default = "default_max_per_minute")]
-    pub max_per_minute: u32,
-    pub routes: Vec<Route>,
-}
-
-/// One branch of a pipeline: messages that also match `query` are shaped and sent by `action`.
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Route {
-    /// Names the route in the editor's graph; unique within the automation.
-    pub id: String,
-    /// MQL filter for this route only.
-    #[serde(default)]
-    pub query: Option<String>,
-    /// The path of a list in the message, such as `value.items`, to run the action once per item
-    /// instead of once per message. The action reads the item as `item`.
-    #[serde(default)]
-    pub split: Option<String>,
-    pub action: Action,
+    #[serde(flatten)]
+    pub pipeline: Pipeline,
 }
 
 /// An automation as saved, including the single-action shape from before routes.
@@ -71,73 +46,24 @@ impl From<Stored> for Automation {
         }
         Self {
             id: s.id,
-            name: s.name,
             enabled: s.enabled,
             cluster_id: s.cluster_id,
-            topic: s.topic,
-            query: s.query,
-            max_per_minute: s.max_per_minute,
-            routes,
+            pipeline: Pipeline {
+                name: s.name,
+                topic: s.topic,
+                query: s.query,
+                max_per_minute: s.max_per_minute,
+                routes,
+            },
         }
     }
 }
 
-pub const DEFAULT_MAX_PER_MINUTE: u32 = 60;
-pub const MAX_PER_MINUTE: u32 = 600;
-
-fn default_max_per_minute() -> u32 {
-    DEFAULT_MAX_PER_MINUTE
-}
-
-/// What an automation does. A new kind of action is a new variant here, a case in
-/// `Engine::run_action` and a case in `validate::automation`.
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum Action {
-    Webhook(Webhook),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Webhook {
-    /// Often the secret itself (Slack and Teams hooks), so it is kept in the keychain.
-    pub url: String,
-    pub method: HttpMethod,
-    #[serde(default)]
-    pub headers: Vec<WebhookHeader>,
-    #[serde(default)]
-    pub body: Body,
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum HttpMethod {
-    Post,
-    Put,
-    Patch,
-}
-
-impl HttpMethod {
-    pub fn as_reqwest(self) -> reqwest::Method {
-        match self {
-            HttpMethod::Post => reqwest::Method::POST,
-            HttpMethod::Put => reqwest::Method::PUT,
-            HttpMethod::Patch => reqwest::Method::PATCH,
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct WebhookHeader {
-    pub name: String,
-    /// Usually a token, so it is kept in the keychain.
-    pub value: String,
-}
-
-// Neither the URL nor a header value may reach a log through `{:?}`.
-impl fmt::Debug for Webhook {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Webhook").field("method", &self.method.as_reqwest().as_str()).finish_non_exhaustive()
+pub fn as_reqwest(method: HttpMethod) -> reqwest::Method {
+    match method {
+        HttpMethod::Post => reqwest::Method::POST,
+        HttpMethod::Put => reqwest::Method::PUT,
+        HttpMethod::Patch => reqwest::Method::PATCH,
     }
 }
 

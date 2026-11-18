@@ -112,6 +112,13 @@ pub fn run() {
             automations::commands::automation_statuses,
             automations::commands::test_automation,
             automations::commands::preview_automation_body,
+            automations::commands::export_pipeline_file,
+            automations::commands::import_pipeline_file,
+            automations::commands::load_replay_file,
+            automations::commands::dry_run_automation,
+            automations::commands::replay_automation,
+            automations::commands::preview_kafka_connect,
+            automations::commands::publish_to_kafka_connect,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

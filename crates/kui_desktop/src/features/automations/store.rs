@@ -62,6 +62,7 @@ impl Secrets {
     /// Moves the secrets out of `automation`, leaving those fields empty.
     fn take(automation: &mut Automation) -> Self {
         let routes = automation
+            .pipeline
             .routes
             .iter_mut()
             .map(|route| match &mut route.action {
@@ -75,7 +76,7 @@ impl Secrets {
     }
 
     fn restore(self, automation: &mut Automation) {
-        for (route, secrets) in automation.routes.iter_mut().zip(self.routes) {
+        for (route, secrets) in automation.pipeline.routes.iter_mut().zip(self.routes) {
             match &mut route.action {
                 Action::Webhook(w) => {
                     w.url = secrets.url;
@@ -202,7 +203,7 @@ impl AutomationStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::automations::model::{Body, HttpMethod, Route, Webhook, WebhookHeader};
+    use crate::features::automations::model::{Body, HttpMethod, Pipeline, Route, Webhook, WebhookHeader};
     use crate::features::clusters::secrets::testing::{MemoryKeychain, NoKeychain};
 
     const URL: &str = "https://hooks.example.com/T000/SECRET-URL";
@@ -211,23 +212,25 @@ mod tests {
     fn automation() -> Automation {
         Automation {
             id: String::new(),
-            name: "Alert".into(),
             enabled: true,
             cluster_id: "c".into(),
-            topic: "orders".into(),
-            query: None,
-            max_per_minute: 60,
-            routes: vec![Route {
-                id: "r1".into(),
+            pipeline: Pipeline {
+                name: "Alert".into(),
+                topic: "orders".into(),
                 query: None,
-                split: None,
-                action: Action::Webhook(Webhook {
-                    url: URL.into(),
-                    method: HttpMethod::Post,
-                    headers: vec![WebhookHeader { name: "Authorization".into(), value: TOKEN.into() }],
-                    body: Body::Envelope,
-                }),
-            }],
+                max_per_minute: 60,
+                routes: vec![Route {
+                    id: "r1".into(),
+                    query: None,
+                    split: None,
+                    action: Action::Webhook(Webhook {
+                        url: URL.into(),
+                        method: HttpMethod::Post,
+                        headers: vec![WebhookHeader { name: "Authorization".into(), value: TOKEN.into() }],
+                        body: Body::Envelope,
+                    }),
+                }],
+            },
         }
     }
 
@@ -236,7 +239,7 @@ mod tests {
     }
 
     fn webhook(a: &Automation) -> &Webhook {
-        let Action::Webhook(w) = &a.routes[0].action;
+        let Action::Webhook(w) = &a.pipeline.routes[0].action;
         w
     }
 
@@ -300,15 +303,15 @@ mod tests {
         let (path, keychain) = (temp_path(), MemoryKeychain::default());
         let mut store = AutomationStore::load(path.clone(), Box::new(keychain.clone())).unwrap();
         let mut two = automation();
-        let mut second = two.routes[0].clone();
+        let mut second = two.pipeline.routes[0].clone();
         second.id = "r2".into();
         let Action::Webhook(w) = &mut second.action;
         w.url = "https://other.example.com/SECRET-2".into();
-        two.routes.push(second);
+        two.pipeline.routes.push(second);
         let saved = store.save(two).unwrap();
 
         let loaded = AutomationStore::load(path.clone(), Box::new(keychain)).unwrap().get(&saved.id).unwrap();
-        let Action::Webhook(w) = &loaded.routes[1].action;
+        let Action::Webhook(w) = &loaded.pipeline.routes[1].action;
         assert_eq!((webhook(&loaded).url.as_str(), w.url.as_str()), (URL, "https://other.example.com/SECRET-2"));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
@@ -324,7 +327,7 @@ mod tests {
         keychain.0.lock().unwrap().insert(keychain_id("a1"), single);
 
         let loaded = AutomationStore::load(path.clone(), Box::new(keychain)).unwrap().get("a1").unwrap();
-        assert_eq!(loaded.routes.len(), 1);
+        assert_eq!(loaded.pipeline.routes.len(), 1);
         assert_eq!((webhook(&loaded).url.as_str(), webhook(&loaded).headers[0].value.as_str()), (URL, TOKEN));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
@@ -334,7 +337,7 @@ mod tests {
         let path = temp_path();
         let mut store = AutomationStore::load(path.clone(), Box::new(MemoryKeychain::default())).unwrap();
         let mut bad = automation();
-        bad.topic = String::new();
+        bad.pipeline.topic = String::new();
         assert!(store.save(bad).is_err());
         assert!(store.list().is_empty());
     }

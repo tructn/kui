@@ -161,3 +161,95 @@ export function emptyAutomation(clusterId: string): Automation {
     routes: [emptyRoute()],
   };
 }
+
+// Replay: mirrors `crates/kui_pipeline/src/replay.rs` and `crates/kui_desktop/src/features/automations/replay.rs`.
+
+/** One message in the shape KUI's message export writes. */
+export interface ReplayMessage {
+  topic?: string | null;
+  partition: number;
+  offset: number;
+  timestamp?: string | null;
+  key?: string | null;
+  keyEncoding?: string | null;
+  value?: string | null;
+  valueEncoding?: string | null;
+  headers: { key: string; value: string | null }[];
+  truncated?: boolean;
+}
+
+/** Messages read from an export file: the first 1,000 of `total`. */
+export interface LoadedMessages {
+  messages: ReplayMessage[];
+  total: number;
+}
+
+/** Mirrors `MAX_MESSAGES` in `replay.rs`. */
+export const MAX_REPLAY_MESSAGES = 1000;
+
+export type ReplayFrom = { kind: "earliest" } | { kind: "latest" } | { kind: "timestamp"; millis: number };
+
+export type ReplaySource =
+  | { kind: "topic"; from: ReplayFrom; limit: number }
+  | { kind: "messages"; messages: ReplayMessage[] };
+
+export type ReplayOutcome =
+  | { kind: "planned" }
+  | { kind: "sent"; status: number }
+  | { kind: "failed"; error: string }
+  | { kind: "skipped" };
+
+export interface ReplayItem {
+  partition: number;
+  offset: number;
+  route: string;
+  body: string;
+  /** `body` was cut for display. */
+  cut: boolean;
+  outcome: ReplayOutcome;
+}
+
+export interface ReplayReport {
+  read: number;
+  matched: number;
+  requests: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  /** The first 200 requests. */
+  items: ReplayItem[];
+}
+
+// Kafka Connect: mirrors `crates/kui_pipeline/src/export/kafka_connect.rs` and `.../automations/connect.rs`.
+
+export interface ConnectOptions {
+  namePrefix: string;
+  /** The Kafka cluster as the Connect workers reach it, for the connector's license and report topics. */
+  bootstrapServers: string;
+  replicationFactor: number;
+  properties: Record<string, string>;
+}
+
+export interface ConnectTarget {
+  url: string;
+  username: string | null;
+  password: string | null;
+}
+
+export interface Connector {
+  name: string;
+  config: Record<string, string>;
+}
+
+export interface ConnectPlan {
+  /** Empty when there are blockers. Credentials are hidden. */
+  connectors: Connector[];
+  warnings: string[];
+  blockers: string[];
+}
+
+export interface PublishedConnector {
+  name: string;
+  /** False when a connector of that name was updated. */
+  created: boolean;
+}

@@ -75,6 +75,10 @@ See how far behind each consumer group is, and reset its offsets when it needs a
 
 A pipeline watches a topic, optionally filters with the same query language as the message browser, and calls webhooks for each match. It's drawn as a graph: the topic on the left and one or more routes beside each other, each with its own filter, shape and webhook, so the same message can go to a CRM as order lines and to Slack only when it failed. Use it for Slack or Teams alerts, n8n or Zapier flows, or your own API. The body is the message as JSON, or a mapping built by picking fields from a sample message: rename, nest and convert them, map every item of a list, or count and join a list. A pipeline can also send one request per item of a list, such as one per order line. Every field shows the value it would send for the sample, and the URL and header values are kept in the system keychain. Pipelines run while KUI is open, and closing the window keeps them running from the system tray. They handle only messages published while they run.
 
+Test a pipeline before it goes live: a dry run over the topic's existing messages, or over a message export, shows
+every request each route would make. Save a pipeline as a file to keep it next to your service, and publish it to
+Kafka Connect to run it on your servers without KUI. See the [pipelines guide](docs/pipelines.md).
+
 ### Make it yours
 
 <img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />

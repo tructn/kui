@@ -102,6 +102,8 @@ export const CHANGING_COMMANDS = [
   "set_automation_enabled",
   "delete_automation",
   "test_automation",
+  "replay_automation",
+  "publish_to_kafka_connect",
 ];
 
 declare global {
