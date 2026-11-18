@@ -10,10 +10,13 @@ use std::time::{Duration, Instant};
 
 use kui_kafka::KafkaClients;
 
-use super::body;
-use super::model::{Action, Automation, RunState, Status};
-use super::template::Event;
-use super::throttle::Throttle;
+use kui_pipeline::body::{self, Bodies};
+use kui_pipeline::template::Event;
+use kui_pipeline::throttle::Throttle;
+
+use kui_mql::Query;
+
+use super::model::{Action, Automation, Route, RunState, Status};
 use super::webhook::{Sender, http_sender};
 use crate::error::{Error, Result};
 use crate::features::messages::model::{Message, TailRequest};
@@ -103,21 +106,48 @@ impl Engine {
         lock(&self.shared.inner).runs.len()
     }
 
-    /// Sends the action once with a made-up message, so the user can try a webhook before enabling it.
-    pub fn test(&self, automation: &Automation) -> Result<u16> {
-        let value = r#"{"test":true,"source":"KUI"}"#;
-        let event = Event {
+    /// Sends route `route`'s action once for `event`, or for a made-up message, so the user can
+    /// try a webhook before enabling it. The route's filter is skipped, and when the message splits
+    /// into items, only the first is sent.
+    pub fn test(&self, automation: &Automation, route: usize, event: Option<&Event<'_>>) -> Result<u16> {
+        let route = automation.routes.get(route).ok_or_else(|| Error::msg("Unknown route."))?;
+        let made_up = Event {
             topic: &automation.topic,
             partition: 0,
             offset: 0,
             timestamp: Some(chrono::Utc::now().timestamp_millis()),
             key: Some("test-key"),
-            value: Some(value),
+            value: Some(r#"{"test":true,"source":"KUI"}"#),
             headers: vec![("x-kui-test", Some("1"))],
             truncated: false,
         };
-        self.shared.run_action(automation, &event).map_err(Error::msg)
+        let Bodies { bodies, .. } = bodies(automation, route, event.unwrap_or(&made_up)).map_err(Error::msg)?;
+        let first = bodies.into_iter().next().ok_or_else(|| {
+            Error::msg(format!(
+                "The test message has no items in \"{}\", so nothing would be sent.",
+                route.split.as_deref().unwrap_or_default()
+            ))
+        })?;
+        self.shared.send(route, first).map_err(Error::msg)
     }
+}
+
+fn bodies(automation: &Automation, route: &Route, event: &Event<'_>) -> std::result::Result<Bodies, String> {
+    match &route.action {
+        Action::Webhook(webhook) => body::render_all(&webhook.body, &automation.name, route.split.as_deref(), event),
+    }
+}
+
+/// Each route's own filter, parsed once per worker. `validate` already accepted them.
+fn route_filters(automation: &Automation) -> std::result::Result<Vec<Option<Query>>, String> {
+    automation
+        .routes
+        .iter()
+        .map(|r| match r.query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+            Some(q) => Query::parse(q).map(Some).map_err(|e| format!("Invalid route filter: {e}")),
+            None => Ok(None),
+        })
+        .collect()
 }
 
 impl Shared {
@@ -131,19 +161,41 @@ impl Shared {
         }
     }
 
-    fn run_action(&self, automation: &Automation, event: &Event<'_>) -> std::result::Result<u16, String> {
-        match &automation.action {
-            Action::Webhook(webhook) => {
-                let body = body::render(&webhook.body, &automation.name, event)?;
-                (self.sender)(webhook, body)
-            }
+    fn send(&self, route: &Route, body: String) -> std::result::Result<u16, String> {
+        match &route.action {
+            Action::Webhook(webhook) => (self.sender)(webhook, body),
         }
+    }
+
+    fn record(&self, automation: &Automation, run: &str, outcome: std::result::Result<u16, String>) {
+        self.update(&automation.id, run, |s| {
+            s.last_fired_at = Some(chrono::Utc::now().timestamp_millis());
+            match outcome {
+                Ok(_) => {
+                    s.fired += 1;
+                    s.last_error = None;
+                }
+                Err(why) => {
+                    s.failed += 1;
+                    s.last_error = Some(why);
+                }
+            }
+        });
     }
 }
 
 fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken) {
     let request = TailRequest { topic: automation.topic.clone(), partition: None, query: automation.query.clone() };
     let mut throttle = Throttle::new(automation.max_per_minute);
+    let filters = match route_filters(automation) {
+        Ok(filters) => filters,
+        Err(why) => {
+            return shared.update(&automation.id, run, |s| {
+                s.state = RunState::Stopped;
+                s.last_error = Some(why);
+            });
+        }
+    };
     let mut failures = 0u32;
     while !token.is_cancelled() {
         let read = (shared.connect)(&automation.cluster_id).and_then(|clients| {
@@ -157,7 +209,7 @@ fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken
                     if token.is_cancelled() {
                         return false;
                     }
-                    handle(shared, automation, run, &mut throttle, message);
+                    handle(shared, automation, &filters, run, &mut throttle, message);
                 }
                 !token.is_cancelled()
             })
@@ -174,25 +226,45 @@ fn work(shared: &Shared, automation: &Automation, run: &str, token: &CancelToken
     }
 }
 
-fn handle(shared: &Shared, automation: &Automation, run: &str, throttle: &mut Throttle, message: &Message) {
-    if !throttle.allow(Instant::now()) {
-        shared.update(&automation.id, run, |s| s.dropped += 1);
-        return;
-    }
-    let outcome = shared.run_action(automation, &event_of(&automation.topic, message));
-    shared.update(&automation.id, run, |s| {
-        s.last_fired_at = Some(chrono::Utc::now().timestamp_millis());
-        match outcome {
-            Ok(_) => {
-                s.fired += 1;
-                s.last_error = None;
-            }
+/// Each request, not each message, counts against the rate limit.
+fn handle(
+    shared: &Shared,
+    automation: &Automation,
+    filters: &[Option<Query>],
+    run: &str,
+    throttle: &mut Throttle,
+    message: &Message,
+) {
+    let event = event_of(&automation.topic, message);
+    let mut dropped = 0;
+    for (index, (route, filter)) in automation.routes.iter().zip(filters).enumerate() {
+        if filter.as_ref().is_some_and(|q| !q.matches(message)) {
+            continue;
+        }
+        // Only name the route when there is more than one to tell apart.
+        let label = |why: String| match automation.routes.len() {
+            1 => why,
+            _ => format!("Route {}: {why}", index + 1),
+        };
+        let Bodies { bodies, skipped } = match bodies(automation, route, &event) {
+            Ok(rendered) => rendered,
             Err(why) => {
-                s.failed += 1;
-                s.last_error = Some(why);
+                shared.record(automation, run, Err(label(why)));
+                continue;
+            }
+        };
+        dropped += skipped;
+        for body in bodies {
+            if throttle.allow(Instant::now()) {
+                shared.record(automation, run, shared.send(route, body).map_err(label));
+            } else {
+                dropped += 1;
             }
         }
-    });
+    }
+    if dropped > 0 {
+        shared.update(&automation.id, run, |s| s.dropped += dropped as u64);
+    }
 }
 
 fn event_of<'a>(topic: &'a str, message: &'a Message) -> Event<'a> {
@@ -225,6 +297,20 @@ fn sleep_unless_cancelled(token: &CancelToken, total: Duration) {
 mod tests {
     use super::*;
     use crate::features::automations::model::{Body, HttpMethod, Webhook};
+
+    fn route(id: &str, body: Body) -> Route {
+        Route {
+            id: id.into(),
+            query: None,
+            split: None,
+            action: Action::Webhook(Webhook {
+                url: "https://hooks.example.com/SECRET".into(),
+                method: HttpMethod::Post,
+                headers: vec![],
+                body,
+            }),
+        }
+    }
     use crate::features::messages::model::{MessageHeader, Payload};
 
     type Sent = Arc<Mutex<Vec<String>>>;
@@ -238,13 +324,12 @@ mod tests {
             topic: "orders".into(),
             query: None,
             max_per_minute,
-            action: Action::Webhook(Webhook {
-                url: "https://hooks.example.com/SECRET".into(),
-                method: HttpMethod::Post,
-                headers: vec![],
-                body,
-            }),
+            routes: vec![route("r1", body)],
         }
+    }
+
+    fn handle(engine: &Engine, a: &Automation, throttle: &mut Throttle, message: &Message) {
+        super::handle(&engine.shared, a, &route_filters(a).unwrap(), "run", throttle, message);
     }
 
     fn message(offset: i64, value: &str) -> Message {
@@ -292,7 +377,7 @@ mod tests {
         register(&engine, &a);
         let mut throttle = Throttle::new(a.max_per_minute);
 
-        handle(&engine.shared, &a, "run", &mut throttle, &message(1, r#"{"id": 7}"#));
+        handle(&engine, &a, &mut throttle, &message(1, r#"{"id": 7}"#));
 
         assert_eq!(sent.lock().unwrap().as_slice(), [r#"{"id": 7, "from": "web"}"#]);
         let s = status(&engine);
@@ -305,7 +390,7 @@ mod tests {
         let (engine, sent) = engine(Ok(204));
         let a = automation(Body::Envelope, 60);
         register(&engine, &a);
-        handle(&engine.shared, &a, "run", &mut Throttle::new(60), &message(5, r#"{"id":7}"#));
+        handle(&engine, &a, &mut Throttle::new(60), &message(5, r#"{"id":7}"#));
 
         let body: serde_json::Value = serde_json::from_str(&sent.lock().unwrap()[0]).unwrap();
         assert_eq!(
@@ -319,7 +404,7 @@ mod tests {
         let (engine, _) = engine(Err("The server answered 404 Not Found".into()));
         let a = automation(Body::Envelope, 60);
         register(&engine, &a);
-        handle(&engine.shared, &a, "run", &mut Throttle::new(60), &message(1, "x"));
+        handle(&engine, &a, &mut Throttle::new(60), &message(1, "x"));
 
         let s = status(&engine);
         assert_eq!((s.fired, s.failed), (0, 1));
@@ -333,7 +418,7 @@ mod tests {
         register(&engine, &a);
         let mut throttle = Throttle::new(2);
         for offset in 0..5 {
-            handle(&engine.shared, &a, "run", &mut throttle, &message(offset, "x"));
+            handle(&engine, &a, &mut throttle, &message(offset, "x"));
         }
 
         assert_eq!(sent.lock().unwrap().len(), 2);
@@ -375,11 +460,63 @@ mod tests {
         let (engine, sent) = engine(Ok(200));
         assert_eq!(
             engine
-                .test(&automation(Body::Template { text: "{{key}}:{{value.test}}:{{headers.x-kui-test}}".into() }, 60))
+                .test(
+                    &automation(Body::Template { text: "{{key}}:{{value.test}}:{{headers.x-kui-test}}".into() }, 60),
+                    0,
+                    None
+                )
                 .unwrap(),
             200
         );
         assert_eq!(sent.lock().unwrap().as_slice(), ["test-key:true:1"]);
+    }
+
+    #[test]
+    fn a_split_message_sends_one_request_per_item_within_the_rate_limit() {
+        let (engine, sent) = engine(Ok(200));
+        let mut a = automation(Body::Template { text: "{{item.sku}}".into() }, 2);
+        a.routes[0].split = Some("value.items".into());
+        register(&engine, &a);
+        let mut throttle = Throttle::new(2);
+        handle(&engine, &a, &mut throttle, &message(1, r#"{"items":[{"sku":"a"},{"sku":"b"},{"sku":"c"}]}"#));
+
+        assert_eq!(sent.lock().unwrap().as_slice(), ["a", "b"]);
+        let s = status(&engine);
+        assert_eq!((s.fired, s.dropped), (2, 1));
+    }
+
+    #[test]
+    fn test_with_a_split_sends_only_the_first_item_and_explains_an_empty_list() {
+        let (engine, sent) = engine(Ok(200));
+        let mut a = automation(Body::Template { text: "{{item}}".into() }, 60);
+        a.routes[0].split = Some("value.items".into());
+        let mut sample = message(0, "");
+        let event = Event { value: Some(r#"{"items":[1,2]}"#), ..event_of("orders", &sample) };
+        engine.test(&a, 0, Some(&event)).unwrap();
+        assert_eq!(sent.lock().unwrap().as_slice(), ["1"]);
+
+        sample.value = None;
+        let err = engine.test(&a, 0, Some(&event_of("orders", &sample))).unwrap_err().to_string();
+        assert!(err.contains("no items in \"value.items\""), "{err}");
+    }
+
+    #[test]
+    fn every_matching_route_sends_and_a_failure_names_its_route() {
+        let (engine, sent) = engine(Ok(200));
+        let mut a = automation(Body::Template { text: "all:{{value.id}}".into() }, 60);
+        let mut failed = route("r2", Body::Template { text: "failed:{{value.id}}".into() });
+        failed.query = Some("value.status = 'failed'".into());
+        a.routes.push(failed);
+        register(&engine, &a);
+        let mut throttle = Throttle::new(60);
+        handle(&engine, &a, &mut throttle, &message(1, r#"{"id":1,"status":"paid"}"#));
+        handle(&engine, &a, &mut throttle, &message(2, r#"{"id":2,"status":"failed"}"#));
+        assert_eq!(sent.lock().unwrap().as_slice(), ["all:1", "all:2", "failed:2"]);
+
+        let (failing, _) = super::tests::engine(Err("The server answered 500".into()));
+        register(&failing, &a);
+        handle(&failing, &a, &mut throttle, &message(3, r#"{"id":3,"status":"failed"}"#));
+        assert_eq!(status(&failing).last_error.as_deref(), Some("Route 2: The server answered 500"));
     }
 
     #[test]

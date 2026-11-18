@@ -1,10 +1,12 @@
 use tauri::State;
 
-use super::model::{Automation, Body, PreviewSample, Status, TestResult};
-use super::template::Event;
-use super::{AutomationStore, Engine, body, validate};
+use kui_pipeline::body;
+use kui_pipeline::template::{self, Event, Scope};
+
+use super::model::{Automation, Body, BodyPreview, PreviewSample, Status, TestResult};
+use super::{AutomationStore, Engine, validate};
 use crate::blocking::run_blocking;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::lock::lock;
 use crate::state::AppState;
 
@@ -65,18 +67,40 @@ pub fn automation_statuses(engine: State<'_, Engine>) -> Vec<Status> {
     engine.statuses()
 }
 
-/// Sends the action once with a sample message. Only runs when the user presses "Send test".
+/// Sends one route's action once with the sample message, or a made-up one without it. Only runs when
+/// the user presses "Send test".
 #[tauri::command]
-pub async fn test_automation(engine: State<'_, Engine>, automation: Automation) -> Result<TestResult> {
+pub async fn test_automation(
+    engine: State<'_, Engine>,
+    automation: Automation,
+    route: usize,
+    sample: Option<PreviewSample>,
+) -> Result<TestResult> {
     validate::automation(&automation)?;
     let engine = engine.inner().clone();
-    run_blocking(move || engine.test(&automation).map(|status| TestResult { status })).await
+    run_blocking(move || {
+        let event = sample.as_ref().map(event_of);
+        engine.test(&automation, route, event.as_ref()).map(|status| TestResult { status })
+    })
+    .await
 }
 
 /// Shows what the body would be for a sample message. Nothing is sent and Kafka isn't read.
 #[tauri::command]
-pub fn preview_automation_body(name: String, body: Body, sample: PreviewSample) -> Result<String> {
-    let event = Event {
+pub fn preview_automation_body(
+    name: String,
+    body: Body,
+    split: Option<String>,
+    sample: PreviewSample,
+) -> Result<BodyPreview> {
+    if let Some(split) = &split {
+        template::validate_path(split, Scope::Message).map_err(Error::msg)?;
+    }
+    body::preview(&body, &name, split.as_deref(), &event_of(&sample)).map_err(Error::msg)
+}
+
+fn event_of(sample: &PreviewSample) -> Event<'_> {
+    Event {
         topic: &sample.topic,
         partition: 0,
         offset: 0,
@@ -85,6 +109,5 @@ pub fn preview_automation_body(name: String, body: Body, sample: PreviewSample) 
         value: sample.value.as_deref(),
         headers: sample.headers.iter().map(|h| (h.name.as_str(), Some(h.value.as_str()))).collect(),
         truncated: false,
-    };
-    body::preview(&body, &name, &event).map_err(crate::error::Error::msg)
+    }
 }

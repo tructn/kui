@@ -2,9 +2,11 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-/// A saved rule: run `action` for each new message on `topic` that matches `query`.
+pub use kui_pipeline::{Body, BodyPreview};
+
+/// A saved pipeline: for each new message on `topic` that matches `query`, run every route.
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", from = "Stored")]
 pub struct Automation {
     /// Empty for a new automation; the store assigns one on save.
     #[serde(default)]
@@ -13,13 +15,71 @@ pub struct Automation {
     pub enabled: bool,
     pub cluster_id: String,
     pub topic: String,
-    /// MQL filter; blank fires on every message.
+    /// MQL filter for every route; blank fires on every message.
     #[serde(default)]
     pub query: Option<String>,
-    /// Actions beyond this many a minute are dropped, so a busy topic can't flood the target.
+    /// Requests beyond this many a minute, across all routes, are dropped, so a busy topic can't
+    /// flood the targets.
     #[serde(default = "default_max_per_minute")]
     pub max_per_minute: u32,
+    pub routes: Vec<Route>,
+}
+
+/// One branch of a pipeline: messages that also match `query` are shaped and sent by `action`.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Route {
+    /// Names the route in the editor's graph; unique within the automation.
+    pub id: String,
+    /// MQL filter for this route only.
+    #[serde(default)]
+    pub query: Option<String>,
+    /// The path of a list in the message, such as `value.items`, to run the action once per item
+    /// instead of once per message. The action reads the item as `item`.
+    #[serde(default)]
+    pub split: Option<String>,
     pub action: Action,
+}
+
+/// An automation as saved, including the single-action shape from before routes.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Stored {
+    #[serde(default)]
+    id: String,
+    name: String,
+    enabled: bool,
+    cluster_id: String,
+    topic: String,
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(default = "default_max_per_minute")]
+    max_per_minute: u32,
+    #[serde(default)]
+    routes: Vec<Route>,
+    #[serde(default)]
+    action: Option<Action>,
+}
+
+impl From<Stored> for Automation {
+    fn from(s: Stored) -> Self {
+        let mut routes = s.routes;
+        if routes.is_empty()
+            && let Some(action) = s.action
+        {
+            routes.push(Route { id: "route-1".to_string(), query: None, split: None, action });
+        }
+        Self {
+            id: s.id,
+            name: s.name,
+            enabled: s.enabled,
+            cluster_id: s.cluster_id,
+            topic: s.topic,
+            query: s.query,
+            max_per_minute: s.max_per_minute,
+            routes,
+        }
+    }
 }
 
 pub const DEFAULT_MAX_PER_MINUTE: u32 = 60;
@@ -47,59 +107,6 @@ pub struct Webhook {
     pub headers: Vec<WebhookHeader>,
     #[serde(default)]
     pub body: Body,
-}
-
-/// What the request body is made of. A new way to build it is a new variant here, a case in
-/// `body::render` and one in `body::validate`.
-#[derive(Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum Body {
-    /// The message described as JSON.
-    #[default]
-    Envelope,
-    /// Free text with placeholders (see `template.rs`).
-    Template { text: String },
-    /// A new JSON object built from the message field by field (see `mapping.rs`).
-    Mapping { fields: Vec<FieldMapping> },
-}
-
-/// One field of the object a `Body::Mapping` builds: read `source`, tidy it with `transform`,
-/// and store it at `target`.
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FieldMapping {
-    /// Where it goes, as a dotted path: `customer.name`, `items.0.sku`. A number is an array index.
-    pub target: String,
-    pub source: Source,
-    #[serde(default)]
-    pub transform: Option<Transform>,
-    /// Used when the source is missing or null.
-    #[serde(default)]
-    pub default: Option<serde_json::Value>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum Source {
-    /// A field of the message: `value.order.id`, `headers.x-source`, `key`, `topic`, ...
-    Field { path: String },
-    /// The same value every time.
-    Fixed { value: serde_json::Value },
-    /// Text with placeholders, always producing a string.
-    Template { text: String },
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Debug)]
-#[serde(rename_all = "camelCase")]
-pub enum Transform {
-    Trim,
-    Upper,
-    Lower,
-    ToNumber,
-    ToString,
-    ToBoolean,
-    /// Epoch milliseconds to an ISO 8601 date-time.
-    EpochToIso,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -182,7 +189,7 @@ pub struct TestResult {
 }
 
 /// A made-up message to try a body on.
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewSample {
     pub topic: String,

@@ -41,18 +41,18 @@ export function AutomationsPage() {
   return (
     <>
       <PageHeader
-        title="Automations"
+        title="Pipelines"
         description={automations.data ? `${visible.length} for this cluster` : undefined}
         actions={
           <Button size="sm" onClick={() => setEditing(emptyAutomation(clusterId))}>
-            <PlusIcon /> New automation
+            <PlusIcon /> New pipeline
           </Button>
         }
       />
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
         {automations.error && <ErrorState error={automations.error} onRetry={() => automations.refetch()} />}
         <TableFrame>
-          <Table aria-label="Automations">
+          <Table aria-label="Pipelines">
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -108,7 +108,7 @@ export function AutomationsPage() {
               })}
               {visible.length === 0 && (
                 <TableStateRow colSpan={7}>
-                  {emptyText(automations, "No automations yet. Create one to react to new messages.")}
+                  {emptyText(automations, "No pipelines yet. Create one to send new messages to a webhook.")}
                 </TableStateRow>
               )}
             </TableBody>

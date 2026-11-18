@@ -33,7 +33,7 @@ export async function expectToast(text: string) {
   );
 }
 
-export async function goTo(page: "Topics" | "Consumer groups" | "Brokers") {
+export async function goTo(page: "Topics" | "Consumer groups" | "Brokers" | "Pipelines") {
   // A sheet or dialog that is still fading out covers the sidebar and would intercept the click.
   await openSheet().waitForExist({ reverse: true });
   await openDialog().waitForExist({ reverse: true });

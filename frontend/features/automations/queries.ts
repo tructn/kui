@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { automationsApi } from "./api";
-import type { Body, PreviewSample } from "./types";
+import type { Automation, Body, PreviewSample } from "./types";
 
 // Automations belong to the app, not to one cluster, so they live outside `clusterKeys.scope`.
 export const automationKeys = {
@@ -46,14 +46,17 @@ export function useDeleteAutomation() {
 }
 
 export function useTestAutomation() {
-  return useMutation({ mutationFn: automationsApi.test });
+  return useMutation({
+    mutationFn: ({ automation, route, sample }: { automation: Automation; route: number; sample: PreviewSample | null }) =>
+      automationsApi.test(automation, route, sample),
+  });
 }
 
 /** The body for a sample message. Keeps the last good preview while the user types. */
-export function useBodyPreview(name: string, body: Body, sample: PreviewSample, enabled: boolean) {
+export function useBodyPreview(name: string, body: Body, split: string | null, sample: PreviewSample, enabled: boolean) {
   return useQuery({
-    queryKey: [...automationKeys.all, "preview", name, body, sample] as const,
-    queryFn: () => automationsApi.previewBody(name, body, sample),
+    queryKey: [...automationKeys.all, "preview", name, body, split, sample] as const,
+    queryFn: () => automationsApi.previewBody(name, body, split, sample),
     enabled,
     placeholderData: keepPreviousData,
     retry: false,

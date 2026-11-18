@@ -73,7 +73,7 @@ See how far behind each consumer group is, and reset its offsets when it needs a
 
 ### React to new messages
 
-An automation watches a topic, optionally filters with the same query language as the message browser, and calls a webhook for each match. Use it for Slack or Teams alerts, n8n or Zapier flows, or your own API. The body is the message as JSON, a template (`{{value.order.id | json}}`), or a field mapping that rebuilds the message into the shape the other system expects (rename, nest, convert types, set defaults), with a live preview, and the URL and header values are kept in the system keychain. Automations run while KUI is open, and closing the window keeps them running from the system tray. They handle only messages published while they run.
+A pipeline watches a topic, optionally filters with the same query language as the message browser, and calls webhooks for each match. It's drawn as a graph: the topic on the left and one or more routes beside each other, each with its own filter, shape and webhook, so the same message can go to a CRM as order lines and to Slack only when it failed. Use it for Slack or Teams alerts, n8n or Zapier flows, or your own API. The body is the message as JSON, or a mapping built by picking fields from a sample message: rename, nest and convert them, map every item of a list, or count and join a list. A pipeline can also send one request per item of a list, such as one per order line. Every field shows the value it would send for the sample, and the URL and header values are kept in the system keychain. Pipelines run while KUI is open, and closing the window keeps them running from the system tray. They handle only messages published while they run.
 
 ### Make it yours
 

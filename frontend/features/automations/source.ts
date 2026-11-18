@@ -3,7 +3,7 @@ import { formatLooseValue, parseLooseValue } from "@/lib/loose-value";
 import type { Source } from "./types";
 
 /** The names a message field path can start with. Mirrors `template.rs`. */
-const FIELD_ROOT = /^(key|value|headers|topic|partition|offset|timestamp|truncated)(\.|$)/;
+const FIELD_ROOT = /^(key|value|headers|topic|partition|offset|timestamp|truncated|item)(\.|$)/;
 
 /**
  * One box covers every kind of source, so the user never picks a type:
@@ -20,6 +20,7 @@ export function parseSource(text: string): Source {
 export function formatSource(source: Source): string {
   switch (source.kind) {
     case "field":
+    case "each":
       return source.path;
     case "template":
       return source.text;

@@ -2183,6 +2183,7 @@ dependencies = [
  "keyring",
  "kui_kafka",
  "kui_mql",
+ "kui_pipeline",
  "rdkafka",
  "reqwest",
  "rustls",
@@ -2214,6 +2215,15 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "elsa",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "kui_pipeline"
+version = "0.1.0"
+dependencies = [
+ "chrono",
  "serde",
  "serde_json",
 ]

@@ -25,9 +25,33 @@ pub struct AutomationStore {
 
 /// The parts of an automation that are credentials, kept as one keychain item.
 #[derive(Default, Serialize, Deserialize)]
+#[serde(from = "StoredSecrets")]
 struct Secrets {
+    /// One per route, in order.
+    routes: Vec<WebhookSecrets>,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct WebhookSecrets {
     url: String,
     header_values: Vec<String>,
+}
+
+/// A keychain item as saved, including the single-webhook shape from before routes.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StoredSecrets {
+    Routes { routes: Vec<WebhookSecrets> },
+    Single(WebhookSecrets),
+}
+
+impl From<StoredSecrets> for Secrets {
+    fn from(stored: StoredSecrets) -> Self {
+        match stored {
+            StoredSecrets::Routes { routes } => Self { routes },
+            StoredSecrets::Single(single) => Self { routes: vec![single] },
+        }
+    }
 }
 
 fn keychain_id(id: &str) -> String {
@@ -37,27 +61,34 @@ fn keychain_id(id: &str) -> String {
 impl Secrets {
     /// Moves the secrets out of `automation`, leaving those fields empty.
     fn take(automation: &mut Automation) -> Self {
-        match &mut automation.action {
-            Action::Webhook(w) => Secrets {
-                url: std::mem::take(&mut w.url),
-                header_values: w.headers.iter_mut().map(|h| std::mem::take(&mut h.value)).collect(),
-            },
-        }
+        let routes = automation
+            .routes
+            .iter_mut()
+            .map(|route| match &mut route.action {
+                Action::Webhook(w) => WebhookSecrets {
+                    url: std::mem::take(&mut w.url),
+                    header_values: w.headers.iter_mut().map(|h| std::mem::take(&mut h.value)).collect(),
+                },
+            })
+            .collect();
+        Self { routes }
     }
 
     fn restore(self, automation: &mut Automation) {
-        match &mut automation.action {
-            Action::Webhook(w) => {
-                w.url = self.url;
-                for (header, value) in w.headers.iter_mut().zip(self.header_values) {
-                    header.value = value;
+        for (route, secrets) in automation.routes.iter_mut().zip(self.routes) {
+            match &mut route.action {
+                Action::Webhook(w) => {
+                    w.url = secrets.url;
+                    for (header, value) in w.headers.iter_mut().zip(secrets.header_values) {
+                        header.value = value;
+                    }
                 }
             }
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.url.is_empty() && self.header_values.iter().all(String::is_empty)
+        self.routes.iter().all(|r| r.url.is_empty() && r.header_values.iter().all(String::is_empty))
     }
 
     fn save(&self, keychain: &dyn SecretStore, id: &str) -> Result<()> {
@@ -171,7 +202,7 @@ impl AutomationStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::automations::model::{Body, HttpMethod, Webhook, WebhookHeader};
+    use crate::features::automations::model::{Body, HttpMethod, Route, Webhook, WebhookHeader};
     use crate::features::clusters::secrets::testing::{MemoryKeychain, NoKeychain};
 
     const URL: &str = "https://hooks.example.com/T000/SECRET-URL";
@@ -186,12 +217,17 @@ mod tests {
             topic: "orders".into(),
             query: None,
             max_per_minute: 60,
-            action: Action::Webhook(Webhook {
-                url: URL.into(),
-                method: HttpMethod::Post,
-                headers: vec![WebhookHeader { name: "Authorization".into(), value: TOKEN.into() }],
-                body: Body::Envelope,
-            }),
+            routes: vec![Route {
+                id: "r1".into(),
+                query: None,
+                split: None,
+                action: Action::Webhook(Webhook {
+                    url: URL.into(),
+                    method: HttpMethod::Post,
+                    headers: vec![WebhookHeader { name: "Authorization".into(), value: TOKEN.into() }],
+                    body: Body::Envelope,
+                }),
+            }],
         }
     }
 
@@ -200,7 +236,7 @@ mod tests {
     }
 
     fn webhook(a: &Automation) -> &Webhook {
-        let Action::Webhook(w) = &a.action;
+        let Action::Webhook(w) = &a.routes[0].action;
         w
     }
 
@@ -256,6 +292,40 @@ mod tests {
         store.delete(&saved.id).unwrap();
         assert!(store.list().is_empty());
         assert!(keychain.0.lock().unwrap().is_empty());
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn each_route_keeps_its_own_secrets() {
+        let (path, keychain) = (temp_path(), MemoryKeychain::default());
+        let mut store = AutomationStore::load(path.clone(), Box::new(keychain.clone())).unwrap();
+        let mut two = automation();
+        let mut second = two.routes[0].clone();
+        second.id = "r2".into();
+        let Action::Webhook(w) = &mut second.action;
+        w.url = "https://other.example.com/SECRET-2".into();
+        two.routes.push(second);
+        let saved = store.save(two).unwrap();
+
+        let loaded = AutomationStore::load(path.clone(), Box::new(keychain)).unwrap().get(&saved.id).unwrap();
+        let Action::Webhook(w) = &loaded.routes[1].action;
+        assert_eq!((webhook(&loaded).url.as_str(), w.url.as_str()), (URL, "https://other.example.com/SECRET-2"));
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn an_automation_saved_before_routes_loads_as_one_route() {
+        let (path, keychain) = (temp_path(), MemoryKeychain::default());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let old = r#"[{"id":"a1","name":"Alert","enabled":false,"clusterId":"c","topic":"orders","maxPerMinute":60,
+            "action":{"kind":"webhook","url":"","method":"POST","headers":[{"name":"Authorization","value":""}],"body":{"kind":"envelope"}}}]"#;
+        std::fs::write(&path, old).unwrap();
+        let single = format!(r#"{{"url":"{URL}","header_values":["{TOKEN}"]}}"#);
+        keychain.0.lock().unwrap().insert(keychain_id("a1"), single);
+
+        let loaded = AutomationStore::load(path.clone(), Box::new(keychain)).unwrap().get("a1").unwrap();
+        assert_eq!(loaded.routes.len(), 1);
+        assert_eq!((webhook(&loaded).url.as_str(), webhook(&loaded).headers[0].value.as_str()), (URL, TOKEN));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 

@@ -25,6 +25,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 kui_mql = { workspace = true }
+kui_pipeline = { workspace = true }
 kui_kafka = { workspace = true }
 # Used directly by the features; its build features are set in kui_kafka.
 rdkafka = { workspace = true }

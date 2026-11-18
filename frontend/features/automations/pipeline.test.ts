@@ -1,12 +1,19 @@
 import { describe, expect, it } from "bun:test";
 
-import { hostOf, isUnlocked, nextStage, stageIssue, stageSummary } from "./pipeline";
-import { emptyAutomation, type Automation, type Body } from "./types";
+import { firstIssue, hostOf, nodeIssue, nodeKey, nodesOf, nodeSummary, parseNodeKey, SOURCE } from "./pipeline";
+import { emptyAutomation, emptyRoute, type Automation, type Body, type Route } from "./types";
 
-function automation(patch: Partial<Automation> = {}, body: Body = { kind: "envelope" }): Automation {
-  const base = emptyAutomation("local");
-  return { ...base, topic: "orders", ...patch, action: { ...base.action, url: "https://hooks.example.com/T0/secret", body } };
+function route(patch: Partial<Route> = {}, body: Body = { kind: "envelope" }): Route {
+  const base = emptyRoute();
+  return { ...base, ...patch, action: { ...base.action, url: "https://hooks.example.com/T0/secret", body } };
 }
+
+function automation(patch: Partial<Automation> = {}, routes: Route[] = [route()]): Automation {
+  return { ...emptyAutomation("local"), topic: "orders", ...patch, routes };
+}
+
+const transform = { kind: "transform", route: "route-1" } as const;
+const webhook = { kind: "webhook", route: "route-1" } as const;
 
 describe("hostOf", () => {
   it("keeps only the host, never the path a chat webhook hides its secret in", () => {
@@ -20,54 +27,62 @@ describe("hostOf", () => {
   });
 });
 
-describe("stageIssue", () => {
+describe("node keys", () => {
+  it("round-trip, even for a route id with a colon", () => {
+    for (const ref of [SOURCE, transform, { kind: "webhook", route: "a:b" } as const]) {
+      expect(parseNodeKey(nodeKey(ref))).toEqual(ref);
+    }
+    expect(parseNodeKey("nope:x")).toBeNull();
+  });
+
+  it("list the source, then each route's transform and webhook", () => {
+    const two = automation({}, [route(), route({ id: "route-2" })]);
+    expect(nodesOf(two).map(nodeKey)).toEqual([
+      "source",
+      "transform:route-1",
+      "webhook:route-1",
+      "transform:route-2",
+      "webhook:route-2",
+    ]);
+  });
+});
+
+describe("nodeIssue", () => {
   it("is null for a complete automation", () => {
-    for (const stage of ["extract", "transform", "load"] as const) expect(stageIssue(stage, automation())).toBeNull();
+    expect(firstIssue(automation())).toBeNull();
   });
 
   it("asks for a topic, a usable body and a URL", () => {
-    expect(stageIssue("extract", automation({ topic: " " }))).not.toBeNull();
-    expect(stageIssue("transform", automation({}, { kind: "template", text: "" }))).not.toBeNull();
-    expect(stageIssue("transform", automation({}, { kind: "mapping", fields: [] }))).not.toBeNull();
-    const noUrl = automation();
+    expect(nodeIssue(automation({ topic: " " }), SOURCE)).not.toBeNull();
+    expect(nodeIssue(automation({}, [route({}, { kind: "template", text: "" })]), transform)).not.toBeNull();
+    expect(nodeIssue(automation({}, [route({}, { kind: "mapping", fields: [] })]), transform)).not.toBeNull();
+    const noUrl = route();
     noUrl.action = { ...noUrl.action, url: "" };
-    expect(stageIssue("load", noUrl)).not.toBeNull();
+    expect(firstIssue(automation({}, [noUrl]))?.ref).toEqual(webhook);
   });
 
   it("rejects a call rate outside what the backend accepts", () => {
-    expect(stageIssue("load", automation({ maxPerMinute: 0 }))).not.toBeNull();
-    expect(stageIssue("load", automation({ maxPerMinute: 601 }))).not.toBeNull();
-    expect(stageIssue("load", automation({ maxPerMinute: Number.NaN }))).not.toBeNull();
+    for (const maxPerMinute of [0, 601, Number.NaN]) expect(nodeIssue(automation({ maxPerMinute }), SOURCE)).not.toBeNull();
   });
 });
 
-describe("stageSummary", () => {
-  it("describes each stage in a line", () => {
-    expect(stageSummary("extract", automation())).toBe("orders, every message");
-    expect(stageSummary("extract", automation({ query: "value.total > 10" }))).toBe("orders, filtered");
-    expect(stageSummary("transform", automation({}, { kind: "mapping", fields: [] }))).toBe("0 fields");
-    expect(stageSummary("load", automation())).toBe("POST hooks.example.com");
+describe("nodeSummary", () => {
+  it("describes each node in a line", () => {
+    expect(nodeSummary(automation(), SOURCE)).toBe("orders, every message");
+    expect(nodeSummary(automation({ query: "value.total > 10" }), SOURCE)).toBe("orders, filtered");
+    expect(nodeSummary(automation({}, [route({}, { kind: "mapping", fields: [] })]), transform)).toBe("0 fields");
+    const both = route({ split: "value.items", query: "value.ok = true" });
+    expect(nodeSummary(automation({}, [both]), transform)).toBe("Whole message, per item");
+    expect(nodeSummary(automation(), webhook)).toBe("POST hooks.example.com");
   });
 
   it("never includes the URL path", () => {
-    expect(stageSummary("load", automation())).not.toContain("secret");
+    expect(nodeSummary(automation(), webhook)).not.toContain("secret");
   });
 });
 
-describe("isUnlocked", () => {
-  it("opens the first step always and the others only after the ones before are complete", () => {
-    const blank = automation({ topic: "" });
-    expect(isUnlocked("extract", blank)).toBe(true);
-    expect(isUnlocked("transform", blank)).toBe(false);
-    expect(isUnlocked("load", blank)).toBe(false);
-    expect(isUnlocked("transform", automation())).toBe(true);
-    expect(isUnlocked("load", automation({}, { kind: "mapping", fields: [] }))).toBe(false);
-  });
-});
-
-describe("nextStage", () => {
-  it("follows the order and ends at load", () => {
-    expect(nextStage("extract")).toBe("transform");
-    expect(nextStage("load")).toBeNull();
+describe("emptyRoute", () => {
+  it("picks the first id no other route has", () => {
+    expect(emptyRoute([route(), route({ id: "route-3" })]).id).toBe("route-2");
   });
 });

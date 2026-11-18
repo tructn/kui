@@ -4,7 +4,7 @@ import {
   ServerIcon,
   SettingsIcon,
   UsersIcon,
-  ZapIcon,
+  WorkflowIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,7 +52,7 @@ const NAV_ITEMS: NavItem[] = [
     route: { page: "consumer-groups" },
     key: "3",
   },
-  { label: "Automations", icon: ZapIcon, page: "automations", route: { page: "automations" }, key: "4" },
+  { label: "Pipelines", icon: WorkflowIcon, page: "automations", route: { page: "automations" }, key: "4" },
 ];
 
 export function AppSidebar() {
