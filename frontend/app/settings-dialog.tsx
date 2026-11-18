@@ -30,6 +30,7 @@ import { AccentPicker } from "@/components/accent-picker";
 import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
 import { useShortcut } from "@/hooks/use-shortcut";
 
+import { usePrivacy } from "./stores/privacy-store";
 import { useSettingsDialog } from "./stores/settings-dialog-store";
 import { useUpdates } from "./stores/update-store";
 import { useViewStateStore } from "./stores/view-state-store";
@@ -48,7 +49,7 @@ const SECTIONS: Section[] = [
     id: "general",
     label: "General",
     icon: SlidersHorizontalIcon,
-    description: "How KUI behaves as you move around it.",
+    description: "How KUI behaves as you move around it, and what it hides.",
     content: () => <GeneralSettings />,
   },
   {
@@ -116,17 +117,48 @@ export function SettingsDialog() {
 function GeneralSettings() {
   const remember = useViewStateStore((s) => s.remember);
   const setRemember = useViewStateStore((s) => s.setRemember);
+  const { maskBootstrapServers, maskClusterNames, update } = usePrivacy();
 
   return (
-    <SettingsGroup>
-      <SettingRow
-        label="Remember sorting and filters"
-        description="Keep sorting, search, and filters when you switch pages or restart KUI."
-        htmlFor="remember-view-state"
-      >
-        <Switch id="remember-view-state" checked={remember} onCheckedChange={setRemember} />
-      </SettingRow>
-    </SettingsGroup>
+    <div className="flex flex-col gap-6">
+      <SettingsGroup>
+        <SettingRow
+          label="Remember sorting and filters"
+          description="Keep sorting, search, and filters when you switch pages or restart KUI."
+          htmlFor="remember-view-state"
+        >
+          <Switch id="remember-view-state" checked={remember} onCheckedChange={setRemember} />
+        </SettingRow>
+      </SettingsGroup>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="px-1 text-xs font-medium text-muted-foreground">Privacy</h3>
+        <SettingsGroup>
+          <SettingRow
+            label="Hide bootstrap servers"
+            description="Show •••••••• for bootstrap servers and broker hosts, for screenshots and screen sharing."
+            htmlFor="mask-bootstrap-servers"
+          >
+            <Switch
+              id="mask-bootstrap-servers"
+              checked={maskBootstrapServers}
+              onCheckedChange={(checked) => update({ maskBootstrapServers: checked })}
+            />
+          </SettingRow>
+          <SettingRow
+            label="Hide cluster names"
+            description="Show clusters as Cluster 1, Cluster 2 and so on. Editing a cluster still shows its real name."
+            htmlFor="mask-cluster-names"
+          >
+            <Switch
+              id="mask-cluster-names"
+              checked={maskClusterNames}
+              onCheckedChange={(checked) => update({ maskClusterNames: checked })}
+            />
+          </SettingRow>
+        </SettingsGroup>
+      </section>
+    </div>
   );
 }
 
