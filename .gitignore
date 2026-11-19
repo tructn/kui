@@ -35,3 +35,4 @@ security/findings/
 
 # graphify knowledge graph, rebuilt locally by its git hooks
 graphify-out/
+.claude/*.graphify-bak
