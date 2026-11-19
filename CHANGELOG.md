@@ -6,6 +6,13 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.3.0](https://github.com/tructn/kui/compare/v0.2.0...v0.3.0) (2026-11-19)
+
+
+### Added
+
+* **privacy:** hide cluster names and bootstrap servers on screen ([#47](https://github.com/tructn/kui/issues/47)) ([af71e1b](https://github.com/tructn/kui/commit/af71e1bc4caf1d7a13dab3c0faf3c77f39853356))
+
 ## [0.2.0](https://github.com/tructn/kui/compare/v0.1.1...v0.2.0) (2026-11-14)
 
 
