@@ -30,6 +30,10 @@
 
 - `unsafe` is denied, and `dbg!`, `todo!`, `println!` warn (clippy runs with `-D warnings`). No `unwrap`/`expect`
   outside tests.
+- The one exception is calling librdkafka APIs that rust-rdkafka doesn't wrap (consumer groups, ACLs): those
+  modules in `kui_kafka` opt in with `#[allow(unsafe_code)]`, give every `unsafe` block a `SAFETY:` comment,
+  free what they allocate on drop, and expose only safe functions. Keep pure types and checks in a module of
+  their own (`acls.rs` beside `acl_admin.rs`) so they stay outside the exception.
 - Make invalid states unrepresentable: enums over string flags, `Option` over sentinel values, newtypes where two
   values of the same type are easy to swap.
 - Borrow rather than clone in hot paths; take `&str`/`&[T]` and return owned data only when the caller needs it.

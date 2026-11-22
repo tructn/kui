@@ -697,3 +697,41 @@ async fn a_message_above_the_retained_limit_is_matched_whole() {
     assert_eq!(walk("NOT value.late = 'ok'"), [2, 3]);
     topics::service::delete(&clients, &[topic]).await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "needs a running Kafka broker with an authorizer"]
+async fn acls_are_created_listed_and_deleted_exactly() {
+    use crate::features::acls;
+    use crate::features::acls::model::AclBinding;
+    use kui_kafka::acls::{Operation, PatternType, Permission, ResourceType};
+
+    let clients = KafkaClients::connect(local_cluster()).unwrap();
+    let principal = format!("User:kui-it-{}", uuid::Uuid::new_v4());
+    let acl = |operation| AclBinding {
+        resource_type: ResourceType::Topic,
+        resource_name: "kui-it-".into(),
+        pattern_type: PatternType::Prefixed,
+        principal: principal.clone(),
+        host: "*".into(),
+        operation,
+        permission: Permission::Allow,
+    };
+    let mine = || -> Vec<AclBinding> {
+        acls::service::list(&clients).unwrap().into_iter().filter(|a| a.principal == principal).collect()
+    };
+
+    acls::service::create(&clients, &[acl(Operation::Read), acl(Operation::Describe)]).unwrap();
+    // ACL changes reach the broker's cache through the metadata log, a moment after they are accepted.
+    for _ in 0..20 {
+        if mine().len() == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    assert_eq!(mine(), [acl(Operation::Read), acl(Operation::Describe)]);
+
+    // Deleting one ACL leaves its sibling, which differs only in the operation.
+    assert_eq!(acls::service::delete(&clients, &[acl(Operation::Read)]).unwrap(), 1);
+    assert!(acls::service::delete(&clients, &[acl(Operation::Read)]).is_err(), "deleting twice should fail");
+    assert_eq!(acls::service::delete(&clients, &[acl(Operation::Describe)]).unwrap(), 1);
+}

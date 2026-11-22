@@ -7,6 +7,9 @@
 #   demo.catalog    30 wide product documents: dynamic-key maps, arrays of arrays, mixed arrays, edge-case numbers
 #   demo.webhooks   40 webhook envelopes whose payload is JSON encoded 2-3 levels deep, base64 or NDJSON
 #   demo.untrusted  6 messages carrying HTML/script payloads in keys, values, JSON keys and headers (e2e: they must render inert)
+#   demo.payments   empty; `payments` may write to it, so bun run kafka:acl-demo has a topic to produce to
+#   ACLs            service principals covering every resource type, literal and prefixed patterns,
+#                   wildcards, DENY rules and host restrictions
 # Each topic is created only if missing, so re-running adds new demo topics to an old broker.
 set -euo pipefail
 BIN=/opt/kafka/bin
@@ -236,4 +239,42 @@ else
     --reader-property headers.key.separator='=' \
     --reader-property parse.key=true --reader-property key.separator='|'
   echo "Seeded demo.untrusted."
+fi
+
+if has_topic demo.payments; then
+  echo "demo.payments already seeded."
+else
+  $BIN/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic demo.payments --partitions 1
+fi
+
+# Clients on the PLAINTEXT listeners are ANONYMOUS, a super user, so these ACLs only restrict the demo
+# users logging in on the dev broker's SASL listener (see docker-compose.yml).
+# Skipped when any seeded principal still has ACLs, so ones deleted in the UI don't come back on every start.
+acl() { $BIN/kafka-acls.sh --bootstrap-server "$BOOTSTRAP" --add "$@" > /dev/null; }
+
+if $BIN/kafka-acls.sh --bootstrap-server "$BOOTSTRAP" --list | grep -q 'principal=User:billing-service,'; then
+  echo "ACLs already seeded."
+else
+  acl --allow-principal User:billing-service --operation Read --operation Describe --topic demo.orders
+  acl --allow-principal User:billing-service --operation Read --group demo-billing
+  acl --allow-principal User:order-service --operation Write --operation Describe --topic demo.orders
+  acl --allow-principal User:order-service --operation Read --topic demo.customers
+  acl --allow-principal User:analytics --allow-principal User:data-science --operation Read --operation Describe \
+    --topic demo. --resource-pattern-type prefixed
+  acl --allow-principal User:analytics --operation Read --group analytics- --resource-pattern-type prefixed
+  acl --allow-principal User:payments --operation Write --operation Describe \
+    --transactional-id payments- --resource-pattern-type prefixed
+  acl --allow-principal User:payments --operation IdempotentWrite --cluster
+  acl --allow-principal User:payments --operation Write --operation Describe --topic demo.payments
+  acl --allow-principal User:auditor --operation Describe --operation DescribeConfigs --topic '*'
+  acl --allow-principal User:auditor --operation Describe --group '*'
+  acl --allow-principal User:auditor --operation Describe --operation DescribeConfigs --cluster
+  acl --allow-principal User:ops --allow-host 10.0.0.5 --operation Alter --operation AlterConfigs --cluster
+  # The intern may read and write every demo topic, but the DENY on all topics wins for writes and deletes.
+  acl --allow-principal User:intern --operation Read --operation Write --operation Describe \
+    --topic demo. --resource-pattern-type prefixed
+  acl --allow-principal User:intern --operation Read --group intern- --resource-pattern-type prefixed
+  acl --deny-principal User:intern --operation Write --operation Delete --topic '*'
+  acl --deny-principal User:legacy-app --deny-host 192.168.1.10 --operation Read --topic demo.untrusted
+  echo "Seeded ACLs."
 fi

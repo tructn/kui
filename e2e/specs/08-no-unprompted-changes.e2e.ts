@@ -58,6 +58,9 @@ describe("Nothing changes without the user's consent", () => {
     await expect(openSheet()).toHaveText(expect.stringContaining("Consumed 30"));
     await browser.keys("Escape");
     await openSheet().waitForExist({ reverse: true });
+
+    await goTo("ACLs");
+    expect(await commandsSent()).toContain("list_acls");
   });
 
   it("ignores stray keys on a focused topic row", async () => {
@@ -93,6 +96,7 @@ describe("Nothing changes without the user's consent", () => {
     for (const [key, heading] of [
       ["1", "Brokers"],
       ["3", "Consumer groups"],
+      ["4", "ACLs"],
       ["2", "Topics"],
     ]) {
       await pressMod(key);
@@ -291,6 +295,26 @@ describe("Nothing changes without the user's consent", () => {
       await expect(openSheet()).toBeDisplayed();
       await browser.keys("Escape");
       await openSheet().waitForExist({ reverse: true });
+    });
+  });
+
+  describe("ACLs", () => {
+    before(async () => {
+      await goTo("ACLs");
+    });
+
+    it("creates nothing when the create dialog is filled in and closed", async () => {
+      await button("New ACL").click();
+      await expect(openDialog()).toBeDisplayed();
+      await $("#acl-principal").clearValue();
+      await $("#acl-principal").setValue("User:not-created");
+      await $("#acl-resource-name").setValue("demo.orders");
+      await $("#acl-op-read").click();
+      // Enter in a text field submits the form, so only Escape is pressed here.
+      await browser.keys("Escape");
+      await openDialog().waitForExist({ reverse: true });
+      await $('input[aria-label="Filter ACLs"]').setValue("not-created");
+      await expect($("td=User:not-created")).not.toBeExisting();
     });
   });
 
