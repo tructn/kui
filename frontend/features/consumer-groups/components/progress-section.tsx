@@ -1,4 +1,5 @@
-import { ChevronRightIcon } from "lucide-react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type ReactNode } from "react";
 
 import { formatNumber } from "@/lib/format";
@@ -16,10 +17,12 @@ interface ProgressSectionProps {
   progress: TopicProgress;
   offsets: PartitionOffset[];
   defaultOpen?: boolean;
+  /** Names the group and topic, for the partition table's pinned columns. */
+  pinScope: readonly string[];
 }
 
 /** One group × topic: totals and a bar, expanding to every partition. */
-export function ProgressSection({ title, extra, progress, offsets, defaultOpen = false }: ProgressSectionProps) {
+export function ProgressSection({ title, extra, progress, offsets, defaultOpen = false, pinScope }: ProgressSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   const read = progress.consumed + progress.lag > 0;
 
@@ -33,7 +36,10 @@ export function ProgressSection({ title, extra, progress, offsets, defaultOpen =
             aria-expanded={open}
             onClick={() => setOpen(!open)}
           >
-            <ChevronRightIcon className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} />
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")}
+            />
             <span className="truncate font-mono">{title}</span>
           </button>
           {extra}
@@ -62,7 +68,7 @@ export function ProgressSection({ title, extra, progress, offsets, defaultOpen =
       </div>
       {open && (
         <div className="border-t">
-          <PartitionOffsetsTable offsets={offsets} />
+          <PartitionOffsetsTable offsets={offsets} pinScope={pinScope} />
         </div>
       )}
     </div>

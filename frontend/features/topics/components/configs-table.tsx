@@ -20,12 +20,21 @@ const COLUMNS: SortColumns<TopicConfigEntry, "name" | "value" | "source"> = {
 };
 
 /** `emptyText` replaces the usual empty message while the topic is loading or failed. */
-export function ConfigsTable({ configs, emptyText }: { configs: TopicConfigEntry[]; emptyText?: ReactNode }) {
+export function ConfigsTable({
+  configs,
+  emptyText,
+  pinScope,
+}: {
+  configs: TopicConfigEntry[];
+  emptyText?: ReactNode;
+  /** Names the topic, so its pinned columns are its own (see `useColumnResize`). */
+  pinScope: readonly string[];
+}) {
   const [overridesOnly, setOverridesOnly] = useViewState("topic-configs.overridesOnly", false);
   const visible = overridesOnly ? configs.filter((c) => !c.isDefault) : configs;
   const sorter = useSort("topic-configs", visible, COLUMNS);
   const pager = usePagination(sorter.rows, `${overridesOnly}|${sorter.key}`);
-  const resize = useColumnResize("topic-configs", 3);
+  const resize = useColumnResize("topic-configs", 3, pinScope);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -45,8 +54,8 @@ export function ConfigsTable({ configs, emptyText }: { configs: TopicConfigEntry
           <TableBody>
             {pager.items.map((c) => (
               <TableRow key={c.name}>
-                <TableCell className="font-mono text-xs">{c.name}</TableCell>
-                <TableCell className="font-mono text-xs break-all whitespace-normal">
+                <TableCell className="font-mono text-code">{c.name}</TableCell>
+                <TableCell className="font-mono text-code break-all whitespace-normal">
                   {c.isSensitive ? "••••••" : c.value ?? <span className="text-muted-foreground">null</span>}
                 </TableCell>
                 <TableCell>

@@ -1,4 +1,5 @@
-import { ArrowUpRightIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import { ArrowUpRight01Icon, Delete02Icon, Undo02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -109,7 +110,7 @@ function GroupDetailBody({
   const topics = detail?.topics ?? [];
   const memberSort = useSort("group-members", detail?.members ?? NO_MEMBERS, MEMBER_COLUMNS);
   const members = usePagination(memberSort.rows, memberSort.key);
-  const memberResize = useColumnResize("group-members", 3);
+  const memberResize = useColumnResize("group-members", 3, [clusterId, name]);
   // The topic the reset dialog opens on; a new key each time starts it fresh.
   const [resetTopic, setResetTopic] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -158,13 +159,13 @@ function GroupDetailBody({
           disabled={!detail || topics.length === 0}
           onClick={() => openReset(topics[0].topic)}
         >
-          <RotateCcwIcon /> Reset offsets
+          <HugeiconsIcon icon={Undo02Icon} /> Reset offsets
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             {/* Kafka only allows deleting groups without active members. */}
             <Button variant="destructive" size="sm" disabled={!detail || detail.members.length > 0}>
-              <Trash2Icon /> Delete group
+              <HugeiconsIcon icon={Delete02Icon} /> Delete group
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -196,6 +197,7 @@ function GroupDetailBody({
         {topics.map((t) => (
           <ProgressSection
             key={t.topic}
+            pinScope={[clusterId, name, t.topic]}
             title={t.topic}
             progress={t}
             offsets={detail?.offsets.filter((o) => o.topic === t.topic) ?? []}
@@ -208,7 +210,7 @@ function GroupDetailBody({
                   aria-label={`Open ${t.topic}`}
                   onClick={() => navigate({ page: "topic", topic: t.topic })}
                 >
-                  <ArrowUpRightIcon />
+                  <HugeiconsIcon icon={ArrowUpRight01Icon} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -217,7 +219,7 @@ function GroupDetailBody({
                   title="Reset offsets"
                   onClick={() => openReset(t.topic)}
                 >
-                  <RotateCcwIcon />
+                  <HugeiconsIcon icon={Undo02Icon} />
                 </Button>
               </>
             }
@@ -259,8 +261,8 @@ function GroupDetailBody({
               <TableBody>
                 {members.items.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-mono text-xs">{m.clientId}</TableCell>
-                    <TableCell className="font-mono text-xs">{m.host}</TableCell>
+                    <TableCell className="font-mono text-code">{m.clientId}</TableCell>
+                    <TableCell className="font-mono text-code">{m.host}</TableCell>
                     <TableCell className="flex flex-wrap gap-1">
                       {Object.entries(m.assignment).map(([topic, partitions]) => (
                         <Badge key={topic} variant="outline" className="font-mono">

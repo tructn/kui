@@ -1,13 +1,13 @@
 import { getVersion } from "@tauri-apps/api/app";
 import {
-  DownloadIcon,
+  Download01Icon,
   KeyboardIcon,
-  PaletteIcon,
-  RefreshCwIcon,
-  RotateCcwIcon,
+  PaintBoardIcon,
+  RefreshIcon,
   SlidersHorizontalIcon,
-  type LucideIcon,
-} from "lucide-react";
+  Undo02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import { ThemePicker } from "./theme-picker";
 interface Section {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   description: string;
   content: () => ReactNode;
 }
@@ -55,14 +55,14 @@ const SECTIONS: Section[] = [
   {
     id: "appearance",
     label: "Appearance",
-    icon: PaletteIcon,
+    icon: PaintBoardIcon,
     description: "Applies right away and is remembered on this machine.",
     content: () => <AppearanceSettings />,
   },
   {
     id: "updates",
     label: "Updates",
-    icon: DownloadIcon,
+    icon: Download01Icon,
     description: "Which versions KUI offers to install, and when it looks for them.",
     content: () => <UpdateSettings />,
   },
@@ -85,7 +85,7 @@ export function SettingsDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {/* Fixed height, one section at a time: switching sections doesn't make the dialog jump. */}
-      <DialogContent className="flex h-[min(34rem,85vh)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
+      <DialogContent className="flex h-[min(42rem,90vh)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <Tabs orientation="vertical" defaultValue={SECTIONS[0].id} className="min-h-0 min-w-0 flex-1 gap-0">
           <div className="flex w-48 shrink-0 flex-col gap-3 border-r bg-muted/40 p-3">
             <DialogTitle className="px-2 pt-1.5 text-base">Settings</DialogTitle>
@@ -93,7 +93,7 @@ export function SettingsDialog() {
             <TabsList className="w-full items-stretch gap-0.5 bg-transparent p-0">
               {SECTIONS.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger key={id} value={id} className="h-8 flex-none px-2 font-normal data-active:font-medium">
-                  <Icon /> {label}
+                  <HugeiconsIcon icon={Icon} /> {label}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -136,7 +136,7 @@ function GeneralSettings() {
         <SettingsGroup>
           <SettingRow
             label="Hide bootstrap servers"
-            description="Show •••••••• for bootstrap servers and broker hosts, for screenshots and screen sharing."
+            description="Show made-up hosts like ねこ.local for bootstrap servers and brokers, for screenshots and screen sharing."
             htmlFor="mask-bootstrap-servers"
           >
             <Switch
@@ -147,7 +147,7 @@ function GeneralSettings() {
           </SettingRow>
           <SettingRow
             label="Hide cluster names"
-            description="Show clusters as Cluster 1, Cluster 2 and so on. Editing a cluster still shows its real name."
+            description="Show clusters under made-up names like Captain Lag. Editing a cluster still shows its real name."
             htmlFor="mask-cluster-names"
           >
             <Switch
@@ -163,7 +163,7 @@ function GeneralSettings() {
 }
 
 function AppearanceSettings() {
-  const { accent, uiFont, codeFont, codeFontSize, codeLigatures, update, resetFonts } = useAppearance();
+  const { accent, ribbon, uiFont, codeFont, codeFontSize, codeLigatures, update, resetFonts } = useAppearance();
 
   return (
     <div className="flex flex-col gap-6">
@@ -174,13 +174,16 @@ function AppearanceSettings() {
         <SettingRow label="Accent color" description="Buttons, switches and focus rings.">
           <AccentPicker value={accent} onChange={(value) => update({ accent: value })} />
         </SettingRow>
+        <SettingRow label="3D ribbon" description="A raised, glossy finish on accent fills." htmlFor="accent-ribbon">
+          <Switch id="accent-ribbon" checked={ribbon} onCheckedChange={(value) => update({ ribbon: value })} />
+        </SettingRow>
       </SettingsGroup>
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h3 className="px-1 text-xs font-medium text-muted-foreground">Fonts</h3>
           <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={resetFonts}>
-            <RotateCcwIcon /> Reset
+            <HugeiconsIcon icon={Undo02Icon} /> Reset
           </Button>
         </div>
         <SettingsGroup>
@@ -214,7 +217,7 @@ function AppearanceSettings() {
             </Select>
           </SettingRow>
 
-          <SettingRow label="Editor font size">
+          <SettingRow label="Code font size">
             <Select value={String(codeFontSize)} onValueChange={(v) => update({ codeFontSize: Number(v) })}>
               <SelectTrigger size="sm" className="w-44">
                 <SelectValue />
@@ -285,7 +288,7 @@ function UpdateSettings() {
         }
       >
         <Button variant="outline" size="sm" disabled={state.step === "checking"} onClick={checkNow}>
-          {state.step === "checking" ? <Spinner /> : <RefreshCwIcon />} Check now
+          {state.step === "checking" ? <Spinner /> : <HugeiconsIcon icon={RefreshIcon} />} Check now
         </Button>
       </SettingRow>
 

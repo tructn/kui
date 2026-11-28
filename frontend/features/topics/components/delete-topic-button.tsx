@@ -1,4 +1,5 @@
-import { Trash2Icon } from "lucide-react";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -46,7 +47,7 @@ export function DeleteTopicButton({ clusterId, topic, onDeleted, trigger }: Dele
       <AlertDialogTrigger asChild>
         {trigger ?? (
           <Button variant="destructive" size="sm">
-            <Trash2Icon /> Delete
+            <HugeiconsIcon icon={Delete02Icon} /> Delete
           </Button>
         )}
       </AlertDialogTrigger>

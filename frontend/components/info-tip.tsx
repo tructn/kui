@@ -1,4 +1,5 @@
-import { InfoIcon } from "lucide-react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 
 import {
@@ -29,7 +30,7 @@ export function InfoTip({
             className,
           )}
         >
-          <InfoIcon className="size-3.5" />
+          <HugeiconsIcon icon={InformationCircleIcon} className="size-3.5" />
         </button>
       </TooltipTrigger>
       <TooltipContent>{children}</TooltipContent>

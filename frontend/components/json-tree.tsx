@@ -1,4 +1,5 @@
-import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HashIcon } from "lucide-react";
+import { ArrowRight01Icon, HashtagIcon, UnfoldLessIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Component, createContext, type ReactNode, useContext, useMemo, useRef, useState } from "react";
 
 import { CopyIndicator, useCopy } from "@/components/copy-button";
@@ -14,7 +15,7 @@ import {
   type JsonContainer,
   type JsonValue,
   parseTree,
-} from "../json-tree";
+} from "@/lib/json-tree";
 
 /** Children shown per container before "Show more", so a 10,000-item array doesn't freeze the panel. */
 const PAGE_SIZE = 100;
@@ -29,6 +30,8 @@ const ShowCounts = createContext(true);
 interface JsonTreeProps {
   /** The payload's text; renders nothing unless it holds a JSON object or array (or a string holding one). */
   text: string;
+  /** Containers at this depth or deeper start collapsed. */
+  openDepth?: number;
   className?: string;
 }
 
@@ -36,13 +39,13 @@ interface JsonTreeProps {
  * A JSON document as a tree that expands and collapses. A string that holds JSON, however deep
  * in the document, is shown as the object it holds, tagged JSON.
  */
-export function JsonTree({ text, className }: JsonTreeProps) {
+export function JsonTree({ text, openDepth = DEFAULT_OPEN_DEPTH, className }: JsonTreeProps) {
   const root = useMemo(() => parseTree(text), [text]);
   // Remounting the nodes resets every one to `openDepth`; that's how Expand/Collapse all work.
   const [showCounts, setShowCounts] = useState(true);
   const body = useRef<HTMLDivElement>(null);
   const { copied: copiedSelection, copy } = useCopy();
-  const [fold, setFold] = useState({ openDepth: DEFAULT_OPEN_DEPTH, epoch: 0 });
+  const [fold, setFold] = useState({ openDepth, epoch: 0 });
   const foldTo = (openDepth: number) => setFold((f) => ({ openDepth, epoch: f.epoch + 1 }));
   if (!root) return null;
 
@@ -70,13 +73,13 @@ export function JsonTree({ text, className }: JsonTreeProps) {
           title="Show how many keys or items each node has"
           onClick={() => setShowCounts(!showCounts)}
         >
-          <HashIcon /> Counts
+          <HugeiconsIcon icon={HashtagIcon} /> Counts
         </Button>
         <Button variant="ghost" size="xs" onClick={() => foldTo(Infinity)}>
-          <ChevronsUpDownIcon /> Expand all
+          <HugeiconsIcon icon={UnfoldMoreIcon} /> Expand all
         </Button>
         <Button variant="ghost" size="xs" onClick={() => foldTo(1)}>
-          <ChevronsDownUpIcon /> Collapse all
+          <HugeiconsIcon icon={UnfoldLessIcon} /> Collapse all
         </Button>
       </div>
       <div
@@ -164,7 +167,8 @@ function ContainerNode({
               aria-label={open ? "Collapse" : "Expand"}
               className="shrink-0 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             >
-              <ChevronRightIcon
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
                 className={cn(
                   "size-3.5 translate-y-0.5 text-muted-foreground transition-transform duration-200",
                   open && "rotate-90 text-primary",

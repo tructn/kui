@@ -1,0 +1,27 @@
+{
+  "eventSource": "aws:kafka",
+  "eventSourceArn": "arn:aws:kafka:local:000000000000:cluster/kui/local",
+  "bootstrapServers": "localhost:9092",
+  "records": {
+    "demo.orders-0": [
+      {
+        "topic": "demo.orders",
+        "partition": 0,
+        "offset": 3,
+        "timestamp": 1764316800000,
+        "timestampType": "CREATE_TIME",
+        "key": "b3JkZXItMw==",
+        "value": "eyJvcmRlcklkIjoib3JkZXItMyIsImN1c3RvbWVyIjoiY3VzdC0zIiwidG90YWwiOjM5Ljk5LCJzdGF0dXMiOiJORVcifQ==",
+        "headers": [
+          {
+            "traceId": [
+              97,
+              98,
+              99
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

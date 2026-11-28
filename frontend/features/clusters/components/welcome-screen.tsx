@@ -1,8 +1,10 @@
-import { DatabaseIcon, PlusIcon } from "lucide-react";
+import { Database01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
 import { useNavigation } from "@/app/stores/navigation-store";
 import { usePrivacy } from "@/app/stores/privacy-store";
+import { ThemeMenuButton } from "@/app/theme-picker";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -20,13 +22,17 @@ export function WelcomeScreen() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-3">
-        <SidebarTrigger />
+      <div className="flex items-center p-3">
+        {/* Below md the sidebar is an off-screen sheet, so its own collapse button can't open it. */}
+        <SidebarTrigger className="md:hidden" />
+        <div className="ml-auto">
+          <ThemeMenuButton />
+        </div>
       </div>
       <Empty className="page-enter">
         <EmptyHeader>
           <EmptyMedia variant="icon" className="float-gentle">
-            <DatabaseIcon />
+            <HugeiconsIcon icon={Database01Icon} />
           </EmptyMedia>
           <EmptyTitle>{clusters.length ? "Select a cluster" : "Connect to Kafka"}</EmptyTitle>
           <EmptyDescription>
@@ -39,11 +45,11 @@ export function WelcomeScreen() {
           <div className="flex flex-wrap justify-center gap-2">
             {clusters.map((c, i) => (
               <Button key={c.id} variant="outline" onClick={() => selectCluster(c.id)}>
-                <DatabaseIcon /> {maskClusterName(c.name, i, maskNames)}
+                <HugeiconsIcon icon={Database01Icon} /> {maskClusterName(c.name, i, maskNames)}
               </Button>
             ))}
             <Button onClick={() => setAdding(true)}>
-              <PlusIcon /> Add cluster
+              <HugeiconsIcon icon={PlusSignIcon} /> Add cluster
             </Button>
           </div>
         </EmptyContent>

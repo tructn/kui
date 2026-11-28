@@ -1,4 +1,5 @@
-import { RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
+import { Alert02Icon, Undo02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -118,7 +119,7 @@ export function ResetOffsetsDialog({
         <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-4">
           {busy && (
             <Alert variant="destructive">
-              <TriangleAlertIcon />
+              <HugeiconsIcon icon={Alert02Icon} />
               <AlertTitle>Stop the group's consumers first</AlertTitle>
               <AlertDescription>
                 {activeMembers} {activeMembers === 1 ? "consumer is" : "consumers are"} connected. Kafka only accepts
@@ -211,7 +212,7 @@ export function ResetOffsetsDialog({
 
           <DialogFooter>
             <Button type="submit" disabled={busy || !current || current.length === 0 || reset.isPending}>
-              {reset.isPending ? <Spinner /> : <RotateCcwIcon />}
+              {reset.isPending ? <Spinner /> : <HugeiconsIcon icon={Undo02Icon} />}
               Reset {current ? `${current.length} ${current.length === 1 ? "partition" : "partitions"}` : "offsets"}
             </Button>
           </DialogFooter>
@@ -238,7 +239,7 @@ function ResetPreview({ changes, loading }: { changes: OffsetChange[] | undefine
               <TableHead className="text-right">Remaining after</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="font-mono text-xs tabular-nums">
+          <TableBody className="font-mono text-code tabular-nums">
             {changes?.map((c) => {
               const moved = c.current == null ? null : c.target - c.current;
               return (

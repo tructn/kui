@@ -1,4 +1,5 @@
-import { RotateCwIcon } from "lucide-react";
+import { ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useClusterId } from "@/app/stores/navigation-store";
 import { usePrivacy } from "@/app/stores/privacy-store";
@@ -14,7 +15,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
 import { formatNumber } from "@/lib/format";
-import { MASK, maskAddress } from "@/lib/mask";
+import { maskAddress, maskPort } from "@/lib/mask";
 
 import { useClusterOverview } from "../queries";
 import type { Broker } from "../types";
@@ -36,7 +37,7 @@ export function BrokersPage() {
   const data = overview.data;
   const sorter = useSort("brokers", data?.brokers ?? NO_BROKERS, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("brokers", 5);
+  const resize = useColumnResize("brokers", 5, [clusterId]);
   // Stat value until the overview arrives: pulsing while it loads, a dash if it failed.
   const placeholder = overview.isPending ? <Skeleton className="h-8 w-12" /> : "—";
 
@@ -47,7 +48,7 @@ export function BrokersPage() {
         description="Cluster health and partition distribution"
         actions={
           <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => overview.refetch()}>
-            <RotateCwIcon className={overview.isFetching ? "animate-spin" : undefined} />
+            <HugeiconsIcon icon={ReloadIcon} className={overview.isFetching ? "animate-spin" : undefined} />
           </Button>
         }
       />
@@ -91,7 +92,7 @@ export function BrokersPage() {
                 <TableRow key={b.id}>
                   <TableCell>{b.id}</TableCell>
                   <TableCell>{maskAddress(b.host, maskServers)}</TableCell>
-                  <TableCell>{maskServers ? MASK : b.port}</TableCell>
+                  <TableCell>{maskPort(b.port, maskServers)}</TableCell>
                   <TableCell className="text-right">{formatNumber(b.leaderPartitions)}</TableCell>
                   <TableCell className="text-right">{formatNumber(b.replicaPartitions)}</TableCell>
                 </TableRow>

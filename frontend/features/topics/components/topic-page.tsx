@@ -1,4 +1,5 @@
-import { ArrowLeftIcon, RotateCwIcon } from "lucide-react";
+import { ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useClusterId, useNavigation } from "@/app/stores/navigation-store";
 import { CopyButton } from "@/components/copy-button";
@@ -7,9 +8,10 @@ import { emptyText, ErrorState } from "@/components/query-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SendResultSheet, SendToActionButton, useTopicActions } from "@/features/actions";
 import { TopicConsumers } from "@/features/consumer-groups";
 import { GenerateDialog } from "@/features/generator";
-import { MessageBrowser, ProduceDialog } from "@/features/messages";
+import { MessageBrowser, ProduceDialog, useLoadedMessages } from "@/features/messages";
 import { formatNumber } from "@/lib/format";
 
 import { useTopic, useTopics } from "../queries";
@@ -28,6 +30,8 @@ export function TopicPage({ topic }: { topic: string }) {
   const navigate = useNavigation((s) => s.navigate);
   const detail = useTopic(clusterId, topic);
   const topics = useTopics(clusterId);
+  const loadedMessages = useLoadedMessages(clusterId, topic);
+  const topicActions = useTopicActions(clusterId, topic);
   const backToList = () => navigate({ page: "topics" });
 
   const partitionIds = detail.data?.partitions.map((p) => p.id) ?? [];
@@ -44,16 +48,9 @@ export function TopicPage({ topic }: { topic: string }) {
   return (
     <>
       <PageHeader
+        crumbs={[{ label: "Topics", onSelect: backToList }]}
         title={
           <span className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Back to topics"
-              onClick={backToList}
-            >
-              <ArrowLeftIcon />
-            </Button>
             <span className="font-mono">{topic}</span>
             <CopyButton value={topic} label="Copy topic name" />
             {internal && (
@@ -78,7 +75,8 @@ export function TopicPage({ topic }: { topic: string }) {
               aria-label="Refresh"
               onClick={() => detail.refetch()}
             >
-              <RotateCwIcon
+              <HugeiconsIcon
+                icon={ReloadIcon}
                 className={detail.isFetching ? "animate-spin" : undefined}
               />
             </Button>
@@ -93,6 +91,7 @@ export function TopicPage({ topic }: { topic: string }) {
                   clusterId={clusterId}
                   topic={topic}
                   partitions={partitionIds}
+                  getSamples={loadedMessages}
                 />
                 <ProduceDialog
                   clusterId={clusterId}
@@ -120,7 +119,14 @@ export function TopicPage({ topic }: { topic: string }) {
               partitions={partitionIds}
               copyTargets={copyTargets}
               readOnly={internal}
+              // The debug column appears only once an Action reads this topic.
+              rowAction={
+                topicActions.length > 0
+                  ? (m) => <SendToActionButton clusterId={clusterId} actions={topicActions} message={m} />
+                  : undefined
+              }
             />
+            <SendResultSheet clusterId={clusterId} />
           </TabsContent>
           <TabsContent value="consumers" className="flex min-h-0 flex-col">
             <TopicConsumers clusterId={clusterId} topic={topic} />
@@ -130,6 +136,7 @@ export function TopicPage({ topic }: { topic: string }) {
               <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
             )}
             <PartitionsTable
+              pinScope={[clusterId, topic]}
               partitions={detail.data?.partitions ?? NO_PARTITIONS}
               emptyText={detail.data ? undefined : emptyText(detail, "")}
             />
@@ -142,6 +149,7 @@ export function TopicPage({ topic }: { topic: string }) {
               <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
             )}
             <ConfigsTable
+              pinScope={[clusterId, topic]}
               configs={detail.data?.configs ?? NO_CONFIGS}
               emptyText={detail.data ? undefined : emptyText(detail, "")}
             />

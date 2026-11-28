@@ -25,10 +25,10 @@ use super::window::{
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
 use crate::tasks::CancelToken;
-use kui_kafka::connection::{ConnectionErrors, explain};
+use kui_kafka::connection::explain;
 use kui_kafka::metadata::{ensure_writable, partition_ids};
 use kui_kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
-use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config, created};
+use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, fetch_one, new_consumer_with};
 
 const MAX_PAGE_SIZE: usize = 1000;
 /// Export pages hold full payloads (nothing is truncated in a file), so keep them small.
@@ -406,13 +406,10 @@ fn browsing_consumer(clients: &KafkaClients) -> Result<KafkaConsumer> {
 }
 
 fn browsing_consumer_for(cluster: &kui_kafka::ClusterConfig) -> Result<KafkaConsumer> {
-    Ok(created(
-        client_config(cluster)
-            .set("group.id", format!("kui-browser-{}", uuid::Uuid::new_v4()))
-            .set("enable.auto.commit", "false")
-            .set("enable.partition.eof", "true")
-            .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers)),
-    )?)
+    let group = format!("kui-browser-{}", uuid::Uuid::new_v4());
+    Ok(new_consumer_with(cluster, &group, |cfg| {
+        cfg.set("enable.partition.eof", "true");
+    })?)
 }
 
 /// A requested partition, its watermarks, and where the first page starts in it.
@@ -607,7 +604,7 @@ pub async fn copy(clients: Arc<KafkaClients>, request: &CopyRequest) -> Result<V
     let originals: Vec<OwnedMessage> = run_blocking(move || {
         let consumer = browsing_consumer(&reader)?;
         refs.into_iter()
-            .map(|(partition, offset)| fetch_one(&consumer, &topic, partition, offset, |m| m.detach()))
+            .map(|(partition, offset)| Ok(fetch_one(&consumer, &topic, partition, offset, |m| m.detach())?))
             .collect()
     })
     .await?;
@@ -643,31 +640,6 @@ fn copy_record<'a>(
         record = record.partition(partition);
     }
     record
-}
-
-/// Reads exactly one message, or fails if it was deleted or compacted away.
-fn fetch_one<T>(
-    consumer: &KafkaConsumer,
-    topic: &str,
-    partition: i32,
-    offset: i64,
-    convert: impl FnOnce(&BorrowedMessage<'_>) -> T,
-) -> Result<T> {
-    let mut assignment = TopicPartitionList::new();
-    assignment.add_partition_offset(topic, partition, Offset::Offset(offset))?;
-    consumer.assign(&assignment)?;
-
-    let deadline = Instant::now() + TIMEOUT;
-    while Instant::now() < deadline {
-        match consumer.poll(Duration::from_millis(200)) {
-            None => {}
-            Some(Ok(m)) if m.offset() == offset && m.partition() == partition => return Ok(convert(&m)),
-            // Landed somewhere else: the offset is gone (retention, compaction, deletion).
-            Some(Ok(_)) | Some(Err(KafkaError::PartitionEOF(_))) => break,
-            Some(Err(e)) => return Err(explain(consumer, e).into()),
-        }
-    }
-    Err(Error::msg(format!("Message at partition {partition}, offset {offset} no longer exists")))
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
-import { DownloadIcon } from "lucide-react";
+import { Download01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -16,7 +17,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { formatNumber } from "@/lib/format";
+import { formatDateTime, formatNumber } from "@/lib/format";
 
 import { useExportMessages } from "../queries";
 import type { BrowseRequest, ExportFormat, ExportSource, MessageRef } from "../types";
@@ -88,7 +89,7 @@ export function ExportMessagesDialog({ clusterId, request, pageCount, selected, 
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" disabled={disabled}>
-          <DownloadIcon /> Export
+          <HugeiconsIcon icon={Download01Icon} /> Export
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -153,7 +154,7 @@ export function ExportMessagesDialog({ clusterId, request, pageCount, selected, 
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={!canExport || exporter.isPending}>
-              {exporter.isPending ? <Spinner /> : <DownloadIcon />}
+              {exporter.isPending ? <Spinner /> : <HugeiconsIcon icon={Download01Icon} />}
               {exporter.isPending ? "Exporting…" : "Save as…"}
             </Button>
           </DialogFooter>
@@ -175,6 +176,6 @@ function rangeLabel(request: BrowseRequest): string {
     case "offset":
       return `From offset ${request.value ?? 0}${where}`;
     case "timestamp":
-      return `From ${request.value == null ? "the chosen time" : new Date(request.value).toLocaleString()}${where}`;
+      return `From ${request.value == null ? "the chosen time" : formatDateTime(request.value)}${where}`;
   }
 }

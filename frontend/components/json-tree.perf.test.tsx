@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { renderToString } from "react-dom/server";
 
-import { entriesOf, parseEmbedded, parseTree } from "../json-tree";
-import { JsonTree } from "./json-tree";
+import { entriesOf, parseEmbedded, parseTree } from "@/lib/json-tree";
+import { JsonTree } from "@/components/json-tree";
 
 // Budgets are ~10x what a laptop needs, so they catch accidental quadratic work, not noise.
 function timed<T>(fn: () => T): [T, number] {

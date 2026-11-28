@@ -1,5 +1,6 @@
-import { XIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
 
 import { emptyText, ErrorState } from "@/components/query-states";
 import { ShortcutHint } from "@/components/shortcut-hint";
@@ -30,10 +31,19 @@ interface MessageBrowserProps {
   copyTargets: CopyTarget[];
   /** Hides copy: the topic is internal and must not be written to. */
   readOnly?: boolean;
+  /** A per-row control, passed to the message table. */
+  rowAction?: (message: KafkaMessage) => ReactNode;
 }
 
 /** Filter toolbar + message table + detail sheet for one topic, with an optional live tail. */
-export function MessageBrowser({ clusterId, topic, partitions, copyTargets, readOnly = false }: MessageBrowserProps) {
+export function MessageBrowser({
+  clusterId,
+  topic,
+  partitions,
+  copyTargets,
+  readOnly = false,
+  rowAction,
+}: MessageBrowserProps) {
   const [filters, setFilters] = useState<BrowseFilters>({
     topic,
     partition: null,
@@ -72,9 +82,12 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
   }
   useShortcut("l", () => toggleLive(!live));
 
+  // A page of large payloads is a heavy render; deferring it keeps the busy overlay painted until the rows commit.
+  const shownPage = useDeferredValue(messages.data);
+  const rendering = shownPage !== messages.data;
   // While the next page loads, the old one is shown as a placeholder: its `next` is stale.
-  const next = messages.isPlaceholderData ? null : (messages.data?.next ?? null);
-  const pager = serverPager(messages.data ?? EMPTY_PAGE, page, pageSize, next !== null, {
+  const next = messages.isPlaceholderData || rendering ? null : (shownPage?.next ?? null);
+  const pager = serverPager(shownPage ?? EMPTY_PAGE, page, pageSize, next !== null, {
     setPage: (to) => {
       if (to === page + 1 && next) setCursors([...cursors, next]);
       else if (to < page) setCursors(cursors.slice(0, to + 1));
@@ -87,18 +100,31 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <MessageFilters
-          partitions={partitions}
-          filters={filters}
-          disabled={live}
-          // New filters start again from the first page.
-          onChange={(patch) => {
-            setFilters((f) => ({ ...f, ...patch }));
+      <div className="flex items-start gap-3">
+        <QueryBar
+          className="flex-1"
+          query={filters.query}
+          onApply={(query) => {
+            setFilters((f) => ({ ...f, query }));
             setCursors([null]);
           }}
+          getCatalog={getCatalog}
+          onFocus={() => setSampling(true)}
+          leading={
+            <MessageFilters
+              partitions={partitions}
+              filters={filters}
+              disabled={live}
+              // New filters start again from the first page.
+              onChange={(patch) => {
+                setFilters((f) => ({ ...f, ...patch }));
+                setCursors([null]);
+              }}
+            />
+          }
         />
-        <div className="ml-auto flex items-center gap-3">
+        {/* h-8 matches the one-line bar, so these stay centred on it when the editor expands. */}
+        <div className="flex h-8 shrink-0 items-center gap-3">
           {live ? (
             <span data-testid="live-count" className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="relative flex size-2">
@@ -126,15 +152,6 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
         </div>
       </div>
 
-      <QueryBar
-        query={filters.query}
-        onApply={(query) => {
-          setFilters((f) => ({ ...f, query }));
-          setCursors([null]);
-        }}
-        getCatalog={getCatalog}
-        onFocus={() => setSampling(true)}
-      />
       {filters.query && !live && scanned !== null && !messages.isPlaceholderData && (
         <p data-testid="search-status" className="-mt-1 px-1 text-xs text-muted-foreground">
           Searched {formatNumber(scanned)} {scanned === 1 ? "message" : "messages"} for this page
@@ -148,7 +165,7 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
             <span className="font-medium tabular-nums">{checked.size}</span> selected
           </span>
           <Button variant="ghost" size="xs" onClick={() => setChecked(new Map())}>
-            <XIcon /> Clear
+            <HugeiconsIcon icon={Cancel01Icon} /> Clear
           </Button>
           <div className="flex-1" />
           <CopyMessageDialog
@@ -165,8 +182,10 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
         <>
           {tail.error && <ErrorState error={tail.error} onRetry={() => toggleLive(false)} />}
           <MessageTable
+            pinScope={[clusterId, topic]}
             messages={tail.messages}
             onSelect={setSelected}
+            rowAction={rowAction}
             animate
             emptyText={
               filters.query
@@ -182,12 +201,17 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
           {messages.error && <ErrorState error={messages.error} onRetry={() => messages.refetch()} />}
           {/* The table shows even before the first page arrives (or when it fails), just empty. */}
           <MessageTable
+            pinScope={[clusterId, topic]}
             messages={pager.items}
             pager={pager}
             onSelect={setSelected}
+            rowAction={rowAction}
             checked={readOnly ? undefined : checked}
             onCheckedChange={setChecked}
-            emptyText={emptyText(
+            // A filter scan or a big topic's first page can take a while; the overlay covers the wait.
+            loading={messages.isPending || messages.isPlaceholderData || rendering}
+            // The overlay's spinner already says it's loading.
+            emptyText={messages.isPending && !messages.isError ? null : emptyText(
               messages,
               !filters.query
                 ? "No messages in this range."

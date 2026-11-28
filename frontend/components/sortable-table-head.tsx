@@ -1,4 +1,5 @@
-import { ArrowDownIcon, ArrowUpIcon, ChevronsUpDownIcon } from "lucide-react";
+import { ArrowDown02Icon, ArrowUp02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { TableHead } from "@/components/ui/table";
@@ -31,10 +32,10 @@ export function SortableTableHead<K extends string>({
   const direction = sort?.key === column ? sort.direction : null;
   const Icon =
     direction === "asc"
-      ? ArrowUpIcon
+      ? ArrowUp02Icon
       : direction === "desc"
-        ? ArrowDownIcon
-        : ChevronsUpDownIcon;
+        ? ArrowDown02Icon
+        : UnfoldMoreIcon;
   return (
     <TableHead
       aria-sort={
@@ -47,26 +48,29 @@ export function SortableTableHead<K extends string>({
       className={cn(align === "right" && "text-right", className)}
       {...props}
     >
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        className={cn(
-          "group/sort -mx-1 inline-flex items-center gap-1 rounded-sm px-1 py-0.5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-          align === "right" && "flex-row-reverse",
-        )}
-      >
-        {children}
-        <Icon
-          aria-hidden
+      <span className="inline-flex items-center gap-1 align-middle">
+        <button
+          type="button"
+          onClick={() => onSort(column)}
           className={cn(
-            "size-3.5 shrink-0",
-            direction
-              ? "text-foreground"
-              : "text-muted-foreground opacity-40 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100",
+            "group/sort -mx-1 inline-flex items-center gap-1 rounded-sm px-1 py-0.5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+            align === "right" && "flex-row-reverse",
           )}
-        />
-      </button>
-      {info && <span className="ml-1 inline-flex align-middle">{info}</span>}
+        >
+          {children}
+          <HugeiconsIcon
+            icon={Icon}
+            aria-hidden
+            className={cn(
+              "size-3.5 shrink-0",
+              direction
+                ? "text-foreground"
+                : "text-muted-foreground opacity-40 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100",
+            )}
+          />
+        </button>
+        {info}
+      </span>
     </TableHead>
   );
 }

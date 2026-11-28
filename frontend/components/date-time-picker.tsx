@@ -1,5 +1,5 @@
-import { format } from "date-fns";
-import { CalendarClockIcon } from "lucide-react";
+import { Calendar03Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -7,16 +7,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 interface DateTimePickerProps {
   value: Date;
   onChange: (value: Date) => void;
   /** Names the field for screen readers, e.g. "Start". */
   label: string;
+  className?: string;
 }
 
 /**
- * One field for a date and a time (to the second): the button shows both, and
+ * One field for a UTC date and time (to the second): the button shows both, and
  * its popover holds the calendar with the time underneath. Picks are a draft
  * until Done (or Enter in the time field) applies them; Esc or a click outside
  * closes it without changing anything.
@@ -24,27 +27,28 @@ interface DateTimePickerProps {
  * Keyboard: Enter opens it with focus on the calendar (arrow keys move between
  * days, Enter picks one), Tab moves on to the time field and Done.
  */
-export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, label, className }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
   const timeId = useId();
   const [draft, setDraft] = useState(value);
   // The time field is edited segment by segment, and is empty while half typed,
   // so it keeps its own text and only updates the draft with complete times.
-  const [time, setTime] = useState(() => format(value, "HH:mm:ss"));
+  const [time, setTime] = useState(() => utcTime(value));
 
   /** Opening starts a fresh draft from the applied value; closing discards it. */
   function toggle(next: boolean) {
     if (next) {
       setDraft(value);
-      setTime(format(value, "HH:mm:ss"));
+      setTime(utcTime(value));
     }
     setOpen(next);
   }
 
   function pickDay(day: Date | undefined) {
     if (!day) return;
-    const next = new Date(day);
-    next.setHours(draft.getHours(), draft.getMinutes(), draft.getSeconds(), 0);
+    // The calendar runs in UTC, so the picked day's UTC fields are the day the user clicked.
+    const next = new Date(draft);
+    next.setUTCFullYear(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate());
     setDraft(next);
   }
 
@@ -53,7 +57,7 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
     const [hours, minutes, seconds = 0] = text.split(":").map(Number);
     if (text === "" || [hours, minutes, seconds].some(Number.isNaN)) return;
     const next = new Date(draft);
-    next.setHours(hours, minutes, seconds, 0);
+    next.setUTCHours(hours, minutes, seconds, 0);
     setDraft(next);
   }
 
@@ -67,11 +71,11 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="w-56 justify-between font-normal"
-          aria-label={`${label}: ${format(value, "PPP 'at' HH:mm:ss")}`}
+          className={cn("w-56 justify-between font-normal", className)}
+          aria-label={`${label}: ${formatDateTime(value.getTime())}`}
         >
-          <span className="tabular-nums">{format(value, "MMM d, yyyy · HH:mm:ss")}</span>
-          <CalendarClockIcon className="text-muted-foreground" />
+          <span className="tabular-nums">{formatDateTime(value.getTime())}</span>
+          <HugeiconsIcon icon={Calendar03Icon} className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto overflow-hidden p-0" align="start" aria-label={label}>
@@ -80,6 +84,7 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
           selected={draft}
           defaultMonth={draft}
           captionLayout="dropdown"
+          timeZone="UTC"
           onSelect={pickDay}
           autoFocus
         />
@@ -92,7 +97,7 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
         >
           <div className="flex flex-1 flex-col gap-1.5">
             <Label htmlFor={timeId} className="text-xs text-muted-foreground">
-              Time
+              Time (UTC)
             </Label>
             <Input
               id={timeId}
@@ -108,4 +113,8 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
       </PopoverContent>
     </Popover>
   );
+}
+
+function utcTime(date: Date): string {
+  return date.toISOString().slice(11, 19);
 }

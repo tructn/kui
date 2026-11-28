@@ -1,5 +1,12 @@
-import { CornerDownLeftIcon, FilterIcon, Maximize2Icon, Minimize2Icon, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ArrowExpandIcon,
+  ArrowShrinkIcon,
+  ArrowTurnBackwardIcon,
+  Cancel01Icon,
+  FilterIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { InfoList, InfoTip } from "@/components/info-tip";
 import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
@@ -20,6 +27,9 @@ interface QueryBarProps {
   /** The editor was focused: time to sample messages for suggestions. */
   onFocus?: () => void;
   disabled?: boolean;
+  /** Controls shown inside the bar, before the filter (e.g. partition and start). */
+  leading?: ReactNode;
+  className?: string;
 }
 
 /**
@@ -27,7 +37,7 @@ interface QueryBarProps {
  * Toggles between a one-line bar and a multi-line editor, where Enter adds a
  * line and Mod-Enter runs.
  */
-export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: QueryBarProps) {
+export function QueryBar({ query, onApply, getCatalog, onFocus, disabled, leading, className }: QueryBarProps) {
   const [expanded, setExpanded] = useViewState("messages.queryEditorExpanded", false);
   const shown = (q: string | null) => (expanded ? (q ?? "") : flattenQuery(q ?? ""));
   const [draft, setDraft] = useState(shown(query));
@@ -80,7 +90,7 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
             if (applied) onApply(null);
           }}
         >
-          <XIcon />
+          <HugeiconsIcon icon={Cancel01Icon} />
         </Button>
       )}
       <Button
@@ -91,11 +101,11 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
         title={expanded ? "Collapse to one line" : "Open the multi-line editor"}
         onClick={() => setExpanded((e) => !e)}
       >
-        {expanded ? <Minimize2Icon /> : <Maximize2Icon />}
+        {expanded ? <HugeiconsIcon icon={ArrowShrinkIcon} /> : <HugeiconsIcon icon={ArrowExpandIcon} />}
       </Button>
       <Button variant={pending ? "default" : "ghost"} size="xs" disabled={disabled || !pending || invalid} onClick={() => apply()}>
         Apply {expanded ? <span className="opacity-70">{MOD_KEY}</span> : null}
-        <CornerDownLeftIcon className="size-3" />
+        <HugeiconsIcon icon={ArrowTurnBackwardIcon} className="size-3" />
       </Button>
     </div>
   );
@@ -105,12 +115,21 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
     invalid && "border-destructive focus-within:border-destructive focus-within:ring-destructive/20",
     applied && !pending && !invalid && "border-primary/40",
   );
-  const filterIcon = <FilterIcon className={cn("size-3.5 shrink-0", applied ? "text-primary" : "text-muted-foreground")} />;
+  const filterIcon = (
+    <HugeiconsIcon
+      icon={FilterIcon}
+      className={cn("size-3.5 shrink-0", applied ? "text-primary" : "text-muted-foreground")}
+    />
+  );
+
+  const divider = leading && <span aria-hidden className="mx-2 h-4 w-px shrink-0 bg-border" />;
 
   if (!expanded) {
     return (
-      <div className="flex flex-col gap-1">
-        <div className={cn(frame, "flex min-h-8 items-center pl-2.5 pr-1")}>
+      <div className={cn("flex min-w-0 flex-col gap-1", className)}>
+        <div className={cn(frame, "flex min-h-8 items-center pr-1", leading ? "pl-1" : "pl-2.5")}>
+          {leading}
+          {divider}
           {filterIcon}
           {editor}
           {actions}
@@ -125,8 +144,10 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
   }
 
   return (
-    <div className={cn(frame, "flex flex-col overflow-hidden")}>
-      <div className="flex h-9 items-center gap-2 border-b bg-muted/40 pl-2.5 pr-1">
+    <div className={cn(frame, "flex min-w-0 flex-col overflow-hidden", className)}>
+      <div className={cn("flex h-9 items-center gap-2 border-b bg-muted/40 pr-1", leading ? "pl-1" : "pl-2.5")}>
+        {leading}
+        {leading && <span aria-hidden className="h-4 w-px shrink-0 bg-border" />}
         {filterIcon}
         <span className="text-xs font-medium">Filter</span>
         <span className="rounded border px-1 font-mono text-[10.5px] text-muted-foreground">WHERE</span>

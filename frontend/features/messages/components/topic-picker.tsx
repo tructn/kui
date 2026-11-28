@@ -1,4 +1,5 @@
-import { ChevronsUpDownIcon } from "lucide-react";
+import { UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export function TopicPicker({ id, value, options, currentTopic, onChange }: Topi
           }}
         >
           <span className="truncate">{value}</span>
-          <ChevronsUpDownIcon className="text-muted-foreground" />
+          <HugeiconsIcon icon={UnfoldMoreIcon} className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent

@@ -7,11 +7,13 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <title>KUI</title>
     <script>
-      // Match the splash to the last theme before any CSS or JS bundle loads.
+      // Match the splash to the last theme and accent before any CSS or JS bundle loads.
       try {
         var theme = localStorage.getItem("kui-splash-theme");
         var dark = theme === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : theme !== "light";
         if (!dark) document.documentElement.classList.remove("dark");
+        var accent = localStorage.getItem("kui-splash-accent");
+        if (accent) document.documentElement.style.setProperty("--splash-accent", accent);
       } catch {}
     </script>
     <!--
@@ -50,7 +52,7 @@
         width: 40%;
         height: 100%;
         border-radius: 3px;
-        background: #f43f5e;
+        background: var(--splash-accent, oklch(0.606 0.25 292.717));
         animation: splash-bar 1.1s ease-in-out infinite;
       }
       @keyframes splash-bar {

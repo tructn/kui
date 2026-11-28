@@ -1,16 +1,29 @@
 /**
  * Accent colors. A preset's real light/dark values live in `index.css` per
- * `data-accent`; `swatch` is only for drawing the picker. Anything else is a
- * custom `#rrggbb` color picked by the user, applied as inline CSS variables.
+ * `data-accent`; `swatch` is only for drawing the picker, as a CSS `background`.
+ * Anything else is a custom `#rrggbb` color picked by the user, applied as
+ * inline CSS variables.
  */
 export const ACCENTS = {
-  violet: { label: "Violet", swatch: "oklch(0.606 0.25 292.717)" },
+  aurora: {
+    label: "Aurora",
+    swatch: "linear-gradient(135deg, oklch(0.702 0.183 293.541), oklch(0.718 0.202 349.761))",
+  },
+  sunset: {
+    label: "Sunset",
+    swatch: "linear-gradient(135deg, oklch(0.828 0.189 84.429), oklch(0.712 0.194 13.428))",
+  },
+  ocean: {
+    label: "Ocean",
+    swatch: "linear-gradient(135deg, oklch(0.707 0.165 254.624), oklch(0.777 0.152 181.912))",
+  },
+  violet: { label: "Violet", swatch: "oklch(0.702 0.183 293.541)" },
   amber: { label: "Amber", swatch: "oklch(0.769 0.188 70.08)" },
-  rose: { label: "Rose", swatch: "oklch(0.645 0.246 16.439)" },
-  orange: { label: "Orange", swatch: "oklch(0.646 0.222 41.116)" },
-  green: { label: "Green", swatch: "oklch(0.627 0.194 149.214)" },
-  teal: { label: "Teal", swatch: "oklch(0.6 0.118 184.704)" },
-  blue: { label: "Blue", swatch: "oklch(0.623 0.214 259.815)" },
+  rose: { label: "Rose", swatch: "oklch(0.712 0.194 13.428)" },
+  orange: { label: "Orange", swatch: "oklch(0.705 0.213 47.604)" },
+  green: { label: "Green", swatch: "oklch(0.723 0.219 149.579)" },
+  teal: { label: "Teal", swatch: "oklch(0.704 0.14 182.503)" },
+  blue: { label: "Blue", swatch: "oklch(0.707 0.165 254.624)" },
   neutral: { label: "Neutral", swatch: "oklch(0.556 0 0)" },
 } as const;
 
@@ -63,4 +76,9 @@ export function applyAccent(root: HTMLElement, accent: Accent) {
     root.style.removeProperty("--brand");
     root.style.removeProperty("--brand-foreground");
   }
+}
+
+/** The glossy, folded "ribbon" finish on accent fills; see `[data-ribbon]` in `index.css`. */
+export function applyRibbon(root: HTMLElement, ribbon: boolean) {
+  root.toggleAttribute("data-ribbon", ribbon);
 }

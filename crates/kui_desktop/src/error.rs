@@ -26,6 +26,16 @@ impl From<kui_kafka::Error> for Error {
     }
 }
 
+impl From<kui_actions::Error> for Error {
+    fn from(e: kui_actions::Error) -> Self {
+        match e {
+            kui_actions::Error::Kafka(e) => e.into(),
+            kui_actions::Error::Io(e) => Error::Io(e),
+            kui_actions::Error::Msg(m) => Error::Msg(m),
+        }
+    }
+}
+
 impl Error {
     pub fn msg(m: impl Into<String>) -> Self {
         Error::Msg(m.into())

@@ -13,6 +13,10 @@ thiserror = "2"
 rdkafka = "0.39"
 kui_mql = { path = "crates/kui_mql" }
 kui_kafka = { path = "crates/kui_kafka" }
+kui_actions = { path = "crates/kui_actions" }
+# No default features: each crate picks its own, and rustls gets its crypto provider explicitly.
+reqwest = { version = "0.13", default-features = false }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

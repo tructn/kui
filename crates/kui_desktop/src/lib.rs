@@ -12,6 +12,7 @@ mod settings;
 mod state;
 mod tasks;
 mod updates;
+mod window_size;
 
 #[cfg(test)]
 mod integration_tests;
@@ -20,7 +21,7 @@ mod security_tests;
 
 use tauri::Manager;
 
-use features::{brokers, clusters, consumer_groups, generator, messages, topics};
+use features::{actions, brokers, clusters, consumer_groups, generator, messages, topics};
 use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -37,9 +38,11 @@ pub fn run() {
             )?;
             app.manage(AppState::new(store));
             app.manage(settings::SettingsStore::load(config_dir.join("settings.json"))?);
+            app.manage(actions::ActionsState::new(actions::store::ActionStore::load(config_dir.join("actions.json"))?));
             // The version comes from package.json (via tauri.conf.json), so the title never drifts.
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title(&format!("KUI v{}", app.package_info().version))?;
+                window_size::fit_to_monitor(&window, (960.0, 600.0));
             }
             Ok(())
         })
@@ -74,6 +77,19 @@ pub fn run() {
             consumer_groups::commands::delete_consumer_group,
             consumer_groups::commands::preview_offset_reset,
             consumer_groups::commands::reset_consumer_group_offsets,
+            actions::commands::list_actions,
+            actions::commands::save_action,
+            actions::commands::delete_action,
+            actions::commands::import_actions,
+            actions::commands::export_actions,
+            actions::commands::action_statuses,
+            actions::commands::start_action,
+            actions::commands::send_to_action,
+            actions::commands::stop_action,
+            actions::commands::action_history,
+            actions::commands::action_execution,
+            actions::commands::clear_action_history,
+            actions::commands::check_lambda_endpoint,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,5 @@
-import { ForwardIcon } from "lucide-react";
+import { ArrowTurnForwardIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -83,7 +84,8 @@ export function CopyMessageDialog({ clusterId, topic, messages, targets, onCopie
     >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <ForwardIcon /> {single ? "Copy to topic" : `Copy ${messages.length} to topic`}
+          <HugeiconsIcon icon={ArrowTurnForwardIcon} />
+          {single ? "Copy to topic" : `Copy ${messages.length} to topic`}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
@@ -129,7 +131,7 @@ export function CopyMessageDialog({ clusterId, topic, messages, targets, onCopie
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={copy.isPending}>
-              {copy.isPending ? <Spinner /> : <ForwardIcon />}
+              {copy.isPending ? <Spinner /> : <HugeiconsIcon icon={ArrowTurnForwardIcon} />}
               {targetTopic === topic ? "Duplicate" : "Copy"}
             </Button>
           </DialogFooter>

@@ -1,4 +1,5 @@
-import { RotateCwIcon } from "lucide-react";
+import { ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { emptyText, ErrorState } from "@/components/query-states";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ export function TopicConsumers({ clusterId, topic }: { clusterId: string; topic:
       <div className="flex items-center justify-between gap-2">
         <ProgressLegend />
         <Button variant="ghost" size="icon-sm" aria-label="Refresh consumers" onClick={() => consumers.refetch()}>
-          <RotateCwIcon className={consumers.isFetching ? "animate-spin" : undefined} />
+          <HugeiconsIcon icon={ReloadIcon} className={consumers.isFetching ? "animate-spin" : undefined} />
         </Button>
       </div>
       {consumers.error && <ErrorState error={consumers.error} onRetry={() => consumers.refetch()} />}
@@ -29,6 +30,7 @@ export function TopicConsumers({ clusterId, topic }: { clusterId: string; topic:
       {consumers.data?.map((c) => (
         <ProgressSection
           key={c.group}
+          pinScope={[clusterId, c.group, topic]}
           title={c.group}
           progress={c.progress}
           offsets={c.offsets}

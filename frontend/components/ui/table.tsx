@@ -1,10 +1,13 @@
 "use client"
 
 import * as React from "react"
+import { Pin02Icon, PinOffIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import type { ColumnResize } from "@/hooks/use-column-resize"
+import { pinnedColumnsCss } from "@/lib/column-widths"
 import { cn } from "@/lib/utils"
 
-/** Set by a `<Table resize>`: its headers get drag handles, its cells truncate. */
+/** Set by a `<Table resize>`: its headers get drag handles and pin buttons, its cells truncate. */
 const ColumnResizeContext = React.createContext<ColumnResize | null>(null)
 
 function Table({
@@ -15,14 +18,18 @@ function Table({
   ...props
 }: React.ComponentProps<"table"> & { resize?: ColumnResize }) {
   const widths = resize?.widths
+  const pinScope = React.useId()
+  const pinned = widths && resize.pinnedCount > 0 ? resize.pinnedCount : 0
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
+      {pinned > 0 && widths && <style>{pinnedColumnsCss(pinScope, widths, pinned)}</style>}
       <ColumnResizeContext.Provider value={resize ?? null}>
         <table
           data-slot="table"
+          data-pin-scope={pinned > 0 ? pinScope : undefined}
           // Fixed widths need fixed layout. The table is as wide as its columns
           // (the frame scrolls sideways when that's wider than it) but never
           // narrower than the frame. Header and body cells share these columns.
@@ -54,7 +61,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
       // borders, and a collapsed border stays behind when the header sticks,
       // so the header's bottom line is an inset shadow on the cells instead.
       className={cn(
-        "sticky top-0 z-10 bg-background [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0 [&_tr]:hover:bg-transparent",
+        "sticky top-0 z-10 bg-background [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0 [&_tr]:hover:[--row-tint:transparent]",
         className
       )}
       {...props}
@@ -85,48 +92,110 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   )
 }
 
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+/**
+ * The row's background is the `--row-tint` variable, not a `bg-*` class, so
+ * pinned cells (see `pinnedColumnsCss`) can paint the same tint over an opaque
+ * background. Restyle a row by setting that variable rather than its background.
+ */
+function TableRow({ className, children, ...props }: React.ComponentProps<"tr">) {
+  const order = React.useContext(ColumnResizeContext)?.order
   return (
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors even:bg-muted/40 hover:bg-muted has-aria-expanded:bg-muted data-[state=selected]:bg-muted",
+        "border-b bg-(--row-tint) [--row-tint:transparent] even:[--row-tint:var(--color-row-stripe)] hover:[--row-tint:var(--color-muted)] has-aria-expanded:[--row-tint:var(--color-muted)] data-[state=selected]:[--row-tint:var(--color-muted)]",
         className
       )}
       {...props}
-    />
+    >
+      {order ? inDisplayOrder(children, order) : children}
+    </tr>
   )
 }
 
-function TableHead({ className, children, ...props }: React.ComponentProps<"th">) {
+/**
+ * Cells moved so pinned columns come first (see `useColumnResize`). Rows that
+ * don't have one cell per column, like a single `colSpan` cell, stay as they are.
+ */
+function inDisplayOrder(children: React.ReactNode, order: readonly number[]): React.ReactNode {
+  const cells = React.Children.toArray(children)
+  return cells.length === order.length ? order.map((column) => cells[column]) : children
+}
+
+/**
+ * `pinnable={false}` leaves out the pin button, for narrow control columns
+ * (checkboxes, expand toggles) where it doesn't fit.
+ */
+function TableHead({
+  className,
+  children,
+  pinnable = true,
+  ...props
+}: React.ComponentProps<"th"> & { pinnable?: boolean }) {
   const resize = React.useContext(ColumnResizeContext)
+  const ref = React.useRef<HTMLTableCellElement>(null)
+  // Read from the DOM: columns are often rendered conditionally, so only the
+  // row knows where this cell ended up.
+  const [column, setColumn] = React.useState(-1)
+  React.useLayoutEffect(() => {
+    const index = ref.current?.cellIndex ?? -1
+    if (index !== column) setColumn(index)
+  })
+  const showPin = resize != null && pinnable
+  // `column` is the display slot; pinned columns fill the first ones.
+  const pinned = showPin && column >= 0 && column < resize.pinnedCount
   return (
     <th
       data-slot="table-head"
       className={cn(
         "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
-        resize && "relative",
+        resize && "group/head relative",
         resize?.widths && "overflow-hidden text-ellipsis",
-        className
+        className,
+        pinned && "pr-8"
       )}
       {...props}
+      ref={ref}
     >
       {children}
+      {showPin && <ColumnPinButton resize={resize} pinned={pinned} />}
       {resize && <ColumnResizeHandle resize={resize} />}
     </th>
   )
 }
 
+/** Shown on hover or focus, and always while the column is pinned. */
+function ColumnPinButton({ resize, pinned }: { resize: ColumnResize; pinned: boolean }) {
+  const label = pinned ? "Unpin column" : "Pin column, so it stays in view when scrolling sideways"
+  return (
+    <button
+      type="button"
+      aria-pressed={pinned}
+      aria-label={label}
+      title={pinned ? "Unpin column" : "Pin column"}
+      onClick={(event) => resize.togglePin(event.currentTarget)}
+      className={cn(
+        "group/pin absolute top-1/2 right-2.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm bg-background text-muted-foreground outline-none hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring",
+        pinned ? "text-foreground" : "opacity-0 group-hover/head:opacity-100"
+      )}
+    >
+      <HugeiconsIcon icon={Pin02Icon} className={cn("size-3.5", pinned && "group-hover/pin:hidden")} />
+      {pinned && <HugeiconsIcon icon={PinOffIcon} className="hidden size-3.5 group-hover/pin:block" />}
+    </button>
+  )
+}
+
 /**
  * On the column's right edge: drag it (or press ← / → when focused) to resize
- * that column (see `useColumnResize`). Double-click resets the whole table.
+ * that column (see `useColumnResize`). Double-click resets the whole table,
+ * pins included.
  */
 function ColumnResizeHandle({ resize }: { resize: ColumnResize }) {
   return (
     <span
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize column. Double-click to reset all columns."
+      aria-label="Resize column. Double-click to reset all column widths and pins."
       title="Drag to resize. Double-click to reset."
       tabIndex={0}
       onPointerDown={resize.onPointerDown}
@@ -168,7 +237,7 @@ function TableStateRow({
   children: React.ReactNode
 }) {
   return (
-    <tr data-slot="table-row" className="hover:bg-transparent">
+    <tr data-slot="table-row" className="hover:[--row-tint:transparent]">
       <td colSpan={colSpan} className="p-0">
         <div
           className={cn(

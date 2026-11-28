@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { PartitionLabel } from "@/components/partition-head";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { TableFrame } from "@/components/table-frame";
@@ -22,16 +23,27 @@ const COLUMNS: SortColumns<Partition, "id" | "leader" | "replicas" | "isr" | "lo
 };
 
 /** `emptyText` replaces "No partitions." while the topic is loading or failed. */
-export function PartitionsTable({ partitions, emptyText }: { partitions: Partition[]; emptyText?: ReactNode }) {
+export function PartitionsTable({
+  partitions,
+  emptyText,
+  pinScope,
+}: {
+  partitions: Partition[];
+  emptyText?: ReactNode;
+  /** Names the topic, so its pinned columns are its own (see `useColumnResize`). */
+  pinScope: readonly string[];
+}) {
   const sorter = useSort("topic-partitions", partitions, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("partitions", 7);
+  const resize = useColumnResize("partitions", 7, pinScope);
   return (
     <TableFrame pager={pager}>
       <Table resize={resize}>
         <TableHeader>
           <TableRow>
-            <SortableTableHead column="id" sort={sorter.sort} onSort={sorter.toggle} className="w-24">Partition</SortableTableHead>
+            <SortableTableHead column="id" sort={sorter.sort} onSort={sorter.toggle} className="w-12">
+              <PartitionLabel />
+            </SortableTableHead>
             <SortableTableHead column="leader" sort={sorter.sort} onSort={sorter.toggle} className="w-24">Leader</SortableTableHead>
             <SortableTableHead column="replicas" sort={sorter.sort} onSort={sorter.toggle}>Replicas</SortableTableHead>
             <SortableTableHead column="isr" sort={sorter.sort} onSort={sorter.toggle}>In-sync</SortableTableHead>
@@ -40,7 +52,7 @@ export function PartitionsTable({ partitions, emptyText }: { partitions: Partiti
             <SortableTableHead column="messages" sort={sorter.sort} onSort={sorter.toggle} align="right">Messages</SortableTableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className="font-mono text-xs tabular-nums">
+        <TableBody className="font-mono text-code tabular-nums">
           {pager.items.map((p) => {
             const underReplicated = p.isr.length < p.replicas.length;
             return (

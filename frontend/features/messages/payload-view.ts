@@ -1,6 +1,6 @@
 import { formatBytes, prettyJson } from "@/lib/format";
 
-import { parseTree } from "./json-tree";
+import { parseTree } from "@/lib/json-tree";
 import type { Payload } from "./types";
 
 /** How the message panel shows a payload's bytes. */

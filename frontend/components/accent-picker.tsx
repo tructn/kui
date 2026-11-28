@@ -1,4 +1,5 @@
-import { PipetteIcon } from "lucide-react";
+import { ColorPickerIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { HexColorInput, HexColorPicker } from "react-colorful";
 import { useEffect, useRef, useState } from "react";
 import { ToggleGroup } from "radix-ui";
@@ -54,7 +55,7 @@ function Swatch({ value, label, color }: { value: string; label: string; color: 
         <ToggleGroup.Item
           value={value}
           aria-label={label}
-          style={{ backgroundColor: color }}
+          style={{ background: color }}
           className={cn(SWATCH, SELECTED, "focus-visible:ring-2 focus-visible:ring-ring/50")}
         />
       </TooltipTrigger>
@@ -93,7 +94,7 @@ function CustomSwatch({ value, onChange }: { value: string | null; onChange: (he
               className={cn(SWATCH, SELECTED, "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/50", !value && RAINBOW)}
               style={value ? { backgroundColor: value } : undefined}
             >
-              {!value && <PipetteIcon className="size-3 text-white drop-shadow" />}
+              {!value && <HugeiconsIcon icon={ColorPickerIcon} className="size-3 text-white drop-shadow" />}
             </button>
           </PopoverTrigger>
         </TooltipTrigger>

@@ -1,4 +1,5 @@
-import { CircleAlertIcon, RotateCwIcon } from "lucide-react";
+import { AlertCircleIcon, ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -34,13 +35,13 @@ interface ErrorStateProps {
 export function ErrorState({ error, onRetry }: ErrorStateProps) {
   return (
     <Alert variant="destructive">
-      <CircleAlertIcon />
+      <HugeiconsIcon icon={AlertCircleIcon} />
       <AlertTitle>Request failed</AlertTitle>
       <AlertDescription>
-        <p className="font-mono text-xs break-all">{error.message}</p>
+        <p className="font-mono text-code break-all">{error.message}</p>
         {onRetry && (
           <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-            <RotateCwIcon /> Retry
+            <HugeiconsIcon icon={ReloadIcon} /> Retry
           </Button>
         )}
       </AlertDescription>

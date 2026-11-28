@@ -1,4 +1,5 @@
-import { SendIcon } from "lucide-react";
+import { SentIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -60,7 +61,7 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <SendIcon /> Produce
+          <HugeiconsIcon icon={SentIcon} /> Produce
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
@@ -117,7 +118,7 @@ export function ProduceDialog({ clusterId, topic, partitions }: ProduceDialogPro
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={produce.isPending}>
-              {produce.isPending ? <Spinner /> : <SendIcon />} Send
+              {produce.isPending ? <Spinner /> : <HugeiconsIcon icon={SentIcon} />} Send
             </Button>
           </DialogFooter>
         </form>

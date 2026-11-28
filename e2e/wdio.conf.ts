@@ -1,7 +1,32 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import net from "node:net";
+import { closeSync, mkdirSync, openSync, readSync } from "node:fs";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+
+import { waitForPort } from "./ports.js";
+
+// Headed runs only (`make e2e-headed`): a pause after every WebDriver command so the run can be
+// followed, and the file name of the last spec, whose app stays open until Enter is pressed.
+const SLOWMO_MS = Math.max(0, Number(process.env.E2E_SLOWMO) || 0);
+const HOLD_SPEC = process.env.E2E_HOLD_SPEC;
+
+// Workers get the launcher's stdin, but wdio may read it too, so ask the terminal directly.
+// Without one (CI, `docker compose run -T`) there is nobody to press Enter, so don't wait.
+function waitForEnter(): void {
+  let tty: number;
+  try {
+    tty = openSync("/dev/tty", "r");
+  } catch {
+    return;
+  }
+  console.log("▶ Holding the app open for the VNC viewer. Press Enter here to close it.");
+  const byte = Buffer.alloc(1);
+  try {
+    while (readSync(tty, byte) === 1 && byte[0] !== 0x0a);
+  } finally {
+    closeSync(tty);
+  }
+}
 
 /**
  * Drives the real KUI binary through tauri-driver (WebDriver for Tauri).
@@ -39,10 +64,18 @@ export const config: WebdriverIO.Config = {
     tauriDriver = spawn("tauri-driver", ["--port", String(DRIVER_PORT)], {
       stdio: ["ignore", "inherit", "inherit"],
     });
-    await waitForPort(DRIVER_PORT);
+    await waitForPort(DRIVER_PORT, "tauri-driver");
   },
   afterSession: () => {
     tauriDriver?.kill();
+  },
+
+  afterCommand: async () => {
+    if (SLOWMO_MS > 0) await sleep(SLOWMO_MS);
+  },
+  // Runs before the session ends, while the app window is still open.
+  after: (_result, _capabilities, specs) => {
+    if (HOLD_SPEC && specs.some((spec) => path.basename(spec) === HOLD_SPEC)) waitForEnter();
   },
 
   afterTest: async (test, _context, { passed }) => {
@@ -52,20 +85,3 @@ export const config: WebdriverIO.Config = {
     await browser.saveScreenshot(path.join(ARTIFACTS, `${name}.png`));
   },
 };
-
-function waitForPort(port: number, timeoutMs = 10_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const attempt = () => {
-      const socket = net.connect(port, "127.0.0.1", () => {
-        socket.end();
-        resolve();
-      });
-      socket.on("error", () => {
-        if (Date.now() > deadline) reject(new Error(`tauri-driver did not start on port ${port}`));
-        else setTimeout(attempt, 100);
-      });
-    };
-    attempt();
-  });
-}

@@ -30,12 +30,15 @@ const COLUMNS: SortColumns<
 /** Where a group stands on each partition of one topic: consumed and remaining messages. */
 export function PartitionOffsetsTable({
   offsets,
+  pinScope,
 }: {
   offsets: PartitionOffset[];
+  /** Names the group and topic, so their pinned columns are their own (see `useColumnResize`). */
+  pinScope: readonly string[];
 }) {
   const sorter = useSort("partition-offsets", offsets, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("partition-offsets", 5);
+  const resize = useColumnResize("partition-offsets", 5, pinScope);
   return (
     // Sits inside a bordered section, so no border of its own.
     <TableFrame pager={pager} fill={false} className="rounded-none border-0">
@@ -77,7 +80,7 @@ export function PartitionOffsetsTable({
             </SortableTableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className="font-mono text-xs tabular-nums">
+        <TableBody className="font-mono text-code tabular-nums">
           {pager.items.map((o) => {
             const segments = partitionSegments(o);
             return (

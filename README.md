@@ -6,7 +6,8 @@
 
 <p align="center">
   <strong>Kafka, without the terminal.</strong><br />
-  A fast, free desktop app to browse topics, read and send messages, and keep an eye on your consumers.
+  A fast, free desktop app to browse topics, read and send messages, keep an eye on your consumers,<br />
+  and run your own code on every message.
 </p>
 
 <p align="center">
@@ -25,7 +26,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/01_topics.png" alt="KUI showing the topics of a Kafka cluster" width="820" />
+  <img src="docs/screenshots/02_messages.png" alt="KUI browsing the messages of a Kafka topic" width="820" />
 </p>
 
 ## Why KUI
@@ -53,17 +54,31 @@ delete topics.
 
 ### Read and filter messages
 
-<img src="docs/screenshots/02_messages.png" alt="A topic's messages filtered with a query in the expanded editor" width="820" />
-
 <img src="docs/screenshots/02_messages_ql.png" alt="Query suggestions listing key values as you type a filter" width="820" />
 
 Browse from the newest or oldest message, or watch new ones arrive live. Filter with SQL-like queries such as
-`value.status = 'shipped'`, with suggestions as you type (see the [query guide](crates/kui_mql/README.md)).
-Export to JSON or CSV, or copy messages to another topic.
+`value.status = 'shipped'`, with suggestions as you type (see the [query guide](crates/kui_mql/README.md)), and
+pick partitions and a starting point right in the query bar. Times are shown in UTC. Export to JSON or CSV, or
+copy messages to another topic.
 
 ### Send messages and generate test data
 
-Send a message with its own key and headers, or fill a topic with generated test data.
+<img src="docs/screenshots/06_generator.png" alt="The generator offering the topic's message shapes as templates" width="820" />
+
+Send a message with its own key and headers, or fill a topic with generated test data. The generator reads the
+messages already in a topic and offers their shapes as templates, so test data looks like the real thing.
+
+### Run your own code on every message
+
+<img src="docs/screenshots/05_actions.png" alt="A running action with its executions, the handler's response and its settings" width="820" />
+
+<img src="docs/screenshots/05_actions_new.png" alt="Creating an action that sends messages to a local Lambda in the Lambda Test Tool" width="820" />
+
+Actions hand Kafka messages to code running on your machine: a local AWS Lambda (through the Lambda Test Tool,
+so you can stop on breakpoints) or any HTTP endpoint. Each run shows the request, the response and any error next
+to the message that caused it, and you can send a single message to an action from the messages table. Actions
+can be exported and imported as files to share with your team. See the [Lambda](examples/order-lambda/README.md)
+and [HTTP](examples/order-api/README.md) examples to try it.
 
 ### Know which consumers are falling behind
 
@@ -75,7 +90,9 @@ See how far behind each consumer group is, and reset its offsets when it needs a
 
 <img src="docs/screenshots/04_settings.png" alt="The Settings window" width="820" />
 
-Light or dark theme, your own fonts, and automatic update checks.
+Light or dark theme, an accent color with an optional glossy finish, your own fonts, and automatic update
+checks. Sharing your screen or recording a demo? Turn on privacy mode to hide cluster names and replace broker
+addresses with made-up ones.
 
 ## Install
 

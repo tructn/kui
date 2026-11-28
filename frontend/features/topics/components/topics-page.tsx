@@ -1,4 +1,12 @@
-import { RegexIcon, RotateCwIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import {
+  Cancel01Icon,
+  Delete02Icon,
+  RegexIcon,
+  ReloadIcon,
+  Search01Icon,
+  ServerCogIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 
 import { useClusterId, useNavigation } from "@/app/stores/navigation-store";
@@ -10,8 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
@@ -53,7 +59,7 @@ export function TopicsPage() {
 
   const sorter = useSort("topics", visible, COLUMNS);
   const pager = usePagination(sorter.rows, `${search}|${regex}|${showInternal}|${sorter.key}`);
-  const resize = useColumnResize("topics", 6);
+  const resize = useColumnResize("topics", 6, [clusterId]);
   const rowProps = useRowNavigation(pager.items.length);
 
   // Only topics matching the filter count as selected, so a filter can't hide
@@ -91,7 +97,7 @@ export function TopicsPage() {
         actions={
           <>
             <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => topics.refetch()}>
-              <RotateCwIcon className={topics.isFetching ? "animate-spin" : undefined} />
+              <HugeiconsIcon icon={ReloadIcon} className={topics.isFetching ? "animate-spin" : undefined} />
             </Button>
             <CreateTopicDialog clusterId={clusterId} onCreated={openTopic} />
           </>
@@ -102,7 +108,7 @@ export function TopicsPage() {
           <div className="flex w-full max-w-sm flex-col gap-1">
             <InputGroup>
               <InputGroupAddon>
-                <SearchIcon />
+                <HugeiconsIcon icon={Search01Icon} />
               </InputGroupAddon>
               <InputGroupInput
                 placeholder={regex ? "Filter topics by regex" : "Filter topics"}
@@ -122,10 +128,24 @@ export function TopicsPage() {
                       aria-pressed={regex}
                       onClick={() => setRegex(!regex)}
                     >
-                      <RegexIcon />
+                      <HugeiconsIcon icon={RegexIcon} />
                     </InputGroupButton>
                   </TooltipTrigger>
                   <TooltipContent>Use regular expression</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InputGroupButton
+                      size="icon-xs"
+                      variant={showInternal ? "secondary" : "ghost"}
+                      aria-label="Show internal"
+                      aria-pressed={showInternal}
+                      onClick={() => setShowInternal(!showInternal)}
+                    >
+                      <HugeiconsIcon icon={ServerCogIcon} />
+                    </InputGroupButton>
+                  </TooltipTrigger>
+                  <TooltipContent>Show internal</TooltipContent>
                 </Tooltip>
               </InputGroupAddon>
             </InputGroup>
@@ -135,10 +155,6 @@ export function TopicsPage() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Switch id="show-internal" checked={showInternal} onCheckedChange={setShowInternal} />
-            <Label htmlFor="show-internal">Show internal</Label>
-          </div>
         </div>
 
         {selected.length > 0 && (
@@ -147,22 +163,25 @@ export function TopicsPage() {
               <span className="font-medium tabular-nums">{selected.length}</span> selected
             </span>
             <Button variant="ghost" size="xs" onClick={() => setChecked(new Set())}>
-              <XIcon /> Clear
+              <HugeiconsIcon icon={Cancel01Icon} /> Clear
             </Button>
             <div className="flex-1" />
             <Button variant="destructive" size="sm" onClick={() => setConfirmOpen(true)}>
-              <Trash2Icon /> Delete {selected.length} {selected.length === 1 ? "topic" : "topics"}
+              <HugeiconsIcon icon={Delete02Icon} />
+              Delete {selected.length} {selected.length === 1 ? "topic" : "topics"}
             </Button>
           </div>
         )}
 
         {topics.error && <ErrorState error={topics.error} onRetry={() => topics.refetch()} />}
-        <TableFrame pager={pager}>
+        {/* The first load already shows "Loading…" in the empty table; this covers refreshes of shown rows. */}
+        <TableFrame pager={pager} busy={topics.isFetching && !topics.isPending}>
           <Table resize={resize} aria-label="Topics. Use the arrow keys to move between rows and Enter to open one.">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
+                <TableHead pinnable={false} className="w-10 px-0">
                   <Checkbox
+                    className="mx-auto"
                     aria-label="Select all topics on this page"
                     disabled={pageSelectable.length === 0}
                     checked={allSelected ? true : pageSelected > 0 ? "indeterminate" : false}
@@ -181,7 +200,7 @@ export function TopicsPage() {
                 <SortableTableHead column="messages" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-36">
                   Messages
                 </SortableTableHead>
-                <TableHead className="w-12" />
+                <TableHead pinnable={false} className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -191,9 +210,10 @@ export function TopicsPage() {
                   {...rowProps(i, () => openTopic(t.name))}
                   data-state={checked.has(t.name) ? "selected" : undefined}
                 >
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="px-0" onClick={(e) => e.stopPropagation()}>
                     {!t.internal && (
                       <Checkbox
+                        className="mx-auto"
                         aria-label={`Select ${t.name}`}
                         checked={checked.has(t.name)}
                         onCheckedChange={(on) => toggle(t.name, on === true)}
@@ -225,7 +245,7 @@ export function TopicsPage() {
                             aria-label={`Delete ${t.name}`}
                             className="text-muted-foreground hover:text-destructive"
                           >
-                            <Trash2Icon />
+                            <HugeiconsIcon icon={Delete02Icon} />
                           </Button>
                         }
                       />

@@ -1,4 +1,5 @@
-import { ListTreeIcon } from "lucide-react";
+import { InsertColumnRightIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 import { create } from "zustand";
 
@@ -78,7 +79,7 @@ function TopicResults({ onSelect }: { onSelect: (topic: string) => void }) {
           <CommandGroup heading="Topics">
             {shown.map((t) => (
               <CommandItem key={t.name} value={t.name} onSelect={onSelect}>
-                <ListTreeIcon />
+                <HugeiconsIcon icon={InsertColumnRightIcon} />
                 <span className="min-w-0 truncate font-mono">{t.name}</span>
                 {t.internal && <Badge variant="outline">internal</Badge>}
                 {/* A shortcut slot hides CommandItem's trailing check icon, which would otherwise split the ml-auto space. */}
