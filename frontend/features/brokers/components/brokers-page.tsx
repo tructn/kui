@@ -15,7 +15,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination } from "@/hooks/use-pagination";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
 import { formatNumber } from "@/lib/format";
-import { MASK, maskAddress } from "@/lib/mask";
+import { maskAddress, maskPort } from "@/lib/mask";
 
 import { useClusterOverview } from "../queries";
 import type { Broker } from "../types";
@@ -92,7 +92,7 @@ export function BrokersPage() {
                 <TableRow key={b.id}>
                   <TableCell>{b.id}</TableCell>
                   <TableCell>{maskAddress(b.host, maskServers)}</TableCell>
-                  <TableCell>{maskServers ? MASK : b.port}</TableCell>
+                  <TableCell>{maskPort(b.port, maskServers)}</TableCell>
                   <TableCell className="text-right">{formatNumber(b.leaderPartitions)}</TableCell>
                   <TableCell className="text-right">{formatNumber(b.replicaPartitions)}</TableCell>
                 </TableRow>
