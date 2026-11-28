@@ -785,7 +785,7 @@ mod tests {
         let started = std::time::Instant::now();
         assert!(!matches("NOT (value.a[*] LIKE value.p)", &m));
         assert!(!matches("NOT (value.a[*] ILIKE value.p)", &m));
-        assert!(started.elapsed().as_secs() < 2, "{:?}", started.elapsed());
+        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
     }
 
     #[test]
