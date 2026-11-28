@@ -159,12 +159,14 @@ export function TopicsPage() {
         )}
 
         {topics.error && <ErrorState error={topics.error} onRetry={() => topics.refetch()} />}
-        <TableFrame pager={pager}>
+        {/* The first load already shows "Loading…" in the empty table; this covers refreshes of shown rows. */}
+        <TableFrame pager={pager} busy={topics.isFetching && !topics.isPending}>
           <Table resize={resize} aria-label="Topics. Use the arrow keys to move between rows and Enter to open one.">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
+                <TableHead pinnable={false} className="w-10 px-0">
                   <Checkbox
+                    className="mx-auto"
                     aria-label="Select all topics on this page"
                     disabled={pageSelectable.length === 0}
                     checked={allSelected ? true : pageSelected > 0 ? "indeterminate" : false}
@@ -183,7 +185,7 @@ export function TopicsPage() {
                 <SortableTableHead column="messages" sort={sorter.sort} onSort={sorter.toggle} align="right" className="w-36">
                   Messages
                 </SortableTableHead>
-                <TableHead className="w-12" />
+                <TableHead pinnable={false} className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -193,9 +195,10 @@ export function TopicsPage() {
                   {...rowProps(i, () => openTopic(t.name))}
                   data-state={checked.has(t.name) ? "selected" : undefined}
                 >
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="px-0" onClick={(e) => e.stopPropagation()}>
                     {!t.internal && (
                       <Checkbox
+                        className="mx-auto"
                         aria-label={`Select ${t.name}`}
                         checked={checked.has(t.name)}
                         onCheckedChange={(on) => toggle(t.name, on === true)}

@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatKeyValueLines, parseKeyValueLines } from "@/lib/key-value";
+import { cn } from "@/lib/utils";
 
 import { useSaveCluster, useTestConnection } from "../queries";
 import {
@@ -254,85 +256,98 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
           </FieldSet>
         )}
 
-        {tls && (
-          <FieldSet>
-            <FieldLegend variant="label">Encryption (TLS)</FieldLegend>
-            <TextField
-              id="cluster-ssl-ca"
-              label="CA certificate"
-              mono
-              placeholder="/path/to/ca.pem"
-              description="PEM file. Leave empty to trust the same certificate authorities as your system."
-              value={form.sslCaLocation}
-              onChange={(sslCaLocation) => update({ sslCaLocation })}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <TextField
-                id="cluster-ssl-cert"
-                label="Client certificate"
-                mono
-                placeholder="/path/to/client.pem"
-                value={form.sslCertificateLocation}
-                onChange={(sslCertificateLocation) => update({ sslCertificateLocation })}
-              />
-              <TextField
-                id="cluster-ssl-key"
-                label="Client key"
-                mono
-                placeholder="/path/to/client.key"
-                value={form.sslKeyLocation}
-                onChange={(sslKeyLocation) => update({ sslKeyLocation })}
-              />
-            </div>
-            <TextField
-              id="cluster-ssl-key-password"
-              label="Key password"
-              type="password"
-              placeholder="Only if the key is encrypted"
-              description="Client certificate and key are for clusters that require mutual TLS. Leave them empty otherwise."
-              value={form.sslKeyPassword}
-              onChange={(sslKeyPassword) => update({ sslKeyPassword })}
-            />
-            <Field orientation="horizontal">
-              <Switch
-                id="cluster-ssl-verify-hostname"
-                checked={form.sslVerifyHostname}
-                onCheckedChange={(sslVerifyHostname) => update({ sslVerifyHostname })}
-              />
-              <FieldLabel htmlFor="cluster-ssl-verify-hostname" className="font-normal">
-                Verify broker hostname
-              </FieldLabel>
-            </Field>
-            {!form.sslVerifyHostname && (
-              <Alert variant="destructive">
-                <HugeiconsIcon icon={Alert02Icon} />
-                <AlertTitle>Hostname check is off</AlertTitle>
-                <AlertDescription>
-                  Any server with a certificate from a trusted CA could pose as the broker and read your traffic. Only
-                  turn this off for test clusters whose certificates don't match their hostnames.
-                </AlertDescription>
-              </Alert>
-            )}
-          </FieldSet>
-        )}
+        <Accordion type="multiple" defaultValue={openByDefault(initial)} className="rounded-lg border">
+          {tls && (
+            <AccordionItem value="tls">
+              <SectionTrigger title="Encryption (TLS)" summary={tlsSummary(form)} warn={!form.sslVerifyHostname} />
+              <AccordionContent className="px-3 pb-3">
+                <FieldGroup className="gap-4">
+                  <TextField
+                    id="cluster-ssl-ca"
+                    label="CA certificate"
+                    mono
+                    placeholder="/path/to/ca.pem"
+                    description="PEM file. Leave empty to trust the same certificate authorities as your system."
+                    value={form.sslCaLocation}
+                    onChange={(sslCaLocation) => update({ sslCaLocation })}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <TextField
+                      id="cluster-ssl-cert"
+                      label="Client certificate"
+                      mono
+                      placeholder="/path/to/client.pem"
+                      value={form.sslCertificateLocation}
+                      onChange={(sslCertificateLocation) => update({ sslCertificateLocation })}
+                    />
+                    <TextField
+                      id="cluster-ssl-key"
+                      label="Client key"
+                      mono
+                      placeholder="/path/to/client.key"
+                      value={form.sslKeyLocation}
+                      onChange={(sslKeyLocation) => update({ sslKeyLocation })}
+                    />
+                  </div>
+                  <TextField
+                    id="cluster-ssl-key-password"
+                    label="Key password"
+                    type="password"
+                    placeholder="Only if the key is encrypted"
+                    description="Client certificate and key are for clusters that require mutual TLS. Leave them empty otherwise."
+                    value={form.sslKeyPassword}
+                    onChange={(sslKeyPassword) => update({ sslKeyPassword })}
+                  />
+                  <Field orientation="horizontal">
+                    <Switch
+                      id="cluster-ssl-verify-hostname"
+                      checked={form.sslVerifyHostname}
+                      onCheckedChange={(sslVerifyHostname) => update({ sslVerifyHostname })}
+                    />
+                    <FieldLabel htmlFor="cluster-ssl-verify-hostname" className="font-normal">
+                      Verify broker hostname
+                    </FieldLabel>
+                  </Field>
+                  {!form.sslVerifyHostname && (
+                    <Alert variant="destructive">
+                      <HugeiconsIcon icon={Alert02Icon} />
+                      <AlertTitle>Hostname check is off</AlertTitle>
+                      <AlertDescription>
+                        Any server with a certificate from a trusted CA could pose as the broker and read your traffic.
+                        Only turn this off for test clusters whose certificates don't match their hostnames.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </FieldGroup>
+              </AccordionContent>
+            </AccordionItem>
+          )}
 
-        <Field>
-          <FieldLabel htmlFor="cluster-properties">Advanced properties</FieldLabel>
-          <Textarea
-            id="cluster-properties"
-            className="min-h-20 font-mono text-xs"
-            placeholder={"ssl.ca.location=/path/to/ca.pem\nssl.endpoint.identification.algorithm=none"}
-            value={propertiesText}
-            onChange={(e) => {
-              setPropertiesText(e.target.value);
-              test.reset();
-            }}
-          />
-          <FieldDescription>
-            librdkafka settings, one key=value per line. Known secret keys go to the system keychain; a misspelled one is stored as a plain setting. Plugin, interceptor
-            and command settings are refused.
-          </FieldDescription>
-        </Field>
+          <AccordionItem value="properties">
+            <SectionTrigger title="Advanced properties" summary={propertiesSummary(propertiesText)} />
+            <AccordionContent className="px-3 pb-3">
+              <Field>
+                <FieldLabel htmlFor="cluster-properties" className="sr-only">
+                  Advanced properties
+                </FieldLabel>
+                <Textarea
+                  id="cluster-properties"
+                  className="min-h-20 font-mono text-xs"
+                  placeholder={"client.id=kui\nrequest.timeout.ms=30000"}
+                  value={propertiesText}
+                  onChange={(e) => {
+                    setPropertiesText(e.target.value);
+                    test.reset();
+                  }}
+                />
+                <FieldDescription>
+                  librdkafka settings, one key=value per line. Known secret keys go to the system keychain; a
+                  misspelled one is stored as a plain setting. Plugin, interceptor and command settings are refused.
+                </FieldDescription>
+              </Field>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         {save.error && <FieldError>{save.error.message}</FieldError>}
         {test.error && <FieldError>{test.error.message}</FieldError>}
@@ -355,6 +370,47 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+type Section = "tls" | "properties";
+
+// Sections holding saved non-default values start open, so editing a cluster doesn't hide its settings.
+function openByDefault(cluster: ClusterConfig): Section[] {
+  const open: Section[] = [];
+  if (tlsCustomized(cluster)) open.push("tls");
+  if (Object.keys(cluster.properties).length > 0) open.push("properties");
+  return open;
+}
+
+function tlsCustomized(c: ClusterConfig): boolean {
+  return (
+    !c.sslVerifyHostname || [c.sslCaLocation, c.sslCertificateLocation, c.sslKeyLocation].some((v) => !!v?.trim())
+  );
+}
+
+function tlsSummary(c: ClusterConfig): string {
+  const parts = [c.sslCaLocation?.trim() ? "Custom CA" : "System CAs"];
+  if (c.sslCertificateLocation?.trim() || c.sslKeyLocation?.trim()) parts.push("client certificate");
+  if (!c.sslVerifyHostname) parts.push("hostname check off");
+  return parts.join(" · ");
+}
+
+function propertiesSummary(text: string): string {
+  const count = parseKeyValueLines(text).length;
+  return count === 0 ? "None" : `${count} set`;
+}
+
+function SectionTrigger({ title, summary, warn }: { title: string; summary: string; warn?: boolean }) {
+  return (
+    <AccordionTrigger className="items-center px-3 hover:no-underline">
+      <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3 pr-2">
+        <span>{title}</span>
+        <span className={cn("truncate text-xs font-normal", warn ? "text-destructive" : "text-muted-foreground")}>
+          {summary}
+        </span>
+      </span>
+    </AccordionTrigger>
   );
 }
 

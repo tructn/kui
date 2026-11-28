@@ -1,7 +1,17 @@
+import {
+  CreditCardIcon,
+  CursorPointer01Icon,
+  ShoppingCart01Icon,
+  TemperatureIcon,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
+
 import type { RecordTemplate } from "./types";
 
 export interface Preset {
   label: string;
+  icon: IconSvgElement;
   template: Omit<RecordTemplate, "locale">;
 }
 
@@ -9,6 +19,7 @@ export interface Preset {
 export const PRESETS: Preset[] = [
   {
     label: "E-commerce orders",
+    icon: ShoppingCart01Icon,
     template: {
       key: "order-{{seq}}",
       value: `{
@@ -31,6 +42,7 @@ export const PRESETS: Preset[] = [
   },
   {
     label: "User sign-ups",
+    icon: UserAdd01Icon,
     template: {
       key: "{{uuid}}",
       value: `{
@@ -55,6 +67,7 @@ export const PRESETS: Preset[] = [
   },
   {
     label: "Clickstream",
+    icon: CursorPointer01Icon,
     template: {
       key: "session-{{hex 12}}",
       value: `{
@@ -69,7 +82,8 @@ export const PRESETS: Preset[] = [
     },
   },
   {
-    label: "IoT sensor readings",
+    label: "IoT sensors",
+    icon: TemperatureIcon,
     template: {
       key: "sensor-{{int 1 20}}",
       value: `{
@@ -85,6 +99,7 @@ export const PRESETS: Preset[] = [
   },
   {
     label: "Payments",
+    icon: CreditCardIcon,
     template: {
       key: "{{uuid}}",
       value: `{

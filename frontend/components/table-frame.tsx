@@ -10,6 +10,7 @@ import type { ReactElement, ReactNode } from "react";
 import { ShortcutHint } from "@/components/shortcut-hint";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Pager } from "@/hooks/use-pagination";
 import { useShortcut } from "@/hooks/use-shortcut";
@@ -26,6 +27,8 @@ interface TableFrameProps {
    * Embedded tables (`false`) show the pager only once there is more than one page of rows.
    */
   fill?: boolean;
+  /** Dims the rows under a spinner, e.g. while a slow render or a new query replaces them. */
+  busy?: boolean;
   className?: string;
 }
 
@@ -33,21 +36,33 @@ interface TableFrameProps {
  * The bordered box every data table sits in: rows scroll under a sticky header,
  * and the pager stays pinned to the bottom edge.
  */
-export function TableFrame({ children, pager, fill = true, className }: TableFrameProps) {
+export function TableFrame({ children, pager, fill = true, busy = false, className }: TableFrameProps) {
   return (
     <div className={cn("flex flex-col rounded-lg border", fill && "min-h-0 flex-1", className)}>
-      {/* min-h-0 lets the scroll area shrink below its content, so a max height works.
-          This box is the scroll container in both directions; the table's own
-          overflow wrapper is switched off, or the sticky header would stick to
-          that wrapper (which never scrolls vertically) instead. It is also the
-          size container, so `100cqw` inside the table means "the visible width". */}
-      <div
-        className={cn(
-          "@container/table-frame min-h-0 overflow-auto [&_[data-slot=table-container]]:overflow-visible",
-          fill && "flex-1"
+      {/* The overlay sits outside the scroll area so it covers what's visible, not the scrolled content. */}
+      <div className={cn("relative flex min-h-0 flex-col", fill && "flex-1")}>
+        {/* min-h-0 lets the scroll area shrink below its content, so a max height works.
+            This box is the scroll container in both directions; the table's own
+            overflow wrapper is switched off, or the sticky header would stick to
+            that wrapper (which never scrolls vertically) instead. It is also the
+            size container, so `100cqw` inside the table means "the visible width". */}
+        <div
+          aria-busy={busy}
+          className={cn(
+            "@container/table-frame min-h-0 overflow-auto [&_[data-slot=table-container]]:overflow-visible",
+            fill && "flex-1"
+          )}
+        >
+          {children}
+        </div>
+        {busy && (
+          <div
+            data-testid="table-busy"
+            className="absolute inset-0 z-20 flex items-center justify-center rounded-t-lg bg-background/60 duration-300 animate-in fade-in"
+          >
+            <Spinner className="size-6 text-muted-foreground" />
+          </div>
         )}
-      >
-        {children}
       </div>
       {pager && (fill || pager.total > PAGE_SIZES[0]) && <TablePagination pager={pager} shortcuts={fill} />}
     </div>

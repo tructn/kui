@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { describeSize, entriesOf, inspectEmbedded, parseEmbedded, parseTree } from "./json-tree";
+import { describeSize, entriesOf, inspectEmbedded, parseEmbedded, parseTree } from "@/lib/json-tree";
 
 describe("parseEmbedded", () => {
   test("unwraps objects and arrays written as strings", () => {

@@ -41,8 +41,11 @@ describe("Streaming features", () => {
 
   it("generates fake data from a template, watched live", async () => {
     await button("Generate").click();
+    // The template starts from the topic's own messages ({"live":true}); switch to a preset.
+    await expect(openDialog().$('[aria-label="Topic structure"]')).toHaveText(expect.stringContaining("live"));
+    await button("E-commerce orders", openDialog()).click();
     // The preview renders sample records from the preset before anything is sent.
-    await expect(openDialog().$$("pre*=orderId")).toBeElementsArrayOfSize(3);
+    await expect(openDialog().$('section[aria-label="Preview"]')).toHaveText(expect.stringContaining("orderId"));
     await $("#generate-count").clearValue();
     await $("#generate-count").setValue("200");
     await snapshot("generate-dialog");

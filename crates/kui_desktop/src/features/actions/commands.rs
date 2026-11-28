@@ -93,6 +93,46 @@ pub async fn start_action(
     Ok(log.status())
 }
 
+/// Sends the message at `partition`/`offset` of the Action's topic to its
+/// target once and returns what came back. For stepping through one message
+/// in a debugger: it waits up to `executor::SEND_ONE_TIMEOUT`, no other
+/// message arrives meanwhile, and no offset is committed. While it waits the
+/// Action shows as running, so Stop cancels it and Start waits for it.
+#[tauri::command]
+pub async fn send_to_action(
+    state: State<'_, AppState>,
+    actions: State<'_, ActionsState>,
+    action_id: String,
+    partition: i32,
+    offset: i64,
+) -> Result<ExecutionDetail> {
+    if partition < 0 || offset < 0 {
+        return Err(Error::msg("That message position is not valid"));
+    }
+    let action = lock(&actions.store).get(&action_id)?;
+    let log = actions.log(&action_id);
+    if log.status().state.is_active() {
+        return Err(Error::msg("Stop the action first, so this message isn't queued behind the stream"));
+    }
+    log.begin()?;
+    let cancel = state.tasks.start(&task_id(&action_id));
+    log.set_state(RunState::Running);
+
+    let sent = async {
+        let cluster = state.clients(&action.cluster_id)?.cluster.clone();
+        let executor = executor::for_one_message(&action.executor);
+        executor::check_target(&executor).await?;
+        let plan = executor::plan(&Action { executor, ..action.clone() }, &cluster)?;
+        let topic = action.source.topic.clone();
+        let record = run_blocking(move || Ok(kafka::fetch(&cluster, &topic, partition, offset)?)).await?;
+        Ok::<_, Error>(run::send_one(record, &plan, &log, || cancel.is_cancelled()).await?)
+    }
+    .await;
+    // The error goes back to the caller; it doesn't mark the Action itself as failed.
+    log.finish(Ok(()));
+    sent
+}
+
 /// Asks a running Action to stop. In-flight invocations finish first.
 #[tauri::command]
 pub fn stop_action(state: State<'_, AppState>, actions: State<'_, ActionsState>, action_id: String) -> bool {

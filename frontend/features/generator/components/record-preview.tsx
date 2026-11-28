@@ -1,5 +1,10 @@
+import { RefreshIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+
+import { JsonTree, JsonTreeBoundary } from "@/components/json-tree";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { prettyJson } from "@/lib/format";
+import { parseJson } from "@/lib/json-tree";
 import { cn } from "@/lib/utils";
 
 import type { GeneratedRecord } from "../types";
@@ -10,31 +15,56 @@ interface RecordPreviewProps {
   loading: boolean;
   /** True while showing the previous template's output. */
   stale: boolean;
+  onShuffle: () => void;
 }
 
-/** A few sample records so the template can be checked before producing anything. */
-export function RecordPreview({ records, error, loading, stale }: RecordPreviewProps) {
+/** A few sample records, as a JSON tree, so the template can be checked before producing anything. */
+export function RecordPreview({ records, error, loading, stale, onShuffle }: RecordPreviewProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        Preview {loading && <Spinner className="size-3" />}
+    <section aria-label="Preview" className="flex min-h-0 min-w-0 flex-col gap-2">
+      <div className="flex h-8 items-center gap-2">
+        <span className="text-sm font-medium">Preview</span>
+        {loading && <Spinner className="size-3" />}
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          className="ml-auto"
+          aria-label="New samples"
+          title="New samples"
+          onClick={onShuffle}
+        >
+          <HugeiconsIcon icon={RefreshIcon} />
+        </Button>
       </div>
       {error && (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 font-mono text-xs text-destructive">
+        <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 font-mono text-xs break-all text-destructive">
           {error.message}
         </p>
       )}
-      <div className={cn("flex max-h-80 flex-col gap-2 overflow-y-auto", (error || stale) && "opacity-50")}>
-        {records?.map((record, i) => (
-          <div key={i} className="rounded-lg bg-muted p-3 font-mono text-code">
-            <div className="mb-1 truncate text-muted-foreground">
-              key: {record.key ?? <span className="italic">null</span>}
-              {record.headers.map((h) => ` · ${h.key}=${h.value}`).join("")}
-            </div>
-            <pre className="break-all whitespace-pre-wrap">{prettyJson(record.value)}</pre>
-          </div>
-        ))}
-      </div>
-    </div>
+      {records && (
+        <JsonTreeBoundary fallback={null}>
+          <JsonTree
+            text={toSampleArray(records)}
+            openDepth={3}
+            className={cn("max-h-[28rem] min-h-80 flex-1", (error || stale) && "opacity-50")}
+          />
+        </JsonTreeBoundary>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The records as one JSON array. A value that is JSON is nested as such; one that isn't (a
+ * template that isn't JSON) stays a string, so a broken template still previews.
+ */
+function toSampleArray(records: GeneratedRecord[]): string {
+  return JSON.stringify(
+    records.map((r) => ({
+      key: r.key,
+      ...(r.headers.length > 0 && { headers: Object.fromEntries(r.headers.map((h) => [h.key, h.value])) }),
+      value: parseJson(r.value) ?? r.value,
+    })),
   );
 }

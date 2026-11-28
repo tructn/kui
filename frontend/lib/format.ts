@@ -27,6 +27,16 @@ export function formatTimestamp(epochMs: number | null): string {
   );
 }
 
+/**
+ * A one-line preview of at most `maxChars` source characters, whitespace runs collapsed,
+ * ending in `…` when cut. Table cells render this instead of the full payload, which can be
+ * megabytes; CSS `text-ellipsis` still trims it to the column width.
+ */
+export function previewLine(text: string, maxChars = 1000): string {
+  const line = text.slice(0, maxChars).replace(/\s+/g, " ").trim();
+  return text.length > maxChars ? `${line}…` : line;
+}
+
 /** Pretty-prints JSON; returns the input unchanged if it isn't JSON. */
 export function prettyJson(text: string): string {
   try {

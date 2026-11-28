@@ -17,10 +17,41 @@ export const actionKeys = {
   execution: (actionId: string, executionId: number) => ["actions", actionId, "execution", executionId] as const,
   endpoint: (endpoint: string, runtime: LambdaRuntime) => ["actions", "endpoint", runtime, endpoint] as const,
   discovery: (projectDir: string) => ["actions", "discovery", projectDir] as const,
+  send: ["actions", "send"] as const,
 };
+
+/** One message, picked in the message table, on its way to an Action's target. */
+export interface SendRequest {
+  action: Action;
+  partition: number;
+  offset: number;
+}
 
 export function useActions(clusterId: string) {
   return useQuery({ queryKey: actionKeys.all(clusterId), queryFn: () => actionsApi.list(clusterId) });
+}
+
+/** The Actions that read `topic`, which are the ones its messages can be sent to. */
+export function useTopicActions(clusterId: string, topic: string): Action[] {
+  const actions = useActions(clusterId);
+  return (actions.data ?? []).filter((a) => a.source.topic === topic);
+}
+
+/**
+ * Sends one message under `actionKeys.send`, so `SendResultSheet` follows it from anywhere. The Action
+ * shows as running while it waits, so its status and history refresh when it's done.
+ */
+export function useSendToAction(clusterId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: actionKeys.send,
+    mutationFn: ({ action, partition, offset }: SendRequest) => actionsApi.sendOne(action.id, partition, offset),
+    onSettled: (_detail, _error, { action }) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: actionKeys.statuses(clusterId) }),
+        queryClient.invalidateQueries({ queryKey: actionKeys.history(action.id) }),
+      ]),
+  });
 }
 
 /** Polls while any Action is between Start and stopped, then goes quiet. */

@@ -106,7 +106,8 @@ impl RunLog {
         self.lock().status.in_flight = u32::try_from(in_flight).unwrap_or(u32::MAX);
     }
 
-    pub(super) fn record(&self, target: &str, done: Finished) {
+    /// Returns the new execution's id.
+    pub(super) fn record(&self, target: &str, done: Finished) -> u64 {
         let mut inner = self.lock();
         inner.status.processed += 1;
         if done.outcome.status != ExecutionStatus::Succeeded {
@@ -118,6 +119,7 @@ impl RunLog {
         if inner.history.len() > HISTORY_LIMIT {
             inner.history.pop_front();
         }
+        id
     }
 }
 

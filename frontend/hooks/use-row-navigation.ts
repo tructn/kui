@@ -53,7 +53,7 @@ export function useRowNavigation(count: number) {
         }
         event.preventDefault();
       },
-      className: "cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+      className: "cursor-pointer outline-none focus-visible:[--row-tint:var(--color-row-focus)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
     };
   };
 }

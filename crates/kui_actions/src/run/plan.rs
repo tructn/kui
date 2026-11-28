@@ -8,7 +8,7 @@ use crate::record::Record;
 
 pub type Invocation = Pin<Box<dyn Future<Output = Outcome> + Send>>;
 /// Builds a record's request body, or says why it can't be sent.
-pub type BuildPayload = Box<dyn Fn(&Record) -> std::result::Result<Vec<u8>, String> + Send>;
+pub type BuildPayload = Box<dyn Fn(&Record) -> std::result::Result<Vec<u8>, String> + Send + Sync>;
 
 /// What a running Action does with each message. Each executor builds one, so
 /// the runner never knows which kind of target it is calling.

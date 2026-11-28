@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { PartitionLabel } from "@/components/partition-head";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { TableFrame } from "@/components/table-frame";
@@ -31,7 +32,9 @@ export function PartitionsTable({ partitions, emptyText }: { partitions: Partiti
       <Table resize={resize}>
         <TableHeader>
           <TableRow>
-            <SortableTableHead column="id" sort={sorter.sort} onSort={sorter.toggle} className="w-24">Partition</SortableTableHead>
+            <SortableTableHead column="id" sort={sorter.sort} onSort={sorter.toggle} className="w-12">
+              <PartitionLabel />
+            </SortableTableHead>
             <SortableTableHead column="leader" sort={sorter.sort} onSort={sorter.toggle} className="w-24">Leader</SortableTableHead>
             <SortableTableHead column="replicas" sort={sorter.sort} onSort={sorter.toggle}>Replicas</SortableTableHead>
             <SortableTableHead column="isr" sort={sorter.sort} onSort={sorter.toggle}>In-sync</SortableTableHead>

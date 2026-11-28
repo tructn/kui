@@ -2,7 +2,8 @@ import {
   DatabaseLightningIcon,
   InsertColumnRightIcon,
   Radar01Icon,
-  SearchAreaIcon,
+  Search01Icon,
+  SidebarLeftIcon,
   SlidersHorizontalIcon,
   ZapIcon,
 } from "@hugeicons/core-free-icons";
@@ -20,6 +21,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
@@ -30,7 +32,6 @@ import { useShortcut } from "@/hooks/use-shortcut";
 
 import { useNavigation, type Route } from "./stores/navigation-store";
 import { useSettingsDialog } from "./stores/settings-dialog-store";
-import { ThemeMenuButton, ThemePicker } from "./theme-picker";
 
 interface NavItem {
   label: string;
@@ -44,8 +45,20 @@ interface NavItem {
 // Ordered the way a cluster is built up: the brokers, the topics they host,
 // then the consumer groups reading those topics.
 const CLUSTER_ITEMS: NavItem[] = [
-  { label: "Brokers", icon: DatabaseLightningIcon, page: "brokers", route: { page: "brokers" }, key: "1" },
-  { label: "Topics", icon: InsertColumnRightIcon, page: "topics", route: { page: "topics" }, key: "2" },
+  {
+    label: "Brokers",
+    icon: DatabaseLightningIcon,
+    page: "brokers",
+    route: { page: "brokers" },
+    key: "1",
+  },
+  {
+    label: "Topics",
+    icon: InsertColumnRightIcon,
+    page: "topics",
+    route: { page: "topics" },
+    key: "2",
+  },
   {
     label: "Consumer groups",
     icon: Radar01Icon,
@@ -57,7 +70,13 @@ const CLUSTER_ITEMS: NavItem[] = [
 
 // KUI's own work on the cluster's messages rather than views of Kafka state.
 const AUTOMATION_ITEMS: NavItem[] = [
-  { label: "Actions", icon: ZapIcon, page: "actions", route: { page: "actions" }, key: "4" },
+  {
+    label: "Actions",
+    icon: ZapIcon,
+    page: "actions",
+    route: { page: "actions" },
+    key: "4",
+  },
 ];
 
 const NAV_ITEMS = [...CLUSTER_ITEMS, ...AUTOMATION_ITEMS];
@@ -86,15 +105,24 @@ export function AppSidebar() {
         {clusterId && (
           <>
             <SearchButton />
-            <NavGroup label="Cluster" items={CLUSTER_ITEMS} activePage={activePage} onNavigate={navigate} />
+            <NavGroup
+              label="Cluster"
+              items={CLUSTER_ITEMS}
+              activePage={activePage}
+              onNavigate={navigate}
+            />
+            <IconModeSeparator />
             <NavGroup
               label="Automation"
               items={AUTOMATION_ITEMS}
               activePage={activePage}
               onNavigate={navigate}
               // Actions keep running on other pages, so the sidebar says so.
-              indicators={runningActions ? { actions: `${runningActions} running` } : {}}
+              indicators={
+                runningActions ? { actions: `${runningActions} running` } : {}
+              }
             />
+            <IconModeSeparator />
           </>
         )}
         <SettingsGroup />
@@ -102,8 +130,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* Collapsed to icons, three segments would be too small to hit: show one button with a menu. */}
-            {collapsed ? <ThemeMenuButton /> : <ThemePicker iconOnly className="flex w-full" />}
+            <CollapseButton collapsed={collapsed} />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
@@ -121,7 +148,13 @@ interface NavGroupProps {
   indicators?: Partial<Record<Route["page"], string>>;
 }
 
-function NavGroup({ label, items, activePage, onNavigate, indicators = {} }: NavGroupProps) {
+function NavGroup({
+  label,
+  items,
+  activePage,
+  onNavigate,
+  indicators = {},
+}: NavGroupProps) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
@@ -139,7 +172,11 @@ function NavGroup({ label, items, activePage, onNavigate, indicators = {} }: Nav
                 <HugeiconsIcon icon={item.icon} />
                 <span>{item.label}</span>
                 {indicators[item.page] && (
-                  <span className="relative flex size-2" role="status" aria-label={indicators[item.page]}>
+                  <span
+                    className="relative flex size-2"
+                    role="status"
+                    aria-label={indicators[item.page]}
+                  >
                     <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500/60" />
                     <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                   </span>
@@ -152,6 +189,14 @@ function NavGroup({ label, items, activePage, onNavigate, indicators = {} }: Nav
       </SidebarGroupContent>
     </SidebarGroup>
   );
+}
+
+/**
+ * Group labels fade out in the icon strip, leaving bare gaps between groups;
+ * a rule keeps the groups visibly apart there.
+ */
+function IconModeSeparator() {
+  return <SidebarSeparator className="mx-auto hidden h-px w-5 group-data-[collapsible=icon]:block" />;
 }
 
 /** Shortcut labels sit at the right of a menu item and hide when the sidebar collapses to icons. */
@@ -167,15 +212,35 @@ function SearchButton() {
             tooltip={`Search topics (${MOD_KEY}K)`}
             aria-keyshortcuts="Meta+K Control+K"
             onClick={() => openSearch(true)}
+            variant="outline"
             className="text-muted-foreground"
           >
-            <HugeiconsIcon icon={SearchAreaIcon} />
+            <HugeiconsIcon icon={Search01Icon} />
             <span>Search topics</span>
             <ShortcutHint keys={[MOD_KEY, "K"]} className={HINT} />
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
+  );
+}
+
+/** The ⌘B shortcut itself is registered by `SidebarProvider`; this only shows it. */
+function CollapseButton({ collapsed }: { collapsed: boolean }) {
+  const { toggleSidebar } = useSidebar();
+  const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  return (
+    <SidebarMenuButton
+      tooltip={`${label} (${MOD_KEY}B)`}
+      aria-label={label}
+      aria-keyshortcuts="Meta+B Control+B"
+      onClick={toggleSidebar}
+      className="text-muted-foreground"
+    >
+      <HugeiconsIcon icon={SidebarLeftIcon} />
+      <span>Collapse</span>
+      <ShortcutHint keys={[MOD_KEY, "B"]} className={HINT} />
+    </SidebarMenuButton>
   );
 }
 

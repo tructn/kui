@@ -2,6 +2,7 @@ import { ComputerIcon, Moon02Icon, Sun03Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { ToggleGroup } from "radix-ui";
 
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SEGMENT_ITEM as ITEM, SEGMENT_ROOT } from "@/components/segmented-control";
 import { cn } from "@/lib/utils";
@@ -23,11 +23,8 @@ const THEMES: { value: Theme; label: string; icon: IconSvgElement }[] = [
   { value: "dark", label: "Dark", icon: Moon02Icon },
 ];
 
-/**
- * System / Light / Dark segmented control. `iconOnly` drops the labels into
- * tooltips, for tight spots like the sidebar.
- */
-export function ThemePicker({ iconOnly = false, className }: { iconOnly?: boolean; className?: string }) {
+/** System / Light / Dark segmented control. */
+export function ThemePicker({ className }: { className?: string }) {
   const theme = useTheme((s) => s.theme);
   const setTheme = useTheme((s) => s.setTheme);
 
@@ -40,30 +37,16 @@ export function ThemePicker({ iconOnly = false, className }: { iconOnly?: boolea
       onValueChange={(v) => v && setTheme(v as Theme)}
       className={cn(SEGMENT_ROOT, className)}
     >
-      {THEMES.map(({ value, label, icon: Icon }) =>
-        iconOnly ? (
-          <Tooltip key={value}>
-            <TooltipTrigger asChild>
-              <ToggleGroup.Item value={value} aria-label={label} className={cn(ITEM, "flex-1 px-0")}>
-                <HugeiconsIcon icon={Icon} />
-              </ToggleGroup.Item>
-            </TooltipTrigger>
-            <TooltipContent>{label}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <ToggleGroup.Item key={value} value={value} aria-label={label} className={ITEM}>
-            <HugeiconsIcon icon={Icon} /> {label}
-          </ToggleGroup.Item>
-        ),
-      )}
+      {THEMES.map(({ value, label, icon: Icon }) => (
+        <ToggleGroup.Item key={value} value={value} aria-label={label} className={ITEM}>
+          <HugeiconsIcon icon={Icon} /> {label}
+        </ToggleGroup.Item>
+      ))}
     </ToggleGroup.Root>
   );
 }
 
-/**
- * One icon button showing the current theme, which opens a menu of all three.
- * For the collapsed sidebar, where three segments would be too small to hit.
- */
+/** One icon button showing the current theme, which opens a menu of all three. */
 export function ThemeMenuButton() {
   const theme = useTheme((s) => s.theme);
   const setTheme = useTheme((s) => s.setTheme);
@@ -75,15 +58,14 @@ export function ThemeMenuButton() {
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton aria-label={`Theme: ${current.label}`}>
+            <Button variant="ghost" size="icon-sm" aria-label={`Theme: ${current.label}`}>
               <HugeiconsIcon icon={current.icon} />
-              <span>Theme</span>
-            </SidebarMenuButton>
+            </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent side="right">Theme: {current.label}</TooltipContent>
+        <TooltipContent>Theme: {current.label}</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent side="right" align="end" className="min-w-36">
+      <DropdownMenuContent align="end" className="min-w-36">
         <DropdownMenuLabel>Theme</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as Theme)}>
           {THEMES.map(({ value, label, icon: Icon }) => (

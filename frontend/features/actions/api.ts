@@ -18,6 +18,9 @@ export const actionsApi = {
   statuses: (clusterId: string) => callCommand<RunStatus[]>("action_statuses", { clusterId }),
   /** Joins the Action's consumer group and starts invoking; commits offsets as it goes. */
   start: (actionId: string) => callCommand<RunStatus>("start_action", { actionId }),
+  /** Reads one message by position and sends it to the Action's target once; nothing is committed. */
+  sendOne: (actionId: string, partition: number, offset: number) =>
+    callCommand<ExecutionDetail>("send_to_action", { actionId, partition, offset }),
   stop: (actionId: string) => callCommand<boolean>("stop_action", { actionId }),
   history: (actionId: string) => callCommand<ExecutionSummary[]>("action_history", { actionId }),
   execution: (actionId: string, executionId: number) =>

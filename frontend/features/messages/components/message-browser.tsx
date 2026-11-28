@@ -1,6 +1,6 @@
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
 
 import { emptyText, ErrorState } from "@/components/query-states";
 import { ShortcutHint } from "@/components/shortcut-hint";
@@ -31,10 +31,19 @@ interface MessageBrowserProps {
   copyTargets: CopyTarget[];
   /** Hides copy: the topic is internal and must not be written to. */
   readOnly?: boolean;
+  /** A per-row control, passed to the message table. */
+  rowAction?: (message: KafkaMessage) => ReactNode;
 }
 
 /** Filter toolbar + message table + detail sheet for one topic, with an optional live tail. */
-export function MessageBrowser({ clusterId, topic, partitions, copyTargets, readOnly = false }: MessageBrowserProps) {
+export function MessageBrowser({
+  clusterId,
+  topic,
+  partitions,
+  copyTargets,
+  readOnly = false,
+  rowAction,
+}: MessageBrowserProps) {
   const [filters, setFilters] = useState<BrowseFilters>({
     topic,
     partition: null,
@@ -73,9 +82,12 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
   }
   useShortcut("l", () => toggleLive(!live));
 
+  // A page of large payloads is a heavy render; deferring it keeps the busy overlay painted until the rows commit.
+  const shownPage = useDeferredValue(messages.data);
+  const rendering = shownPage !== messages.data;
   // While the next page loads, the old one is shown as a placeholder: its `next` is stale.
-  const next = messages.isPlaceholderData ? null : (messages.data?.next ?? null);
-  const pager = serverPager(messages.data ?? EMPTY_PAGE, page, pageSize, next !== null, {
+  const next = messages.isPlaceholderData || rendering ? null : (shownPage?.next ?? null);
+  const pager = serverPager(shownPage ?? EMPTY_PAGE, page, pageSize, next !== null, {
     setPage: (to) => {
       if (to === page + 1 && next) setCursors([...cursors, next]);
       else if (to < page) setCursors(cursors.slice(0, to + 1));
@@ -168,6 +180,7 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
           <MessageTable
             messages={tail.messages}
             onSelect={setSelected}
+            rowAction={rowAction}
             animate
             emptyText={
               filters.query
@@ -186,9 +199,13 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
             messages={pager.items}
             pager={pager}
             onSelect={setSelected}
+            rowAction={rowAction}
             checked={readOnly ? undefined : checked}
             onCheckedChange={setChecked}
-            emptyText={emptyText(
+            // A filter scan or a big topic's first page can take a while; the overlay covers the wait.
+            loading={messages.isPending || messages.isPlaceholderData || rendering}
+            // The overlay's spinner already says it's loading.
+            emptyText={messages.isPending && !messages.isError ? null : emptyText(
               messages,
               !filters.query
                 ? "No messages in this range."

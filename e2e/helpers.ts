@@ -150,6 +150,7 @@ export const CHANGING_COMMANDS = [
   "save_action",
   "delete_action",
   "start_action",
+  "send_to_action",
   "stop_action",
   "clear_action_history",
 ];

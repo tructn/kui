@@ -6,6 +6,7 @@ mod client;
 mod cluster;
 pub mod connection;
 mod error;
+mod fetch;
 #[allow(unsafe_code)] // librdkafka call rust-rdkafka does not wrap
 mod group_offsets;
 #[allow(unsafe_code)] // librdkafka calls rust-rdkafka does not wrap
@@ -17,6 +18,7 @@ pub use client::{KafkaClients, client_config, created, new_consumer, new_consume
 pub use cluster::{ClusterConfig, SECRET_PROPERTIES, check_properties, is_secret_property};
 pub use connection::KafkaConsumer;
 pub use error::{Error, Result};
+pub use fetch::fetch_one;
 
 use std::time::Duration;
 

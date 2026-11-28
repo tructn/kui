@@ -1,10 +1,12 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { useTablePrefs } from "@/app/stores/table-store";
-import { resizeColumn, type ColumnLayout } from "@/lib/column-widths";
+import { resizeColumn, togglePinned, type ColumnLayout } from "@/lib/column-widths";
 
 /** How far ← / → move a focused resize handle, in px. */
 const KEY_STEP = 16;
+
+const NONE: readonly number[] = [];
 
 /** Passed to `<Table resize={...}>`; the table's headers then get drag handles. */
 export interface ColumnResize {
@@ -12,7 +14,11 @@ export interface ColumnResize {
   widths: number[] | null;
   onPointerDown: (event: PointerEvent<HTMLElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
-  /** Back to automatic widths. */
+  /** Indices of the columns that stay on screen while the table scrolls sideways. Empty without `widths`. */
+  pinned: readonly number[];
+  /** Pins or unpins the column of the header cell holding `control`. */
+  togglePin: (control: HTMLElement) => void;
+  /** Back to automatic widths, with no column pinned. */
   reset: () => void;
 }
 
@@ -25,14 +31,21 @@ export interface ColumnResize {
  * the table always fills its frame. Header and body cells share the table's
  * column widths, so they always stay aligned.
  *
- * `columnCount` guards against widths saved for an older version of the table.
+ * A pinned column sticks to the frame's left edge (after any pinned columns
+ * before it). Its offset depends on those widths, so pinning first fixes the
+ * current widths, as a resize does; pins only apply while widths are set.
+ *
+ * `columnCount` guards against widths and pins saved for an older version of the table.
  */
 export function useColumnResize(tableId: string, columnCount: number): ColumnResize {
   const saved = useTablePrefs((s) => s.columnWidths[tableId]);
   const save = useTablePrefs((s) => s.setColumnWidths);
+  const savedPins = useTablePrefs((s) => s.pinnedColumns[tableId]);
+  const savePins = useTablePrefs((s) => s.setPinnedColumns);
   // Widths while dragging; saved (one settings write) when the pointer is released.
   const [draft, setDraft] = useState<number[] | null>(null);
   const current = draft ?? (isValid(saved, columnCount) ? saved : null);
+  const pinned = current && savedPins ? savedPins.filter((c) => c >= 0 && c < columnCount) : NONE;
 
   function measure(handle: HTMLElement): ColumnLayout | null {
     const cell = handle.closest("th");
@@ -84,7 +97,17 @@ export function useColumnResize(tableId: string, columnCount: number): ColumnRes
       event.preventDefault();
       save(tableId, resizeColumn(measured, delta));
     },
-    reset: () => save(tableId, null),
+    pinned,
+    togglePin(control) {
+      const measured = measure(control);
+      if (!measured) return;
+      if (!current) save(tableId, measured.px.map(Math.round));
+      savePins(tableId, togglePinned(pinned, measured.column));
+    },
+    reset() {
+      save(tableId, null);
+      savePins(tableId, null);
+    },
   };
 }
 

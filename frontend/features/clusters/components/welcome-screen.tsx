@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useNavigation } from "@/app/stores/navigation-store";
 import { usePrivacy } from "@/app/stores/privacy-store";
+import { ThemeMenuButton } from "@/app/theme-picker";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -21,8 +22,12 @@ export function WelcomeScreen() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-3">
-        <SidebarTrigger />
+      <div className="flex items-center p-3">
+        {/* Below md the sidebar is an off-screen sheet, so its own collapse button can't open it. */}
+        <SidebarTrigger className="md:hidden" />
+        <div className="ml-auto">
+          <ThemeMenuButton />
+        </div>
       </div>
       <Empty className="page-enter">
         <EmptyHeader>

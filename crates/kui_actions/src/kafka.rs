@@ -1,5 +1,5 @@
-//! The Kafka side of a run: the Action's consumer, and the `MessageSource`
-//! the runner reads it through.
+//! The Kafka side of a run: the Action's consumer, the `MessageSource` the
+//! runner reads it through, and reading back one message to send on its own.
 
 use std::time::Duration;
 
@@ -9,7 +9,7 @@ use rdkafka::message::{BorrowedMessage, Headers, Timestamp};
 use rdkafka::{Message, Offset, TopicPartitionList};
 
 use kui_kafka::connection::explain;
-use kui_kafka::{ClusterConfig, KafkaConsumer, TIMEOUT, new_consumer_with};
+use kui_kafka::{ClusterConfig, KafkaConsumer, TIMEOUT, fetch_one, new_consumer_with};
 
 use crate::model::{Source, StartFrom};
 use crate::record::{Record, TimestampType};
@@ -28,6 +28,15 @@ pub fn subscribe(cluster: &ClusterConfig, source: &Source) -> Result<KafkaConsum
     }
     consumer.subscribe(&[&source.topic])?;
     Ok(consumer)
+}
+
+/// Reads one message by position, outside the Action's group: nothing is
+/// joined or committed, so a running group's progress is untouched. Blocking.
+pub fn fetch(cluster: &ClusterConfig, topic: &str, partition: i32, offset: i64) -> Result<Record> {
+    let consumer = new_consumer_with(cluster, "kui-action-send", |cfg| {
+        cfg.set("client.id", "kui-action").set("enable.partition.eof", "true");
+    })?;
+    Ok(fetch_one(&consumer, topic, partition, offset, record)?)
 }
 
 fn auto_offset_reset(start: StartFrom) -> &'static str {

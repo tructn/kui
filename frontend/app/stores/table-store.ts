@@ -14,6 +14,10 @@ interface TableState {
   columnWidths: Record<string, number[]>;
   /** `null` goes back to automatic widths. */
   setColumnWidths: (tableId: string, widths: number[] | null) => void;
+  /** Pinned column indices by table id (see `useColumnResize`). */
+  pinnedColumns: Record<string, number[]>;
+  /** `null` or empty unpins every column. */
+  setPinnedColumns: (tableId: string, pinned: number[] | null) => void;
 }
 
 export const useTablePrefs = create<TableState>()(
@@ -30,6 +34,14 @@ export const useTablePrefs = create<TableState>()(
           if (widths) columnWidths[tableId] = widths;
           else delete columnWidths[tableId];
           return { columnWidths };
+        }),
+      pinnedColumns: {},
+      setPinnedColumns: (tableId, pinned) =>
+        set((state) => {
+          const pinnedColumns = { ...state.pinnedColumns };
+          if (pinned?.length) pinnedColumns[tableId] = pinned;
+          else delete pinnedColumns[tableId];
+          return { pinnedColumns };
         }),
     }),
     { name: "kui.tables", storage: settingsStorage() },

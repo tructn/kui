@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { type PayloadView, payloadViews, renderPayload, truncationNotice } from "../payload-view";
 import type { Payload } from "../types";
-import { JsonTree, JsonTreeBoundary } from "./json-tree";
+import { JsonTree, JsonTreeBoundary } from "@/components/json-tree";
 
 const VIEW_LABELS: Record<PayloadView, string> = { json: "JSON", tree: "Tree", base64: "Base64" };
 

@@ -11,6 +11,7 @@ export { ACCENTS, type Accent } from "@/lib/accent";
 export const UI_FONTS = {
   inter: { label: "Inter", stack: "'Inter Variable', ui-sans-serif, system-ui, sans-serif" },
   geist: { label: "Geist", stack: "'Geist Variable', ui-sans-serif, system-ui, sans-serif" },
+  "mona-sans": { label: "Mona Sans", stack: "'Mona Sans Variable', ui-sans-serif, system-ui, sans-serif" },
   system: { label: "System", stack: "ui-sans-serif, system-ui, -apple-system, sans-serif" },
 } as const;
 

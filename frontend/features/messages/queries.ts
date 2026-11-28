@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { clusterKeys } from "@/features/clusters";
 
 import { messagesApi } from "./api";
-import type { BrowseRequest, CopyRequest, ExportRequest, ProduceRequest } from "./types";
+import type { BrowsePage, BrowseRequest, CopyRequest, ExportRequest, KafkaMessage, ProduceRequest } from "./types";
 
 export const messageKeys = {
   topic: (clusterId: string, topic: string) => [...clusterKeys.scope(clusterId), "messages", topic] as const,
@@ -42,6 +42,27 @@ export function useMessageSample(clusterId: string, topic: string, enabled: bool
     enabled,
     staleTime: 60_000,
   });
+}
+
+/**
+ * Reads the topic's most recently loaded page from the cache, without asking Kafka for anything.
+ * Empty when no page of this topic has been loaded yet.
+ */
+export function useLoadedMessages(clusterId: string, topic: string): () => KafkaMessage[] {
+  const queryClient = useQueryClient();
+  return () => {
+    const pages = queryClient
+      .getQueryCache()
+      .findAll({ queryKey: messageKeys.topic(clusterId, topic) })
+      .filter((q) => q.queryKey.at(-1) !== "sample")
+      .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
+    const data = pages[0]?.state.data;
+    return isBrowsePage(data) ? data.messages : [];
+  };
+}
+
+function isBrowsePage(data: unknown): data is BrowsePage {
+  return typeof data === "object" && data !== null && "messages" in data && Array.isArray(data.messages);
 }
 
 export function useProduceMessage(clusterId: string) {

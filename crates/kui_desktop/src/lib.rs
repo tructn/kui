@@ -80,6 +80,7 @@ pub fn run() {
             actions::commands::delete_action,
             actions::commands::action_statuses,
             actions::commands::start_action,
+            actions::commands::send_to_action,
             actions::commands::stop_action,
             actions::commands::action_history,
             actions::commands::action_execution,

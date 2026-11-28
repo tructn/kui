@@ -1,8 +1,9 @@
 import { ArrowRight01Icon, Copy01Icon, UnfoldLessIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Fragment, memo, startTransition, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/copy-button";
+import { PartitionLabel } from "@/components/partition-head";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { TableFrame } from "@/components/table-frame";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { useColumnResize } from "@/hooks/use-column-resize";
 import { usePagination, type Pager } from "@/hooks/use-pagination";
 import { useRowNavigation } from "@/hooks/use-row-navigation";
 import { useSort, type SortColumns } from "@/hooks/use-sort";
-import { formatBytes, formatTimestamp } from "@/lib/format";
+import { formatBytes, formatTimestamp, previewLine } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { KafkaMessage, MessageRef, Payload } from "../types";
@@ -29,6 +30,10 @@ interface MessageTableProps {
   /** Checked messages by `messageKey`; with `onCheckedChange`, rows get checkboxes. */
   checked?: ReadonlyMap<string, MessageRef>;
   onCheckedChange?: (checked: ReadonlyMap<string, MessageRef>) => void;
+  /** The rows shown are stale while new ones load (a new filter or page). */
+  loading?: boolean;
+  /** A per-row control in a last column, shown on hover or focus so the grid stays quiet. */
+  rowAction?: (message: KafkaMessage) => ReactNode;
 }
 
 export const messageKey = (m: MessageRef) => `${m.partition}/${m.offset}`;
@@ -51,6 +56,8 @@ export function MessageTable({
   pager: serverPager,
   checked,
   onCheckedChange,
+  loading = false,
+  rowAction,
 }: MessageTableProps) {
   // With server-side paging only the loaded page is here, so sorting reorders
   // that page; otherwise it sorts every message before paging.
@@ -60,10 +67,13 @@ export function MessageTable({
   const items = serverPager ? sorter.rows : localPager.items;
   const rowProps = useRowNavigation(items.length);
   const selectable = checked != null && onCheckedChange != null;
-  // The expand column, the checkbox column (when selectable) and the five data columns.
-  const columnCount = selectable ? 7 : 6;
+  // The expand column, the checkbox column (when selectable), the five data columns and the row action.
+  const columnCount = 6 + (selectable ? 1 : 0) + (rowAction ? 1 : 0);
   // Separate saved widths per layout: the extra columns shift every other one.
-  const resize = useColumnResize(selectable ? "messages-expand-select" : "messages-expand", columnCount);
+  const resize = useColumnResize(
+    `messages-expand${selectable ? "-select" : ""}${rowAction ? "-action" : ""}`,
+    columnCount,
+  );
   const pageChecked = selectable ? items.filter((m) => checked.has(messageKey(m))).length : 0;
   const allChecked = items.length > 0 && pageChecked === items.length;
 
@@ -78,6 +88,7 @@ export function MessageTable({
 
   // Expanded rows by `messageKey`, so they stay open across sorting and paging back.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [expanding, startExpanding] = useTransition();
   const anyExpanded = items.some((m) => expanded.has(messageKey(m)));
 
   function setRowExpanded(key: string, open: boolean) {
@@ -92,10 +103,11 @@ export function MessageTable({
 
   /**
    * Collapses every row on this page if any is open, otherwise expands them all.
-   * A transition, since a full page of previews is a big render: the UI stays responsive meanwhile.
+   * A transition, since a full page of previews is a big render: the UI stays responsive and
+   * shows the busy overlay meanwhile.
    */
   function toggleAllExpanded() {
-    startTransition(() => setExpanded((current) => {
+    startExpanding(() => setExpanded((current) => {
       const next = new Set(current);
       for (const m of items) {
         if (anyExpanded) next.delete(messageKey(m));
@@ -105,7 +117,7 @@ export function MessageTable({
     }));
   }
 
-  const head = (column: Column, label: string, className: string, align?: "right") => (
+  const head = (column: Column, label: ReactNode, className: string, align?: "right") => (
     <SortableTableHead
       column={column}
       sort={sorter.sort}
@@ -118,7 +130,7 @@ export function MessageTable({
     </SortableTableHead>
   );
   return (
-    <TableFrame pager={pager}>
+    <TableFrame pager={pager} busy={loading || expanding}>
       <Table
         resize={resize}
         className="table-fixed"
@@ -126,11 +138,11 @@ export function MessageTable({
       >
         <TableHeader>
           <TableRow>
-            <TableHead className="w-10 px-1 text-center">
+            <TableHead pinnable={false} className="w-10 px-1 text-center">
               <Button
                 variant="ghost"
                 size="icon-xs"
-                disabled={items.length === 0}
+                disabled={items.length === 0 || expanding}
                 aria-label={anyExpanded ? "Collapse all rows" : "Expand all rows"}
                 title={anyExpanded ? "Collapse all rows" : "Expand all rows"}
                 onClick={toggleAllExpanded}
@@ -143,8 +155,9 @@ export function MessageTable({
               </Button>
             </TableHead>
             {selectable && (
-              <TableHead className="w-10">
+              <TableHead pinnable={false} className="w-10 px-0">
                 <Checkbox
+                  className="mx-auto"
                   aria-label="Select all messages on this page"
                   disabled={items.length === 0}
                   checked={allChecked ? true : pageChecked > 0 ? "indeterminate" : false}
@@ -152,11 +165,16 @@ export function MessageTable({
                 />
               </TableHead>
             )}
-            {head("partition", "Partition", "w-24", "right")}
+            {head("partition", <PartitionLabel />, "w-12", "right")}
             {head("offset", "Offset", "w-24", "right")}
             {head("timestamp", "Timestamp", "w-52")}
             {head("key", "Key", "w-48")}
             {head("value", "Value", "")}
+            {rowAction && (
+              <TableHead pinnable={false} className="w-10 px-1">
+                <span className="sr-only">Debug</span>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody className="font-mono text-xs">
@@ -167,7 +185,10 @@ export function MessageTable({
             const open = expanded.has(key);
             // Preview rows sit between messages, so `even:` striping would drift; stripe by index instead.
             // (Both classes carry `even:` so they replace the row's own `even:` stripe.)
-            const stripe = i % 2 === 1 ? "bg-muted/40 even:bg-muted/40" : "even:bg-transparent";
+            const stripe =
+              i % 2 === 1
+                ? "[--row-tint:var(--color-row-stripe)] even:[--row-tint:var(--color-row-stripe)]"
+                : "even:[--row-tint:transparent]";
             return (
             <Fragment key={key}>
             <TableRow
@@ -179,7 +200,13 @@ export function MessageTable({
                 } else row.onKeyDown(event);
               }}
               data-state={isChecked ? "selected" : undefined}
-              className={cn(row.className, stripe, open && "border-b-0", animate && "animate-in duration-500 fade-in")}
+              className={cn(
+                "group/row",
+                row.className,
+                stripe,
+                open && "border-b-0",
+                animate && "animate-in duration-500 fade-in",
+              )}
             >
               <TableCell className="px-1 text-center">
                 <Button
@@ -202,8 +229,9 @@ export function MessageTable({
               </TableCell>
               {selectable && (
                 // Keep checkbox clicks from opening the message.
-                <TableCell onClick={(e) => e.stopPropagation()}>
+                <TableCell className="px-0" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
+                    className="mx-auto"
                     aria-label={`Select partition ${m.partition}, offset ${m.offset}`}
                     checked={isChecked}
                     onCheckedChange={(on) => toggle(on === true, [m])}
@@ -213,8 +241,22 @@ export function MessageTable({
               <TableCell className="text-right tabular-nums">{m.partition}</TableCell>
               <TableCell className="text-right tabular-nums">{m.offset}</TableCell>
               <TableCell className="text-muted-foreground tabular-nums">{formatTimestamp(m.timestamp)}</TableCell>
-              <TableCell className="truncate">{m.key?.text ?? <Null />}</TableCell>
-              <TableCell className="truncate">{m.value?.text ?? <Null />}</TableCell>
+              <TableCell className="truncate">{m.key ? previewLine(m.key.text) : <Null />}</TableCell>
+              <TableCell className="truncate">{m.value ? previewLine(m.value.text) : <Null />}</TableCell>
+              {rowAction && (
+                // Clicks (also from a menu portalled out of it) shouldn't open the message.
+                <TableCell
+                  className={cn(
+                    "px-1 text-center opacity-0 transition-opacity",
+                    "group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-focus-visible/row:opacity-100",
+                    // Stay visible while its menu is open or its send is running.
+                    "has-aria-busy:opacity-100 has-data-[state=open]:opacity-100",
+                  )}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {rowAction(m)}
+                </TableCell>
+              )}
             </TableRow>
             {open && <MessagePreview message={m} colSpan={columnCount} />}
             </Fragment>

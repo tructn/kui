@@ -4,6 +4,7 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/mona-sans";
 @import "@fontsource-variable/cascadia-code";
 @import "@fontsource-variable/fira-code";
 @import "@fontsource-variable/jetbrains-mono";
@@ -47,6 +48,9 @@
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
     --color-muted: var(--muted);
+    /* Table row tints (see TableRow), translucent like `bg-muted/40` and `/60`. */
+    --color-row-stripe: color-mix(in oklab, var(--muted) 40%, transparent);
+    --color-row-focus: color-mix(in oklab, var(--muted) 60%, transparent);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
@@ -90,13 +94,15 @@
     --json-string: oklch(0.5 0.13 150);
     --json-number: oklch(0.56 0.15 55);
     --json-boolean: oklch(0.5 0.2 310);
-    --json-null: oklch(0.62 0 0);
-    --json-punct: oklch(0.6 0 0);
+    --json-null: oklch(0.55 0 0);
+    --json-punct: oklch(0.54 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    /* Darker than shadcn's 0.556, which drops below 4.5:1 on the muted and hover backgrounds. */
+    --muted-foreground: oklch(0.54 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
+    /* red-700: destructive text sits on its own 10-20% tint, which needs the deeper shade. */
+    --destructive: oklch(0.505 0.213 27.518);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: var(--brand);
@@ -152,24 +158,25 @@
 
 /*
  * Accent color schemes, set as data-accent on <html> by the appearance store.
- * Violet is the default (:root above), matching the app icon. Light mode uses a deeper Tailwind
- * shade than dark, so text on the accent stays readable in both. Amber is the one color bright
- * enough in dark mode to take dark text, as neutral does; the rest keep white text, which is
- * why green, teal and orange use their 600 shade in dark.
+ * Violet is the default (:root above), matching the app icon. The accent is both a fill under
+ * --brand-foreground and a text color on the background, and both must reach WCAG AA (4.5:1).
+ * Light mode uses a deep shade with near-white text. Dark mode can't keep white text: no shade is
+ * dark enough for white text yet light enough to read on the near-black background. So dark uses
+ * a bright shade (400 or 500) with the color's 950 as text.
  */
-.dark { --brand: oklch(0.606 0.25 292.717); }
+.dark { --brand: oklch(0.702 0.183 293.541); --brand-foreground: oklch(0.283 0.141 291.089); }
 [data-accent="amber"] { --brand: oklch(0.555 0.163 48.998); --brand-foreground: oklch(0.987 0.022 95.277); }
 .dark[data-accent="amber"] { --brand: oklch(0.769 0.188 70.08); --brand-foreground: oklch(0.279 0.077 45.635); }
-[data-accent="rose"] { --brand: oklch(0.586 0.253 17.585); --brand-foreground: oklch(0.969 0.015 12.422); }
-.dark[data-accent="rose"] { --brand: oklch(0.645 0.246 16.439); }
+[data-accent="rose"] { --brand: oklch(0.514 0.222 16.935); --brand-foreground: oklch(0.969 0.015 12.422); }
+.dark[data-accent="rose"] { --brand: oklch(0.712 0.194 13.428); --brand-foreground: oklch(0.271 0.105 12.094); }
 [data-accent="blue"] { --brand: oklch(0.546 0.245 262.881); --brand-foreground: oklch(0.97 0.014 254.604); }
-.dark[data-accent="blue"] { --brand: oklch(0.623 0.214 259.815); }
+.dark[data-accent="blue"] { --brand: oklch(0.707 0.165 254.624); --brand-foreground: oklch(0.282 0.091 267.935); }
 [data-accent="green"] { --brand: oklch(0.527 0.154 150.069); --brand-foreground: oklch(0.982 0.018 155.826); }
-.dark[data-accent="green"] { --brand: oklch(0.627 0.194 149.214); }
+.dark[data-accent="green"] { --brand: oklch(0.723 0.219 149.579); --brand-foreground: oklch(0.266 0.065 152.934); }
 [data-accent="teal"] { --brand: oklch(0.511 0.096 186.391); --brand-foreground: oklch(0.984 0.014 180.72); }
-.dark[data-accent="teal"] { --brand: oklch(0.6 0.118 184.704); }
-[data-accent="orange"] { --brand: oklch(0.646 0.222 41.116); --brand-foreground: oklch(0.98 0.016 73.684); }
-.dark[data-accent="orange"] { --brand: oklch(0.646 0.222 41.116); }
+.dark[data-accent="teal"] { --brand: oklch(0.704 0.14 182.503); --brand-foreground: oklch(0.277 0.046 192.524); }
+[data-accent="orange"] { --brand: oklch(0.553 0.195 38.402); --brand-foreground: oklch(0.98 0.016 73.684); }
+.dark[data-accent="orange"] { --brand: oklch(0.705 0.213 47.604); --brand-foreground: oklch(0.266 0.079 36.259); }
 [data-accent="neutral"] { --brand: oklch(0.205 0 0); --brand-foreground: oklch(0.985 0 0); }
 .dark[data-accent="neutral"] { --brand: oklch(0.922 0 0); --brand-foreground: oklch(0.205 0 0); }
 
