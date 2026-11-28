@@ -16,15 +16,17 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${units[unit]}`;
 }
 
-/** Local date-time with milliseconds, e.g. `2026-10-12 08:15:02.123`. */
+// Every time in the UI is UTC, so it reads the same as broker logs and on every teammate's machine.
+
+/** UTC date-time with milliseconds, e.g. `2026-10-12 08:15:02.123 UTC`. */
 export function formatTimestamp(epochMs: number | null): string {
   if (epochMs == null) return "—";
-  const d = new Date(epochMs);
-  const pad = (n: number, width = 2) => String(n).padStart(width, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
-  );
+  return `${new Date(epochMs).toISOString().slice(0, 23).replace("T", " ")} UTC`;
+}
+
+/** UTC date-time to the second, e.g. `2026-10-12 08:15:02 UTC`. */
+export function formatDateTime(epochMs: number): string {
+  return `${new Date(epochMs).toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
 
 /**

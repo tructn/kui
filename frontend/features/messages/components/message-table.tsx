@@ -181,7 +181,7 @@ export function MessageTable({
             {head("value", "Value", "")}
           </TableRow>
         </TableHeader>
-        <TableBody className="font-mono text-xs">
+        <TableBody className="font-mono text-code">
           {items.map((m, i) => {
             const key = messageKey(m);
             const row = rowProps(i, () => onSelect(m));

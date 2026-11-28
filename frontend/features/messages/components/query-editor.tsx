@@ -346,7 +346,7 @@ const multiLineTheme = EditorView.theme({
     color: "var(--muted-foreground)",
     borderRight: "1px solid var(--border)",
   },
-  ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 12px", minWidth: "32px", fontSize: "11.5px", opacity: "0.7" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 12px", minWidth: "32px", fontSize: "0.9em", opacity: "0.7" },
   ".cm-activeLine": { backgroundColor: "color-mix(in oklab, var(--muted) 40%, transparent)" },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--foreground)" },
   ".cm-activeLineGutter.cm-gutterElement": { opacity: "1" },
@@ -360,7 +360,7 @@ const multiLineTheme = EditorView.theme({
 
 /** Blends the editor into the surrounding input group and themes the popups. */
 const theme = EditorView.theme({
-  "&": { fontSize: "13px", backgroundColor: "transparent" },
+  "&": { fontSize: "var(--text-code)", backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.5" },
   ".cm-content": { caretColor: "var(--foreground)" },
@@ -373,7 +373,7 @@ const theme = EditorView.theme({
     overflow: "hidden",
     boxShadow: "0 8px 24px rgb(0 0 0 / 0.12)",
   },
-  ".cm-tooltip.cm-tooltip-autocomplete > ul": { fontFamily: "var(--font-mono)", fontSize: "12.5px", maxHeight: "18rem", minWidth: "22rem" },
+  ".cm-tooltip.cm-tooltip-autocomplete > ul": { fontFamily: "var(--font-mono)", fontSize: "var(--text-code)", maxHeight: "18rem", minWidth: "22rem" },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li": { padding: "3px 10px", display: "flex", gap: "16px" },
   ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: "var(--accent)", color: "var(--accent-foreground)" },
   ".cm-completionLabel": { flex: "1" },

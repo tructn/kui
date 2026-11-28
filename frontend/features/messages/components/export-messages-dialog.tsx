@@ -17,7 +17,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { formatNumber } from "@/lib/format";
+import { formatDateTime, formatNumber } from "@/lib/format";
 
 import { useExportMessages } from "../queries";
 import type { BrowseRequest, ExportFormat, ExportSource, MessageRef } from "../types";
@@ -176,6 +176,6 @@ function rangeLabel(request: BrowseRequest): string {
     case "offset":
       return `From offset ${request.value ?? 0}${where}`;
     case "timestamp":
-      return `From ${request.value == null ? "the chosen time" : new Date(request.value).toLocaleString()}${where}`;
+      return `From ${request.value == null ? "the chosen time" : formatDateTime(request.value)}${where}`;
   }
 }

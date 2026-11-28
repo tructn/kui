@@ -599,18 +599,17 @@ function valueItems(s: State, catalog: FieldCatalog, prefix: string, partial: To
 
 type ValueLike = string | number | boolean | null;
 
-/** Date strings the filter understands, for comparing with `timestamp`. */
+/** Date strings the filter understands, for comparing with `timestamp`. A date without a zone is UTC. */
 function timeItems(end: string): Suggestion[] {
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const day = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const minute = (d: Date) => `${day(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const minute = (d: Date) => d.toISOString().slice(0, 16).replace("T", " ");
   const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   return [
-    { label: `'${minute(hourAgo)}'`, detail: "an hour ago" },
-    { label: `'${day(now)}'`, detail: "today, local time" },
-    { label: `'${day(yesterday)}'`, detail: "yesterday" },
+    { label: `'${minute(hourAgo)}'`, detail: "an hour ago, UTC" },
+    { label: `'${day(now)}'`, detail: "today, UTC" },
+    { label: `'${day(yesterday)}'`, detail: "yesterday, UTC" },
     { label: `'${now.toISOString().slice(0, 19)}Z'`, detail: "now, UTC" },
   ].map((i) => ({ ...i, insert: i.label + end, kind: "value" as const, retrigger: true }));
 }
