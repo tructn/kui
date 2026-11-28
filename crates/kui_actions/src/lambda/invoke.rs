@@ -109,8 +109,9 @@ mod tests {
     async fn reports_a_stopped_endpoint() {
         let endpoint = closed_endpoint().await;
         for (runtime, command) in [(LambdaRuntime::Sam, "sam local"), (LambdaRuntime::TestTool, "lambda-test-tool")] {
+            // Windows retries a refused SYN for about 2s before failing, so a shorter timeout fires first.
             let out =
-                invoke(&client().unwrap(), &call(runtime, &endpoint, "Fn", Duration::from_secs(2)), b"{}".to_vec())
+                invoke(&client().unwrap(), &call(runtime, &endpoint, "Fn", Duration::from_secs(15)), b"{}".to_vec())
                     .await;
             assert_eq!(out.status, ExecutionStatus::Failed);
             let error = out.error.unwrap();
