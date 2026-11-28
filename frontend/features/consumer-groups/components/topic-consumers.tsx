@@ -30,6 +30,7 @@ export function TopicConsumers({ clusterId, topic }: { clusterId: string; topic:
       {consumers.data?.map((c) => (
         <ProgressSection
           key={c.group}
+          pinScope={[clusterId, c.group, topic]}
           title={c.group}
           progress={c.progress}
           offsets={c.offsets}

@@ -37,7 +37,7 @@ export function BrokersPage() {
   const data = overview.data;
   const sorter = useSort("brokers", data?.brokers ?? NO_BROKERS, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("brokers", 5);
+  const resize = useColumnResize("brokers", 5, [clusterId]);
   // Stat value until the overview arrives: pulsing while it loads, a dash if it failed.
   const placeholder = overview.isPending ? <Skeleton className="h-8 w-12" /> : "—";
 

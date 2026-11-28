@@ -51,6 +51,8 @@
     /* Table row tints (see TableRow), translucent like `bg-muted/40` and `/60`. */
     --color-row-stripe: color-mix(in oklab, var(--muted) 40%, transparent);
     --color-row-focus: color-mix(in oklab, var(--muted) 60%, transparent);
+    /* Opaque, so scrolled cells don't show through pinned ones (see pinnedColumnsCss). */
+    --color-pinned: color-mix(in oklab, var(--muted) 55%, var(--background));
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);

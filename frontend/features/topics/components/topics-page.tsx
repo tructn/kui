@@ -54,7 +54,7 @@ export function TopicsPage() {
 
   const sorter = useSort("topics", visible, COLUMNS);
   const pager = usePagination(sorter.rows, `${search}|${regex}|${showInternal}|${sorter.key}`);
-  const resize = useColumnResize("topics", 6);
+  const resize = useColumnResize("topics", 6, [clusterId]);
   const rowProps = useRowNavigation(pager.items.length);
 
   // Only topics matching the filter count as selected, so a filter can't hide

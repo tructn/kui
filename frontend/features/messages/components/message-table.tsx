@@ -34,6 +34,8 @@ interface MessageTableProps {
   loading?: boolean;
   /** A per-row control in a last column, shown on hover or focus so the grid stays quiet. */
   rowAction?: (message: KafkaMessage) => ReactNode;
+  /** Names the topic, so its pinned columns are its own (see `useColumnResize`). */
+  pinScope: readonly string[];
 }
 
 export const messageKey = (m: MessageRef) => `${m.partition}/${m.offset}`;
@@ -58,6 +60,7 @@ export function MessageTable({
   onCheckedChange,
   loading = false,
   rowAction,
+  pinScope,
 }: MessageTableProps) {
   // With server-side paging only the loaded page is here, so sorting reorders
   // that page; otherwise it sorts every message before paging.
@@ -73,6 +76,7 @@ export function MessageTable({
   const resize = useColumnResize(
     `messages${rowAction ? "-action" : ""}-expand${selectable ? "-select" : ""}`,
     columnCount,
+    pinScope,
   );
   const pageChecked = selectable ? items.filter((m) => checked.has(messageKey(m))).length : 0;
   const allChecked = items.length > 0 && pageChecked === items.length;

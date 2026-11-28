@@ -1,21 +1,34 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { useTablePrefs } from "@/app/stores/table-store";
-import { resizeColumn, togglePinned, type ColumnLayout } from "@/lib/column-widths";
+import {
+  displayOrder,
+  measuredWidths,
+  permute,
+  pinKey,
+  resizeColumn,
+  togglePinned,
+  unpermute,
+  validPins,
+  type ColumnLayout,
+} from "@/lib/column-widths";
 
 /** How far ← / → move a focused resize handle, in px. */
 const KEY_STEP = 16;
 
-const NONE: readonly number[] = [];
-
 /** Passed to `<Table resize={...}>`; the table's headers then get drag handles. */
 export interface ColumnResize {
-  /** Column widths in px, or null for the browser's automatic layout. */
+  /** Column widths in px in display order, or null for the browser's automatic layout. */
   widths: number[] | null;
+  /**
+   * The column each display slot shows (see `displayOrder`), or null while
+   * nothing is pinned. Rows render their cells in this order.
+   */
+  order: readonly number[] | null;
   onPointerDown: (event: PointerEvent<HTMLElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
-  /** Indices of the columns that stay on screen while the table scrolls sideways. Empty without `widths`. */
-  pinned: readonly number[];
+  /** How many leading display slots are pinned: they stay on screen while the table scrolls sideways. */
+  pinnedCount: number;
   /** Pins or unpins the column of the header cell holding `control`. */
   togglePin: (control: HTMLElement) => void;
   /** Back to automatic widths, with no column pinned. */
@@ -31,22 +44,33 @@ export interface ColumnResize {
  * the table always fills its frame. Header and body cells share the table's
  * column widths, so they always stay aligned.
  *
- * A pinned column sticks to the frame's left edge (after any pinned columns
- * before it). Its offset depends on those widths, so pinning first fixes the
- * current widths, as a resize does; pins only apply while widths are set.
+ * Pinned columns move to the front, in the order they were pinned, and stick
+ * to the frame's left edge; the columns they jumped over (like the expand
+ * toggle) follow them instead of scrolling underneath. Their offsets depend on
+ * the widths, so pinning first fixes the current widths, as a resize does;
+ * pins only apply while widths are set. Widths are saved in column order and
+ * shown in display order.
+ *
+ * Widths are shared by every table of the kind `tableId`; pins belong to the
+ * one table `scope` names (e.g. `[clusterId, topic]`), so pinning a column of
+ * one topic's partitions doesn't pin it for every topic.
  *
  * `columnCount` guards against widths and pins saved for an older version of the table.
  */
-export function useColumnResize(tableId: string, columnCount: number): ColumnResize {
+export function useColumnResize(tableId: string, columnCount: number, scope: readonly string[]): ColumnResize {
   const saved = useTablePrefs((s) => s.columnWidths[tableId]);
   const save = useTablePrefs((s) => s.setColumnWidths);
-  const savedPins = useTablePrefs((s) => s.pinnedColumns[tableId]);
+  const pinsAt = pinKey(tableId, scope);
+  const savedPins = useTablePrefs((s) => s.pinnedColumns[pinsAt]);
   const savePins = useTablePrefs((s) => s.setPinnedColumns);
   // Widths while dragging; saved (one settings write) when the pointer is released.
   const [draft, setDraft] = useState<number[] | null>(null);
   const current = draft ?? (isValid(saved, columnCount) ? saved : null);
-  const pinned = current && savedPins ? savedPins.filter((c) => c >= 0 && c < columnCount) : NONE;
+  const pinned = current && savedPins ? validPins(columnCount, savedPins) : [];
+  const order = pinned.length > 0 ? displayOrder(columnCount, pinned) : null;
+  const toColumns = (px: number[]) => (order ? unpermute(px, order) : px);
 
+  /** The layout in display order, which is what a drag or the neighbour rule sees. */
   function measure(handle: HTMLElement): ColumnLayout | null {
     const cell = handle.closest("th");
     const row = cell?.parentElement as HTMLTableRowElement | null;
@@ -54,26 +78,28 @@ export function useColumnResize(tableId: string, columnCount: number): ColumnRes
     if (!cell || !row || !container) return null;
     return {
       column: cell.cellIndex,
-      px: [...row.cells].map((c) => c.getBoundingClientRect().width),
+      px: measuredWidths([...row.cells].map((c) => c.getBoundingClientRect().width)),
       available: container.getBoundingClientRect().width,
     };
   }
 
   return {
-    widths: current,
+    widths: current && order ? permute(current, order) : current,
+    order,
+    pinnedCount: pinned.length,
     onPointerDown(event) {
       if (event.button !== 0) return;
       const measured = measure(event.currentTarget);
       if (!measured) return;
       event.preventDefault(); // no text selection while dragging
-      const start = measured.px.map(Math.round);
+      const start = toColumns(measured.px);
       const startX = event.clientX;
       let latest = start;
       setDraft(start);
       document.body.style.cursor = "col-resize";
 
       const move = (e: globalThis.PointerEvent) => {
-        latest = resizeColumn(measured, e.clientX - startX);
+        latest = toColumns(resizeColumn(measured, e.clientX - startX));
         setDraft(latest);
       };
       const end = () => {
@@ -95,18 +121,17 @@ export function useColumnResize(tableId: string, columnCount: number): ColumnRes
       const measured = measure(event.currentTarget);
       if (!measured) return;
       event.preventDefault();
-      save(tableId, resizeColumn(measured, delta));
+      save(tableId, toColumns(resizeColumn(measured, delta)));
     },
-    pinned,
     togglePin(control) {
       const measured = measure(control);
       if (!measured) return;
-      if (!current) save(tableId, measured.px.map(Math.round));
-      savePins(tableId, togglePinned(pinned, measured.column));
+      if (!current) save(tableId, toColumns(measured.px));
+      savePins(pinsAt, togglePinned(pinned, order ? order[measured.column] : measured.column));
     },
     reset() {
       save(tableId, null);
-      savePins(tableId, null);
+      savePins(pinsAt, null);
     },
   };
 }

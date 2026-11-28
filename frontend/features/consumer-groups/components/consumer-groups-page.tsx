@@ -50,7 +50,7 @@ export function ConsumerGroupsPage() {
   );
   const sorter = useSort("consumer-groups", visible, columns);
   const pager = usePagination(sorter.rows, `${search}|${sorter.key}`);
-  const resize = useColumnResize("consumer-groups", 6);
+  const resize = useColumnResize("consumer-groups", 6, [clusterId]);
   const rowProps = useRowNavigation(pager.items.length);
 
   function refresh() {

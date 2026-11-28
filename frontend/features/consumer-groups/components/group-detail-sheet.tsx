@@ -110,7 +110,7 @@ function GroupDetailBody({
   const topics = detail?.topics ?? [];
   const memberSort = useSort("group-members", detail?.members ?? NO_MEMBERS, MEMBER_COLUMNS);
   const members = usePagination(memberSort.rows, memberSort.key);
-  const memberResize = useColumnResize("group-members", 3);
+  const memberResize = useColumnResize("group-members", 3, [clusterId, name]);
   // The topic the reset dialog opens on; a new key each time starts it fresh.
   const [resetTopic, setResetTopic] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -197,6 +197,7 @@ function GroupDetailBody({
         {topics.map((t) => (
           <ProgressSection
             key={t.topic}
+            pinScope={[clusterId, name, t.topic]}
             title={t.topic}
             progress={t}
             offsets={detail?.offsets.filter((o) => o.topic === t.topic) ?? []}

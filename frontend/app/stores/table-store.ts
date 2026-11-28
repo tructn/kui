@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { withPins } from "@/lib/column-widths";
 import { settingsStorage } from "@/lib/settings-storage";
 
 interface TableState {
@@ -14,10 +15,10 @@ interface TableState {
   columnWidths: Record<string, number[]>;
   /** `null` goes back to automatic widths. */
   setColumnWidths: (tableId: string, widths: number[] | null) => void;
-  /** Pinned column indices by table id (see `useColumnResize`). */
+  /** Pinned column indices by `pinKey`: one table instance, not every table of its kind. */
   pinnedColumns: Record<string, number[]>;
   /** `null` or empty unpins every column. */
-  setPinnedColumns: (tableId: string, pinned: number[] | null) => void;
+  setPinnedColumns: (key: string, pinned: number[] | null) => void;
 }
 
 export const useTablePrefs = create<TableState>()(
@@ -36,13 +37,8 @@ export const useTablePrefs = create<TableState>()(
           return { columnWidths };
         }),
       pinnedColumns: {},
-      setPinnedColumns: (tableId, pinned) =>
-        set((state) => {
-          const pinnedColumns = { ...state.pinnedColumns };
-          if (pinned?.length) pinnedColumns[tableId] = pinned;
-          else delete pinnedColumns[tableId];
-          return { pinnedColumns };
-        }),
+      setPinnedColumns: (key, pinned) =>
+        set((state) => ({ pinnedColumns: withPins(state.pinnedColumns, key, pinned) })),
     }),
     { name: "kui.tables", storage: settingsStorage() },
   ),

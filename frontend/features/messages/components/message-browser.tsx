@@ -178,6 +178,7 @@ export function MessageBrowser({
         <>
           {tail.error && <ErrorState error={tail.error} onRetry={() => toggleLive(false)} />}
           <MessageTable
+            pinScope={[clusterId, topic]}
             messages={tail.messages}
             onSelect={setSelected}
             rowAction={rowAction}
@@ -196,6 +197,7 @@ export function MessageBrowser({
           {messages.error && <ErrorState error={messages.error} onRetry={() => messages.refetch()} />}
           {/* The table shows even before the first page arrives (or when it fails), just empty. */}
           <MessageTable
+            pinScope={[clusterId, topic]}
             messages={pager.items}
             pager={pager}
             onSelect={setSelected}

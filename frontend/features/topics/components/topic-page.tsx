@@ -136,6 +136,7 @@ export function TopicPage({ topic }: { topic: string }) {
               <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
             )}
             <PartitionsTable
+              pinScope={[clusterId, topic]}
               partitions={detail.data?.partitions ?? NO_PARTITIONS}
               emptyText={detail.data ? undefined : emptyText(detail, "")}
             />
@@ -148,6 +149,7 @@ export function TopicPage({ topic }: { topic: string }) {
               <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
             )}
             <ConfigsTable
+              pinScope={[clusterId, topic]}
               configs={detail.data?.configs ?? NO_CONFIGS}
               emptyText={detail.data ? undefined : emptyText(detail, "")}
             />

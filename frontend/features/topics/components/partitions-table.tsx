@@ -23,10 +23,19 @@ const COLUMNS: SortColumns<Partition, "id" | "leader" | "replicas" | "isr" | "lo
 };
 
 /** `emptyText` replaces "No partitions." while the topic is loading or failed. */
-export function PartitionsTable({ partitions, emptyText }: { partitions: Partition[]; emptyText?: ReactNode }) {
+export function PartitionsTable({
+  partitions,
+  emptyText,
+  pinScope,
+}: {
+  partitions: Partition[];
+  emptyText?: ReactNode;
+  /** Names the topic, so its pinned columns are its own (see `useColumnResize`). */
+  pinScope: readonly string[];
+}) {
   const sorter = useSort("topic-partitions", partitions, COLUMNS);
   const pager = usePagination(sorter.rows, sorter.key);
-  const resize = useColumnResize("partitions", 7);
+  const resize = useColumnResize("partitions", 7, pinScope);
   return (
     <TableFrame pager={pager}>
       <Table resize={resize}>

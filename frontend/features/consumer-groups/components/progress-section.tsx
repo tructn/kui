@@ -17,10 +17,12 @@ interface ProgressSectionProps {
   progress: TopicProgress;
   offsets: PartitionOffset[];
   defaultOpen?: boolean;
+  /** Names the group and topic, for the partition table's pinned columns. */
+  pinScope: readonly string[];
 }
 
 /** One group × topic: totals and a bar, expanding to every partition. */
-export function ProgressSection({ title, extra, progress, offsets, defaultOpen = false }: ProgressSectionProps) {
+export function ProgressSection({ title, extra, progress, offsets, defaultOpen = false, pinScope }: ProgressSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   const read = progress.consumed + progress.lag > 0;
 
@@ -66,7 +68,7 @@ export function ProgressSection({ title, extra, progress, offsets, defaultOpen =
       </div>
       {open && (
         <div className="border-t">
-          <PartitionOffsetsTable offsets={offsets} />
+          <PartitionOffsetsTable offsets={offsets} pinScope={pinScope} />
         </div>
       )}
     </div>

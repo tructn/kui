@@ -19,17 +19,17 @@ function Table({
 }: React.ComponentProps<"table"> & { resize?: ColumnResize }) {
   const widths = resize?.widths
   const pinScope = React.useId()
-  const pinned = widths && resize.pinned.length > 0 ? resize.pinned : null
+  const pinned = widths && resize.pinnedCount > 0 ? resize.pinnedCount : 0
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
-      {pinned && widths && <style>{pinnedColumnsCss(pinScope, widths, pinned)}</style>}
+      {pinned > 0 && widths && <style>{pinnedColumnsCss(pinScope, widths, pinned)}</style>}
       <ColumnResizeContext.Provider value={resize ?? null}>
         <table
           data-slot="table"
-          data-pin-scope={pinned ? pinScope : undefined}
+          data-pin-scope={pinned > 0 ? pinScope : undefined}
           // Fixed widths need fixed layout. The table is as wide as its columns
           // (the frame scrolls sideways when that's wider than it) but never
           // narrower than the frame. Header and body cells share these columns.
@@ -97,7 +97,8 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
  * pinned cells (see `pinnedColumnsCss`) can paint the same tint over an opaque
  * background. Restyle a row by setting that variable rather than its background.
  */
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+function TableRow({ className, children, ...props }: React.ComponentProps<"tr">) {
+  const order = React.useContext(ColumnResizeContext)?.order
   return (
     <tr
       data-slot="table-row"
@@ -106,8 +107,19 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
         className
       )}
       {...props}
-    />
+    >
+      {order ? inDisplayOrder(children, order) : children}
+    </tr>
   )
+}
+
+/**
+ * Cells moved so pinned columns come first (see `useColumnResize`). Rows that
+ * don't have one cell per column, like a single `colSpan` cell, stay as they are.
+ */
+function inDisplayOrder(children: React.ReactNode, order: readonly number[]): React.ReactNode {
+  const cells = React.Children.toArray(children)
+  return cells.length === order.length ? order.map((column) => cells[column]) : children
 }
 
 /**
@@ -130,7 +142,8 @@ function TableHead({
     if (index !== column) setColumn(index)
   })
   const showPin = resize != null && pinnable
-  const pinned = showPin && resize.pinned.includes(column)
+  // `column` is the display slot; pinned columns fill the first ones.
+  const pinned = showPin && column >= 0 && column < resize.pinnedCount
   return (
     <th
       data-slot="table-head"
