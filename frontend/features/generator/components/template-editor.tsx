@@ -157,7 +157,7 @@ const highlighting = ViewPlugin.fromClass(
 );
 
 const theme = EditorView.theme({
-  "&": { flex: "1", minWidth: "0", fontSize: "12.5px", backgroundColor: "transparent" },
+  "&": { flex: "1", minWidth: "0", fontSize: "var(--text-code)", backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { overflow: "auto", fontFamily: "var(--font-mono)", lineHeight: "1.55" },
   ".cm-content": { padding: "8px 0", caretColor: "var(--foreground)" },
@@ -168,7 +168,7 @@ const theme = EditorView.theme({
     color: "var(--muted-foreground)",
     borderRight: "1px solid var(--border)",
   },
-  ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 10px", minWidth: "28px", fontSize: "11px", opacity: "0.7" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 10px", minWidth: "28px", fontSize: "0.9em", opacity: "0.7" },
   ".cm-activeLine": { backgroundColor: "color-mix(in oklab, var(--muted) 40%, transparent)" },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--foreground)" },
   "&.cm-focused .cm-matchingBracket": {

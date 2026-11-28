@@ -18,7 +18,7 @@ export interface Preset {
 /** Starting points for common kinds of events. Users can edit them freely. */
 export const PRESETS: Preset[] = [
   {
-    label: "E-commerce orders",
+    label: "E-commerce",
     icon: ShoppingCart01Icon,
     template: {
       key: "order-{{seq}}",
@@ -41,7 +41,7 @@ export const PRESETS: Preset[] = [
     },
   },
   {
-    label: "User sign-ups",
+    label: "Sign-ups",
     icon: UserAdd01Icon,
     template: {
       key: "{{uuid}}",

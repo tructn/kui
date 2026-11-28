@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { DiceIcon, StopIcon } from "@hugeicons/core-free-icons";
+import { MagicWand01Icon, StopIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { clusterKeys } from "@/features/clusters";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -37,6 +38,8 @@ import { StructurePicker } from "./structure-picker";
 import { TemplateEditor, type TemplateEditorHandle } from "./template-editor";
 
 const AUTO_PARTITION = "auto";
+/** Messages per second to start from: quick to fill a topic without flooding a shared cluster. */
+const DEFAULT_RATE = "1000";
 
 type Part = "value" | "key" | "headers";
 
@@ -77,7 +80,7 @@ export function GenerateDialog({ clusterId, topic, partitions, getSamples }: Gen
   const [locale, setLocale] = useState<Locale>("en");
   const [partition, setPartition] = useState(AUTO_PARTITION);
   const [count, setCount] = useState("1000");
-  const [rate, setRate] = useState("");
+  const [rate, setRate] = useState(DEFAULT_RATE);
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
   const editors = { value: useRef<TemplateEditorHandle>(null), headers: useRef<TemplateEditorHandle>(null) };
@@ -172,7 +175,7 @@ export function GenerateDialog({ clusterId, topic, partitions, getSamples }: Gen
     <Dialog open={open} onOpenChange={openChange}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          <HugeiconsIcon icon={DiceIcon} /> Generate
+          <HugeiconsIcon icon={MagicWand01Icon} /> Generate
         </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-5xl">
@@ -188,16 +191,23 @@ export function GenerateDialog({ clusterId, topic, partitions, getSamples }: Gen
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
           {/* Only the body scrolls, so the header and the Generate button stay in view. */}
-          <fieldset disabled={run != null} className="-mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
-            {structures.length > 0 && (
-              <StructurePicker
-                structures={structures}
-                sampled={sampled}
-                active={activeStructure}
-                onPick={(s: Structure) => apply(s.template)}
-              />
-            )}
-            <PresetPicker presets={PRESETS} active={activePreset} onPick={(p) => apply(p.template)} />
+          {/* min-w-0 overrides the fieldset's default min-content width, which let a long chip row widen the dialog. */}
+          <fieldset disabled={run != null} className="-mx-4 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
+            {/* One row: the topic's own shapes first, since most runs reuse them, then the scenarios. */}
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5 py-1">
+              {structures.length > 0 && (
+                <>
+                  <StructurePicker
+                    structures={structures}
+                    sampled={sampled}
+                    active={activeStructure}
+                    onPick={(s: Structure) => apply(s.template)}
+                  />
+                  <Separator orientation="vertical" className="mx-1 h-5 data-vertical:self-center" />
+                </>
+              )}
+              <PresetPicker presets={PRESETS} active={activePreset} onPick={(p) => apply(p.template)} />
+            </div>
 
             <div className="grid min-h-0 gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
               <Tabs value={part} onValueChange={(v) => setPart(v as Part)} className="min-w-0">
@@ -330,7 +340,7 @@ export function GenerateDialog({ clusterId, topic, partitions, getSamples }: Gen
                       type="number"
                       min={1}
                       className="font-mono"
-                      placeholder="Max"
+                      placeholder="No limit"
                       value={rate}
                       onChange={(e) => setRate(e.target.value)}
                     />
@@ -347,7 +357,7 @@ export function GenerateDialog({ clusterId, topic, partitions, getSamples }: Gen
               </Button>
             ) : (
               <Button type="submit" disabled={preview.error != null}>
-                <HugeiconsIcon icon={DiceIcon} /> Generate {formatNumber(Number(count) || 0)}
+                <HugeiconsIcon icon={MagicWand01Icon} /> Generate {formatNumber(Number(count) || 0)}
               </Button>
             )}
           </DialogFooter>

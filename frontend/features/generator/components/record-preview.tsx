@@ -38,7 +38,7 @@ export function RecordPreview({ records, error, loading, stale, onShuffle }: Rec
         </Button>
       </div>
       {error && (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 font-mono text-xs break-all text-destructive">
+        <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 font-mono text-code break-all text-destructive">
           {error.message}
         </p>
       )}
