@@ -6,6 +6,33 @@ All notable changes to KUI are documented here. Versions follow
 This file is written by [release-please](https://github.com/googleapis/release-please) from the
 Conventional Commit titles on `main`; see "Releasing" in CONTRIBUTING.md rather than editing it by hand.
 
+## [0.3.0-beta.1](https://github.com/tructn/kui/compare/v0.2.0...v0.3.0-beta.1) (2026-11-28)
+
+
+### chore
+
+* release 0.3.0-beta.1 ([a25779f](https://github.com/tructn/kui/commit/a25779fe5d5dfdb41be2ca8ba9b277204d621660))
+
+
+### Added
+
+* **actions:** give each action its own page and import or export them ([15a0e45](https://github.com/tructn/kui/commit/15a0e45a3aa298e92d753029b141cc2ba125044b))
+* **actions:** run Kafka messages through Lambda and HTTP handlers ([d9df18f](https://github.com/tructn/kui/commit/d9df18f5776d91b919ba89d21f00cbb868055986))
+* **actions:** send single messages to actions and polish the UI ([84d8d4c](https://github.com/tructn/kui/commit/84d8d4c92d113eafd7ce7e7c51e86d7acba11e0e))
+* **actions:** show the debug button first and always visible ([76c33ae](https://github.com/tructn/kui/commit/76c33ae98fddd35b90270e24e30ba705b391540a))
+* **appearance:** add a glossy accent finish and Be Vietnam Pro font ([39d6e4b](https://github.com/tructn/kui/commit/39d6e4b1d2d53cda88f43ac079c9c54865471b6e))
+* **brokers:** mask hidden addresses and ports with made-up values ([3f2aa4f](https://github.com/tructn/kui/commit/3f2aa4f319236edd7122b69612ddc48e5adcff07))
+* **generator:** show the topic's message shapes as template chips ([d0ad1f3](https://github.com/tructn/kui/commit/d0ad1f3f43d9a0190f70f4cf553408f5274142ad))
+* **messages:** put partition and start filters inside the query bar ([e5aded5](https://github.com/tructn/kui/commit/e5aded56bccdbba7cdb4c7d9254d767d2249f201))
+* **messages:** show times in UTC and move filters into a popover ([bad0da1](https://github.com/tructn/kui/commit/bad0da1f4ee2832ee007958ca388e48ba91a7652))
+* **privacy:** hide cluster names and bootstrap servers on screen ([#47](https://github.com/tructn/kui/issues/47)) ([af71e1b](https://github.com/tructn/kui/commit/af71e1bc4caf1d7a13dab3c0faf3c77f39853356))
+
+
+### Fixed
+
+* **deps:** update cookie and url for two RustSec advisories ([4927e45](https://github.com/tructn/kui/commit/4927e4540e54dbcf53ec5423fa50c7e09077cc33))
+* **tables:** pin several columns per table and unpin them reliably ([02eb091](https://github.com/tructn/kui/commit/02eb0919d87e166612b729d8c7a1fbfffcdd4cdb))
+
 ## [0.2.0](https://github.com/tructn/kui/compare/v0.1.1...v0.2.0) (2026-11-14)
 
 
