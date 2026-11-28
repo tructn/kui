@@ -3,7 +3,6 @@ import { callCommand } from "@/lib/invoke";
 
 import type {
   Action,
-  Discovery,
   EndpointCheck,
   ExecutionDetail,
   ExecutionSummary,
@@ -15,6 +14,11 @@ export const actionsApi = {
   list: (clusterId: string) => callCommand<Action[]>("list_actions", { clusterId }),
   save: (action: Action) => callCommand<Action>("save_action", { action }),
   remove: (actionId: string) => callCommand<void>("delete_action", { actionId }),
+  /** Opens a file window in Rust and adds the file's Actions to the cluster. `null` when the user cancels. */
+  import: (clusterId: string) => callCommand<Action[] | null>("import_actions", { clusterId }),
+  /** Opens a save window in Rust and writes a shareable file. The path, or `null` when the user cancels. */
+  export: (clusterId: string, actionIds: string[]) =>
+    callCommand<string | null>("export_actions", { clusterId, actionIds }),
   statuses: (clusterId: string) => callCommand<RunStatus[]>("action_statuses", { clusterId }),
   /** Joins the Action's consumer group and starts invoking; commits offsets as it goes. */
   start: (actionId: string) => callCommand<RunStatus>("start_action", { actionId }),
@@ -28,7 +32,4 @@ export const actionsApi = {
   clearHistory: (actionId: string) => callCommand<void>("clear_action_history", { actionId }),
   checkEndpoint: (endpoint: string, runtime: LambdaRuntime) =>
     callCommand<EndpointCheck>("check_lambda_endpoint", { endpoint, runtime }),
-  /** Opens a folder picker when `projectDir` is null; resolves null if the user cancels. */
-  discover: (projectDir: string | null) =>
-    callCommand<Discovery | null>("discover_lambda_functions", { projectDir }),
 };

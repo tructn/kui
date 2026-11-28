@@ -39,7 +39,7 @@ async fn invokes_the_example_function_through_the_test_tool() {
     let response = String::from_utf8(out.response.unwrap()).unwrap();
     assert!(response.contains("\"Decision\""), "{response}");
 
-    // HandleMsk can't read a plain order, so the handler throws.
+    // OrderProcessor can't read a plain order, so the handler throws.
     let out = lambda::invoke(&client, &call("OrderProcessor"), br#"{"orderId":"o9"}"#.to_vec()).await;
     assert_eq!(out.status, ExecutionStatus::FunctionError);
     assert!(!out.retryable);

@@ -7,7 +7,6 @@
 //! only in `kafka`: the runner reads through `run::MessageSource`, so its
 //! delivery guarantees are tested with a fake source, without a broker.
 
-pub mod discovery;
 mod error;
 pub mod executor;
 pub mod kafka;
@@ -16,6 +15,7 @@ pub mod model;
 pub mod payload;
 pub mod record;
 pub mod run;
+pub mod share;
 pub mod validate;
 
 pub use error::{Error, Result};

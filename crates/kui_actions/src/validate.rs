@@ -39,11 +39,6 @@ fn lambda_target(target: &LambdaTarget) -> Result<()> {
     if !(1..=MAX_CONCURRENCY).contains(&target.concurrency) {
         return Err(Error::msg(format!("Concurrency must be 1 to {MAX_CONCURRENCY}")));
     }
-    // A run stops at the first unanswered message; with several in flight the
-    // others would finish, and be committed, past it.
-    if target.debug && target.concurrency != 1 {
-        return Err(Error::msg("Debug mode sends one message at a time: set concurrency to 1"));
-    }
     Ok(())
 }
 
@@ -72,7 +67,7 @@ pub fn function_name(name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{LambdaRuntime, PayloadFormat, Source, StartFrom};
+    use crate::model::{LambdaRuntime, Source, StartFrom};
 
     fn sample() -> Action {
         Action {
@@ -88,11 +83,8 @@ mod tests {
                 runtime: LambdaRuntime::Sam,
                 endpoint: "http://127.0.0.1:3001".into(),
                 function_name: "OrderProcessor".into(),
-                project_dir: None,
-                payload: PayloadFormat::Msk,
                 timeout_secs: 30,
                 concurrency: 1,
-                debug: false,
             }),
         }
     }
@@ -150,15 +142,10 @@ mod tests {
     }
 
     #[test]
-    fn debug_mode_runs_one_message_at_a_time() {
-        assert!(action(&with_target(|t| t.debug = true)).is_ok());
-        assert!(action(&with_target(|t| (t.debug, t.concurrency) = (true, 2))).is_err());
-    }
-
-    #[test]
-    fn actions_saved_before_runtimes_and_debug_load_as_sam() {
-        let saved = r#"{"endpoint":"http://127.0.0.1:3001","functionName":"Fn","payload":"msk","timeoutSecs":30,"concurrency":1}"#;
+    fn older_saved_actions_still_load() {
+        // Saved before runtimes existed, with the payload, project and debug settings since removed.
+        let saved = r#"{"endpoint":"http://127.0.0.1:3001","functionName":"Fn","projectDir":"/p","payload":"raw","timeoutSecs":30,"concurrency":1,"debug":true}"#;
         let target: LambdaTarget = serde_json::from_str(saved).unwrap();
-        assert_eq!((target.runtime, target.debug), (LambdaRuntime::Sam, false));
+        assert_eq!((target.runtime, target.timeout_secs), (LambdaRuntime::Sam, 30));
     }
 }

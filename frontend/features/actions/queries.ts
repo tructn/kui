@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { clusterKeys } from "@/features/clusters";
 
@@ -15,8 +15,8 @@ export const actionKeys = {
   // Run logs live outside the cluster scope: refreshing a cluster doesn't touch them.
   history: (actionId: string) => ["actions", actionId, "history"] as const,
   execution: (actionId: string, executionId: number) => ["actions", actionId, "execution", executionId] as const,
-  endpoint: (endpoint: string, runtime: LambdaRuntime) => ["actions", "endpoint", runtime, endpoint] as const,
-  discovery: (projectDir: string) => ["actions", "discovery", projectDir] as const,
+  endpoints: ["actions", "endpoint"] as const,
+  endpoint: (endpoint: string, runtime: LambdaRuntime) => [...actionKeys.endpoints, runtime, endpoint] as const,
   send: ["actions", "send"] as const,
 };
 
@@ -90,6 +90,8 @@ export function useExecution(actionId: string, executionId: number | null) {
     enabled: executionId != null,
     // A finished execution never changes.
     staleTime: Infinity,
+    // While a running action follows its newest execution, the old one stays up until the new one loads.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -104,24 +106,20 @@ export function useEndpointCheck(endpoint: string | null, runtime: LambdaRuntime
   });
 }
 
-/** The functions in a saved SAM project folder, read again each time the editor opens. */
-export function useDiscovery(projectDir: string | null) {
-  return useQuery({
-    queryKey: actionKeys.discovery(projectDir ?? ""),
-    queryFn: () => actionsApi.discover(projectDir ?? ""),
-    enabled: projectDir != null,
-    retry: false,
-  });
-}
-
-/** Asks for a project folder (a native picker) and caches what it finds under that folder. */
-export function useChooseProject() {
+/**
+ * Refetches the Actions, their statuses, run history and endpoint checks, for a Lambda runtime that came up
+ * after they loaded. A mutation only for its `isPending`: statuses poll while running, so `isFetching` would
+ * spin the button all the time.
+ */
+export function useRefreshActions(clusterId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => actionsApi.discover(null),
-    onSuccess: (found) => {
-      if (found) queryClient.setQueryData(actionKeys.discovery(found.projectDir), found);
-    },
+    mutationFn: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: actionKeys.all(clusterId) }),
+        queryClient.invalidateQueries({ queryKey: actionKeys.endpoints }),
+        queryClient.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === "actions" && queryKey[2] === "history" }),
+      ]),
   });
 }
 
@@ -139,6 +137,18 @@ export function useDeleteAction(clusterId: string) {
     mutationFn: actionsApi.remove,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: actionKeys.all(clusterId) }),
   });
+}
+
+export function useImportActions(clusterId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => actionsApi.import(clusterId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: actionKeys.all(clusterId) }),
+  });
+}
+
+export function useExportActions(clusterId: string) {
+  return useMutation({ mutationFn: (actionIds: string[]) => actionsApi.export(clusterId, actionIds) });
 }
 
 /** Start and Stop both refresh the statuses, which turns polling on or off. */

@@ -33,6 +33,10 @@ export const DESTINATIONS: readonly Destination[] = [
   { id: "http", status: "planned", title: "HTTP request", runtime: "Any local service" },
 ];
 
+export function destinationForKind(kind: ExecutorKind): AvailableDestination {
+  return BY_KIND[kind];
+}
+
 export function destinationOf(executor: Executor): AvailableDestination {
-  return BY_KIND[executor.kind];
+  return destinationForKind(executor.kind);
 }

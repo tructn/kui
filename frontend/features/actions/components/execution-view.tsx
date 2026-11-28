@@ -21,7 +21,7 @@ export function ExecutionView({ detail }: { detail: ExecutionDetail }) {
         </span>
       </div>
       {detail.error && (
-        <p className="rounded-md bg-destructive/10 p-2.5 font-mono text-xs break-all whitespace-pre-wrap text-destructive">
+        <p className="rounded-md bg-destructive/10 p-2.5 font-mono text-code break-all whitespace-pre-wrap text-destructive">
           {detail.error}
         </p>
       )}

@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
-import { defaultGroupId, draftProblems, formatDuration, isActive, isEndpoint, newDraft, suggestedPayload } from "./draft";
-import type { Action, DiscoveredFunction } from "./types";
+import {
+  defaultGroupId,
+  draftProblems,
+  emptyHistoryText,
+  formatDuration,
+  isActive,
+  isEndpoint,
+  newDraft,
+} from "./draft";
+import type { Action } from "./types";
 
 function complete(): Action {
   const draft = newDraft("local");
@@ -35,6 +43,14 @@ describe("draftProblems", () => {
     action.executor = { ...action.executor, functionName: "../admin", timeoutSecs: 0, concurrency: 9 };
     expect(Object.keys(draftProblems(action)).sort()).toEqual(["concurrency", "functionName", "timeoutSecs"]);
   });
+
+  test("tells a pasted .NET handler apart from a function name", () => {
+    const action = complete();
+    action.executor = { ...action.executor, functionName: "OrderLambda::OrderLambda.OrderProcessor::FunctionHandler" };
+    expect(draftProblems(action).functionName).toContain("handler");
+    action.executor = { ...action.executor, functionName: "arn:aws:lambda:local:fn" };
+    expect(draftProblems(action).functionName).toBeUndefined();
+  });
 });
 
 test("isEndpoint accepts bare http URLs only", () => {
@@ -43,22 +59,6 @@ test("isEndpoint accepts bare http URLs only", () => {
   for (const bad of ["127.0.0.1:3001", "http://h/path", "file:///x", "http://u@h", ""]) {
     expect(isEndpoint(bad)).toBe(false);
   }
-});
-
-test("suggestedPayload picks MSK for functions with Kafka events", () => {
-  const fn: DiscoveredFunction = {
-    logicalId: "Fn",
-    resourceType: "AWS::Serverless::Function",
-    functionName: { kind: "notSet" },
-    runtime: null,
-    handler: null,
-    codeUri: null,
-    packageType: null,
-    kafkaTopics: ["demo.orders"],
-    metadata: {},
-  };
-  expect(suggestedPayload(fn)).toBe("msk");
-  expect(suggestedPayload({ ...fn, kafkaTopics: [] })).toBe("raw");
 });
 
 test("isActive covers every state between Start and stopped", () => {
@@ -73,4 +73,23 @@ test("formatDuration", () => {
   expect(formatDuration(1234)).toBe("1.23 s");
   expect(formatDuration(12_345)).toBe("12.3 s");
   expect(formatDuration(125_000)).toBe("2m 5s");
+});
+
+describe("emptyHistoryText", () => {
+  const action = complete();
+
+  test("asks for a start while the action is stopped", () => {
+    expect(emptyHistoryText(action, { kind: "stopped" }, 0)).toStartWith("No executions yet");
+  });
+
+  test("waits on the topic while nothing has been sent", () => {
+    expect(emptyHistoryText(action, { kind: "running" }, 0)).toBe("Waiting for messages on demo.orders…");
+  });
+
+  test("points at the function once messages are sent but unanswered", () => {
+    const text = emptyHistoryText(action, { kind: "running" }, 1);
+    expect(text).toStartWith("Sent 1 message to OrderProcessor");
+    expect(text).toContain(action.executor.endpoint);
+    expect(emptyHistoryText(action, { kind: "running" }, 3)).toStartWith("Sent 3 messages");
+  });
 });

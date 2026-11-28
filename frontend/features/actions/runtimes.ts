@@ -1,12 +1,14 @@
 // What differs between the two local hosts of the Lambda Invoke API. KUI sends the same request to both; they differ
 // in how the function runs, which decides whether the Visual Studio debugger can attach to it.
-import type { DiscoveredFunction, LambdaRuntime, LambdaTarget } from "./types";
+import type { LambdaRuntime, LambdaTarget } from "./types";
 
 interface RuntimeInfo {
   title: string;
   description: string;
   endpoint: string;
   endpointLabel: string;
+  /** A new Action's timeout: a function under a debugger may sit at a breakpoint for minutes. */
+  timeoutSecs: number;
   startCommand: string;
   startWhere: string;
   readyText: string;
@@ -19,67 +21,73 @@ export const RUNTIMES: Record<LambdaRuntime, RuntimeInfo> = {
     description: "Debug in Visual Studio or Rider",
     endpoint: "http://localhost:5050",
     endpointLabel: "Lambda Test Tool endpoint",
+    timeoutSecs: 900,
     startCommand: "dotnet lambda-test-tool start --lambda-emulator-port 5050",
     startWhere: "Install it once with dotnet tool install -g Amazon.Lambda.TestTool, then run:",
     readyText: "The Lambda Test Tool is running",
-    functionHint: "The name after the port in the function's AWS_LAMBDA_RUNTIME_API.",
+    functionHint:
+      "Any name you choose, as long as the function uses the same one after the port in AWS_LAMBDA_RUNTIME_API (localhost:5050/OrderProcessor → OrderProcessor). The launch profile below sets it for you. Not the handler.",
   },
   sam: {
     title: "AWS SAM CLI",
     description: "Runs your template in Docker",
     endpoint: "http://127.0.0.1:3001",
     endpointLabel: "SAM local endpoint",
+    timeoutSecs: 30,
     startCommand: "sam build && sam local start-lambda",
     startWhere: "In your SAM project folder, run:",
     readyText: "SAM local is running",
-    functionHint: "The function's logical ID in the SAM template.",
+    functionHint:
+      "The function's logical ID in template.yaml, the key under Resources (OrderProcessor), not its Handler.",
   },
 };
 
 export const RUNTIME_ORDER: readonly LambdaRuntime[] = ["testTool", "sam"];
 
-/** Switches the runtime, moving the endpoint along unless the user typed their own. */
+/** Switches the runtime, moving the endpoint and timeout along unless the user changed them. */
 export function withRuntime(target: LambdaTarget, runtime: LambdaRuntime): Partial<LambdaTarget> {
-  const typedOwn = target.endpoint.trim() !== RUNTIMES[target.runtime].endpoint;
-  return { runtime, ...(typedOwn ? {} : { endpoint: RUNTIMES[runtime].endpoint }) };
+  const from = RUNTIMES[target.runtime];
+  const to = RUNTIMES[runtime];
+  return {
+    runtime,
+    ...(target.endpoint.trim() === from.endpoint ? { endpoint: to.endpoint } : {}),
+    ...(target.timeoutSecs === from.timeoutSecs ? { timeoutSecs: to.timeoutSecs } : {}),
+  };
 }
 
-export const DEBUG_TIMEOUT_SECS = 900;
-export const DEFAULT_TIMEOUT_SECS = 30;
+export type HostOs = "windows" | "unix";
 
-/** Debug mode waits as long as Lambda allows, since a breakpoint holds the answer, and runs one message at a time. */
-export function withDebug(debug: boolean): Partial<LambdaTarget> {
-  return debug
-    ? { debug, timeoutSecs: DEBUG_TIMEOUT_SECS, concurrency: 1 }
-    : { debug, timeoutSecs: DEFAULT_TIMEOUT_SECS };
+export function hostOs(userAgent: string): HostOs {
+  return userAgent.includes("Windows") ? "windows" : "unix";
 }
 
-/** `dotnet8` from a SAM template becomes `net8.0`. */
-export function targetFramework(runtime: string | null): string {
-  const version = runtime?.match(/^dotnet(\d+)$/)?.[1];
-  return version ? `net${version}.0` : "{TARGET_FRAMEWORK}";
+/** The IDE that reads the profile: Visual Studio on Windows, Rider elsewhere. */
+export function launchProfileIde(os: HostOs): string {
+  return os === "windows" ? "Visual Studio" : "Rider";
 }
 
 /**
- * A Visual Studio launch profile that runs the function against the Test Tool. A class-library handler
+ * A launch profile that runs the function against the Test Tool. A class-library handler
  * (`Assembly::Type::Method`) runs under the Test Tool's runtime shim; an executable project just needs the variable.
+ * Rider on macOS and Linux expands `%HOME%` but has no `%USERPROFILE%`, and needs `/` separators.
  */
-export function launchProfile(target: LambdaTarget, fn: DiscoveredFunction | null): string {
+export function launchProfile(target: LambdaTarget, handlerText: string, os: HostOs): string {
   const name = target.functionName || "{FUNCTION_NAME}";
   const environmentVariables = { AWS_LAMBDA_RUNTIME_API: `${hostOf(target.endpoint)}/${name}` };
-  const handler = fn?.handler ?? null;
-  const assembly = handler?.includes("::") ? handler.split("::")[0] : null;
+  const handler = handlerText.trim();
+  const assembly = handler.includes("::") ? handler.split("::")[0] : null;
+  const framework = "{TARGET_FRAMEWORK}";
   const profile =
-    handler && assembly
+    assembly
       ? {
           commandName: "Executable",
           executablePath: "dotnet",
-          workingDirectory: `.\\bin\\$(Configuration)\\${targetFramework(fn?.runtime ?? null)}`,
+          workingDirectory: os === "windows" ? `.\\bin\\$(Configuration)\\${framework}` : `bin/$(Configuration)/${framework}`,
           commandLineArgs: [
             "exec",
             `--depsfile ./${assembly}.deps.json`,
             `--runtimeconfig ./${assembly}.runtimeconfig.json`,
-            shimPath(targetFramework(fn?.runtime ?? null)),
+            shimPath(framework, os),
             handler,
           ].join(" "),
           environmentVariables,
@@ -88,8 +96,9 @@ export function launchProfile(target: LambdaTarget, fn: DiscoveredFunction | nul
   return JSON.stringify({ profiles: { [`KUI ${name}`]: profile } }, null, 2);
 }
 
-function shimPath(framework: string): string {
-  const store = "%USERPROFILE%/.dotnet/tools/.store/amazon.lambda.testtool/{TEST_TOOL_VERSION}/amazon.lambda.testtool";
+function shimPath(framework: string, os: HostOs): string {
+  const home = os === "windows" ? "%USERPROFILE%" : "%HOME%";
+  const store = `${home}/.dotnet/tools/.store/amazon.lambda.testtool/{TEST_TOOL_VERSION}/amazon.lambda.testtool`;
   return `${store}/{TEST_TOOL_VERSION}/content/Amazon.Lambda.RuntimeSupport/${framework}/Amazon.Lambda.RuntimeSupport.TestTool.dll`;
 }
 

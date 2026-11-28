@@ -33,7 +33,6 @@ pub fn for_one_message(executor: &Executor) -> Executor {
         Executor::LocalLambda(target) => Executor::LocalLambda(LambdaTarget {
             timeout_secs: u32::try_from(SEND_ONE_TIMEOUT.as_secs()).unwrap_or(u32::MAX),
             concurrency: 1,
-            debug: true,
             ..target.clone()
         }),
     }

@@ -1,6 +1,7 @@
 import { $, browser, expect } from "@wdio/globals";
 
 import {
+  actionPage,
   button,
   createTopic,
   deleteTopic,
@@ -11,13 +12,14 @@ import {
   openSheet,
   produceMessages,
   snapshot,
+  typeFunction,
   uniqueName,
 } from "../helpers.js";
 import { startOrderLambda, type OrderLambda } from "../order-lambda.js";
 
 /**
  * Actions against the real examples/order-lambda: messages produced in KUI run the .NET handler through the
- * AWS Lambda Test Tool, set up with the editor's defaults (Test Tool, MSK event, debug mode).
+ * AWS Lambda Test Tool, set up with the editor's defaults (Test Tool, 900 s timeout).
  */
 describe("Actions with the .NET order Lambda", () => {
   const topic = uniqueName("e2e.orders");
@@ -52,12 +54,11 @@ describe("Actions with the .NET order Lambda", () => {
     await $("#action-name").setValue(name);
     await $("#action-topic").click();
     await $(`[role="option"]*=${topic}`).click();
-    await openSheet().$('button[role="radio"]*=The whole topic').click();
+    await openSheet().$('button[role="radio"]*=The oldest message').click();
 
     await expect($("#action-endpoint")).toHaveValue(lambda.endpoint);
     await expect($("#action-endpoint-status")).toHaveText(expect.stringContaining("The Lambda Test Tool is running"));
-    await $("#action-function").setValue(lambda.functionName);
-    await expect($("#action-debug")).toHaveAttribute("aria-checked", "true");
+    await typeFunction(lambda.functionName);
 
     await button("Save and start", openSheet()).click();
     await expectToast(`${name} is running`);
@@ -72,35 +73,34 @@ describe("Actions with the .NET order Lambda", () => {
 
     await goTo("Actions");
     await button(name).click();
-    await expect(openSheet()).toBeDisplayed();
+    await expect(actionPage()).toBeDisplayed();
     // Debug mode runs one message at a time, and the first invocation also warms up the .NET runtime.
-    await browser.waitUntil(async () => (await openSheet().$$('tbody [data-slot="badge"]').length) === 2, {
+    await browser.waitUntil(async () => (await actionPage().$$('tbody [data-slot="badge"]').length) === 2, {
       timeout: 60_000,
       timeoutMsg: "The history did not show both executions",
     });
-    await expect(openSheet().$('tbody [data-slot="badge"]=Succeeded')).toBeExisting();
-    await expect(openSheet().$('tbody [data-slot="badge"]=Function error')).toBeExisting();
+    await expect(actionPage().$('tbody [data-slot="badge"]=Succeeded')).toBeExisting();
+    await expect(actionPage().$('tbody [data-slot="badge"]=Handler error')).toBeExisting();
 
-    // HandleMsk logs every record it reads, so this proves the .NET code itself got both messages.
+    // OrderProcessor logs every record it reads, so this proves the .NET code itself got both messages.
     expect(lambda.output()).toContain(`${topic}[`);
     expect(lambda.output()).toContain('"orderId":"e2e-1"');
     expect(lambda.output()).toContain('"orderId":"e2e-2"');
 
-    await openSheet().$(`td=${charged.key}`).click();
-    await expect(openSheet().$('pre*="charge"')).toBeExisting();
-    await openSheet().$(`td=${refused.key}`).click();
-    await expect(openSheet().$("p*=over the 450 review limit")).toBeExisting();
+    await actionPage().$(`td=${charged.key}`).click();
+    await expect(actionPage().$('pre*="charge"')).toBeExisting();
+    await actionPage().$(`td=${refused.key}`).click();
+    await expect(actionPage().$("p*=over the 450 review limit")).toBeExisting();
     await snapshot("dotnet-lambda-history");
   });
 
   it("stops and cleans up", async () => {
-    await openSheet().$(`button[aria-label="Stop ${name}"]`).click();
-    await expect(openSheet().$('[data-slot="sheet-header"] [data-slot="badge"]=Stopped')).toBeExisting();
-    await browser.keys("Escape");
-    await openSheet().waitForExist({ reverse: true });
+    await $(`button[aria-label="Stop ${name}"]`).click();
+    await expect($('h1 [data-slot="badge"]=Stopped')).toBeExisting();
+    await goTo("Actions");
 
-    await $(`button[aria-label="More for ${name}"]`).click();
-    await $('[role="menuitem"]*=Delete').click();
+    await $(`button=${name}`).click();
+    await $(`button[aria-label="Delete ${name}"]`).click();
     await button("Delete", openAlertDialog()).click();
     await expectToast(`Deleted ${name}`);
 

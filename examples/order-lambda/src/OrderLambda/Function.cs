@@ -17,7 +17,7 @@ public record Order(
 
 public record ProcessedOrder(string OrderId, string Customer, decimal Total, string Status, string Decision, string? Source);
 
-public class Function
+public class OrderProcessor
 {
     /// <summary>Orders above this are refused, so the demo shows a function error in KUI.</summary>
     public const decimal ReviewLimit = 450m;
@@ -27,7 +27,7 @@ public class Function
     /// <summary>
     /// For KUI's "AWS MSK event" payload, and for a real MSK trigger: the same code runs in both.
     /// </summary>
-    public IReadOnlyList<ProcessedOrder> HandleMsk(KafkaEvent kafkaEvent, ILambdaContext context)
+    public IReadOnlyList<ProcessedOrder> FunctionHandler(KafkaEvent kafkaEvent, ILambdaContext context)
     {
         var processed = new List<ProcessedOrder>();
         foreach (var record in kafkaEvent.Records.SelectMany(batch => batch.Value))
@@ -38,13 +38,6 @@ public class Function
             processed.Add(Decide(order, $"{record.Topic}-{record.Partition}@{record.Offset}"));
         }
         return processed;
-    }
-
-    /// <summary>For KUI's "Message value" payload: the order JSON itself.</summary>
-    public ProcessedOrder HandleRaw(Order order, ILambdaContext context)
-    {
-        context.Logger.LogInformation($"Raw order {order.OrderId}");
-        return Decide(order, source: null);
     }
 
     public static Order Parse(string json) =>

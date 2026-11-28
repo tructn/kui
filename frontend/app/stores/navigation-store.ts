@@ -12,7 +12,8 @@ export type Route =
   | { page: "topics" }
   | { page: "topic"; topic: string }
   | { page: "consumer-groups" }
-  | { page: "actions" };
+  | { page: "actions" }
+  | { page: "action"; actionId: string };
 
 /** The page a cluster opens on: its brokers, first in the sidebar. */
 const HOME_ROUTE: Route = { page: "brokers" };

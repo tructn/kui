@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Example .NET functions for trying KUI Actions against the demo Kafka topic.
+Description: An example .NET function for trying KUI Actions against the demo Kafka topic.
 
 Parameters:
   # Only used if you deploy. `sam local start-lambda` ignores event sources;
@@ -23,7 +23,7 @@ Resources:
   OrderProcessor:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: OrderLambda::OrderLambda.Function::HandleMsk
+      Handler: OrderLambda::OrderLambda.OrderProcessor::FunctionHandler
       Events:
         Orders:
           Type: MSK
@@ -32,9 +32,3 @@ Resources:
             Topics:
               - demo.orders
             StartingPosition: LATEST
-
-  # Pick "Message value" in KUI: the handler takes the order JSON itself.
-  RawOrderProcessor:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: OrderLambda::OrderLambda.Function::HandleRaw

@@ -20,6 +20,8 @@ export function button(text: string, within?: ChainablePromiseElement) {
 export const openDialog = () => $('[data-slot="dialog-content"]');
 export const openAlertDialog = () => $('[data-slot="alert-dialog-content"]');
 export const openSheet = () => $('[data-slot="sheet-content"]');
+/** The history and logs side of an action's detail page. */
+export const actionPage = () => $('section[aria-label="Run history"]');
 
 export async function expectToast(text: string) {
   await browser.waitUntil(
@@ -40,6 +42,12 @@ export async function goTo(page: "Topics" | "Consumer groups" | "Brokers" | "Act
   // Sidebar buttons also hold a shortcut hint ("Ctrl 2"), so match the label inside them.
   await $(`//*[@data-sidebar="menu-button"][.//span[normalize-space()="${page}"]]`).click();
   await expect($(`h1*=${page}`)).toBeDisplayed();
+}
+
+/** Types `name` into the action editor's function picker and takes it. */
+export async function typeFunction(name: string) {
+  await $("#action-function").setValue(name);
+  await expect($("#action-function")).toHaveValue(name);
 }
 
 /** Creates `topic` from the Topics page and opens it. */
@@ -149,6 +157,7 @@ export const CHANGING_COMMANDS = [
   "install_update",
   "save_action",
   "delete_action",
+  "import_actions",
   "start_action",
   "send_to_action",
   "stop_action",

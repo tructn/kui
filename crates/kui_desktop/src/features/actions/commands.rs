@@ -1,12 +1,10 @@
-use std::path::PathBuf;
-
 use tauri::{State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use kui_actions::model::{
-    Action, Discovery, EndpointCheck, ExecutionDetail, ExecutionSummary, LambdaRuntime, RunState, RunStatus,
+    Action, EndpointCheck, ExecutionDetail, ExecutionSummary, LambdaRuntime, RunState, RunStatus,
 };
-use kui_actions::{discovery, executor, kafka, lambda, run, validate};
+use kui_actions::{executor, kafka, lambda, run, share, validate};
 
 use super::{ActionsState, task_id};
 use crate::blocking::run_blocking;
@@ -37,6 +35,72 @@ pub fn delete_action(actions: State<'_, ActionsState>, action_id: String) -> Res
     lock(&actions.store).delete(&action_id)?;
     actions.forget(&action_id);
     Ok(())
+}
+
+/// Asks for an actions file a teammate shared and adds its Actions to
+/// `cluster_id`. `None` when the user cancels. Rust opens the window and reads
+/// the file, so the webview never gets file-system access.
+#[tauri::command]
+pub async fn import_actions(
+    window: WebviewWindow,
+    actions: State<'_, ActionsState>,
+    cluster_id: String,
+) -> Result<Option<Vec<Action>>> {
+    let shared = run_blocking(move || {
+        let chosen = window
+            .dialog()
+            .file()
+            .set_parent(&window)
+            .set_title("Import actions")
+            .add_filter("JSON", &["json"])
+            .blocking_pick_file();
+        let Some(chosen) = chosen else { return Ok(None) };
+        let path = chosen.as_path().ok_or_else(|| Error::msg("Can't open a file from that location"))?;
+        Ok(Some(share::parse(&share::read_file(path)?)?))
+    })
+    .await?;
+    let Some(shared) = shared else { return Ok(None) };
+    Ok(Some(lock(&actions.store).import(&cluster_id, shared)?))
+}
+
+/// Asks where to save, then writes the Actions in `action_ids` to a file
+/// teammates can import. Returns the path, or `None` when the user cancels.
+#[tauri::command]
+pub async fn export_actions(
+    window: WebviewWindow,
+    actions: State<'_, ActionsState>,
+    cluster_id: String,
+    action_ids: Vec<String>,
+) -> Result<Option<String>> {
+    let chosen: Vec<Action> =
+        lock(&actions.store).list(&cluster_id).into_iter().filter(|a| action_ids.contains(&a.id)).collect();
+    let file_name = match chosen.as_slice() {
+        [] => return Err(Error::msg("Choose at least one action to export")),
+        [one] => format!("{}.kui-actions.json", file_stem(&one.name)),
+        _ => "kui-actions.json".to_string(),
+    };
+    let json = share::export(&chosen)?;
+    run_blocking(move || {
+        let target = window
+            .dialog()
+            .file()
+            .set_parent(&window)
+            .set_title("Export actions")
+            .set_file_name(file_name)
+            .add_filter("JSON", &["json"])
+            .blocking_save_file();
+        let Some(target) = target else { return Ok(None) };
+        let path = target.as_path().ok_or_else(|| Error::msg("Can't save to that location"))?;
+        std::fs::write(path, json)?;
+        Ok(Some(path.display().to_string()))
+    })
+    .await
+}
+
+fn file_stem(name: &str) -> String {
+    let stem: String = name.chars().map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' }).collect();
+    let stem = stem.trim_matches('-');
+    if stem.is_empty() { "action".into() } else { stem.to_lowercase() }
 }
 
 #[tauri::command]
@@ -167,37 +231,4 @@ pub fn clear_action_history(actions: State<'_, ActionsState>, action_id: String)
 pub async fn check_lambda_endpoint(endpoint: String, runtime: LambdaRuntime) -> Result<EndpointCheck> {
     let endpoint = validate::endpoint(&endpoint)?;
     Ok(lambda::check_endpoint(&lambda::client()?, &endpoint, runtime).await)
-}
-
-/// Lists the functions in a SAM project. Without `project_dir` it asks for the
-/// folder; `None` when the user cancels.
-///
-/// The folder window opens from Rust, so the webview never gets file-system
-/// access. A saved `project_dir` can be read again without asking; only its
-/// SAM template is read, and only the function list comes back.
-#[tauri::command]
-pub async fn discover_lambda_functions(
-    window: WebviewWindow,
-    project_dir: Option<String>,
-) -> Result<Option<Discovery>> {
-    run_blocking(move || {
-        let dir = match project_dir {
-            Some(dir) => PathBuf::from(dir),
-            None => {
-                let chosen = window
-                    .dialog()
-                    .file()
-                    .set_parent(&window)
-                    .set_title("Choose the SAM project folder")
-                    .blocking_pick_folder();
-                let Some(chosen) = chosen else { return Ok(None) };
-                chosen.as_path().ok_or_else(|| Error::msg("Can't read that location"))?.to_path_buf()
-            }
-        };
-        if !dir.is_absolute() || !dir.is_dir() {
-            return Err(Error::msg("That project folder no longer exists"));
-        }
-        Ok(Some(discovery::discover(&dir)?))
-    })
-    .await
 }

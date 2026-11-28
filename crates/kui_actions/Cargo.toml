@@ -19,9 +19,6 @@ reqwest = { workspace = true, features = ["rustls-no-provider"] }
 rustls = { workspace = true }
 tokio = { version = "1", features = ["rt", "time", "sync"] }
 base64 = "0.22"
-# SAM templates are YAML with CloudFormation tags (`!Ref`, `!Sub`). The
-# event-level parser keeps those tags, which serde-based YAML crates reject.
-yaml-rust2 = { version = "0.13", default-features = false }
 
 [lints]
 workspace = true

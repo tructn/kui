@@ -1,3 +1,4 @@
+import { InfoList, InfoTip } from "@/components/info-tip";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -33,12 +34,32 @@ export function RunStateBadge({ state }: { state: RunState }) {
   }
 }
 
-const EXECUTION_LABELS: Record<ExecutionStatus, string> = {
+export const EXECUTION_LABELS: Record<ExecutionStatus, string> = {
   succeeded: "Succeeded",
-  functionError: "Function error",
-  failed: "Failed",
+  functionError: "Handler error",
+  failed: "Invoke failed",
   timedOut: "Timed out",
 };
+
+const EXECUTION_DESCRIPTIONS: Record<ExecutionStatus, string> = {
+  succeeded: "The handler ran and returned a response.",
+  functionError: "The handler ran but threw. The bug is in your code: set a breakpoint there.",
+  failed: "The handler never ran: the endpoint is down, the function wasn't found or the payload was rejected.",
+  timedOut: "No response in time. The handler may be slow or paused on a breakpoint.",
+};
+
+export function ExecutionStatusInfo() {
+  return (
+    <InfoTip label="What the statuses mean">
+      <InfoList
+        items={(Object.keys(EXECUTION_LABELS) as ExecutionStatus[]).map((status) => ({
+          term: EXECUTION_LABELS[status],
+          description: EXECUTION_DESCRIPTIONS[status],
+        }))}
+      />
+    </InfoTip>
+  );
+}
 
 export function ExecutionStatusBadge({ status }: { status: ExecutionStatus }) {
   const label = EXECUTION_LABELS[status];

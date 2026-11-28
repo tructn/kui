@@ -26,7 +26,7 @@ public class FunctionTest
         Assert.Equal("order-3", Encoding.UTF8.GetString(Convert.FromBase64String(record.Key)));
         Assert.Equal("abc", Encoding.UTF8.GetString((byte[])(Array)record.Headers[0]["traceId"]));
 
-        var processed = new Function().HandleMsk(kafkaEvent, new TestLambdaContext());
+        var processed = new OrderProcessor().FunctionHandler(kafkaEvent, new TestLambdaContext());
         var order = Assert.Single(processed);
         Assert.Equal("order-3", order.OrderId);
         Assert.Equal("charge", order.Decision);
@@ -34,18 +34,17 @@ public class FunctionTest
     }
 
     [Fact]
-    public void ReadsARawOrder()
+    public void ShipsPaidOrders()
     {
-        using var file = File.OpenRead(Path.Combine("events", "order.json"));
-        var order = Serializer.Deserialize<Order>(file);
-        Assert.Equal("ship", Function.Decide(order with { Status = "PAID" }, null).Decision);
+        var order = new Order("order-4", "cust-1", 20m, "PAID");
+        Assert.Equal("ship", OrderProcessor.Decide(order, null).Decision);
     }
 
     [Fact]
     public void RefusesOrdersOverTheLimit()
     {
         var order = new Order("order-9", "cust-2", 499.99m, "NEW");
-        var error = Assert.Throws<InvalidOperationException>(() => Function.Decide(order, null));
+        var error = Assert.Throws<InvalidOperationException>(() => OrderProcessor.Decide(order, null));
         Assert.Contains("review limit", error.Message);
     }
 }

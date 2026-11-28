@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use kui_actions::model::Action;
+use kui_actions::share::SharedAction;
 use kui_actions::validate;
 
 use crate::error::{Error, Result};
@@ -27,10 +28,8 @@ impl ActionStore {
     }
 
     /// Adds a new Action (empty id) or replaces the saved one.
-    pub fn save(&mut self, mut action: Action) -> Result<Action> {
-        validate::action(&action)?;
-        action.name = action.name.trim().to_string();
-        action.source.group_id = action.source.group_id.trim().to_string();
+    pub fn save(&mut self, action: Action) -> Result<Action> {
+        let mut action = checked(action)?;
         if action.id.is_empty() {
             action.id = uuid::Uuid::new_v4().to_string();
             self.actions.push(action.clone());
@@ -40,6 +39,27 @@ impl ActionStore {
         }
         self.persist()?;
         Ok(action)
+    }
+
+    /// Adds shared Actions to `cluster_id` as new ones. All or nothing: one
+    /// invalid Action adds none, so a retry after fixing the file can't duplicate the rest.
+    pub fn import(&mut self, cluster_id: &str, shared: Vec<SharedAction>) -> Result<Vec<Action>> {
+        let imported = shared
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let mut action =
+                    checked(s.into_action(cluster_id)).map_err(|e| Error::msg(format!("Action {}: {e}", i + 1)))?;
+                action.id = uuid::Uuid::new_v4().to_string();
+                Ok(action)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        self.actions.extend(imported.iter().cloned());
+        if let Err(e) = self.persist() {
+            self.actions.truncate(self.actions.len() - imported.len());
+            return Err(e);
+        }
+        Ok(imported)
     }
 
     pub fn delete(&mut self, id: &str) -> Result<()> {
@@ -52,9 +72,16 @@ impl ActionStore {
     }
 }
 
+fn checked(mut action: Action) -> Result<Action> {
+    validate::action(&action)?;
+    action.name = action.name.trim().to_string();
+    action.source.group_id = action.source.group_id.trim().to_string();
+    Ok(action)
+}
+
 #[cfg(test)]
 mod tests {
-    use kui_actions::model::{Executor, LambdaRuntime, LambdaTarget, PayloadFormat, Source, StartFrom};
+    use kui_actions::model::{Executor, LambdaRuntime, LambdaTarget, Source, StartFrom};
 
     use super::*;
 
@@ -72,11 +99,8 @@ mod tests {
                 runtime: LambdaRuntime::Sam,
                 endpoint: "http://127.0.0.1:3001".into(),
                 function_name: "OrderProcessor".into(),
-                project_dir: None,
-                payload: PayloadFormat::Msk,
                 timeout_secs: 30,
                 concurrency: 1,
-                debug: false,
             }),
         }
     }
@@ -125,6 +149,35 @@ mod tests {
         let mut unknown = draft();
         unknown.id = "missing".into();
         assert!(store.save(unknown).is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn imports_shared_actions_as_new_ones_on_the_current_cluster() {
+        let path = temp_path();
+        let mut store = ActionStore::load(path.clone()).unwrap();
+        let original = store.save(draft()).unwrap();
+        let shared = vec![SharedAction::from(&Action { cluster_id: "elsewhere".into(), ..draft() })];
+
+        let imported = store.import("team", shared).unwrap();
+        assert_eq!(imported.len(), 1);
+        assert_ne!(imported[0].id, original.id);
+        assert_eq!((imported[0].cluster_id.as_str(), imported[0].name.as_str()), ("team", "Orders"));
+        assert_eq!(ActionStore::load(path.clone()).unwrap().list("team"), imported);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn one_invalid_shared_action_imports_none() {
+        let path = temp_path();
+        let mut store = ActionStore::load(path.clone()).unwrap();
+        let mut invalid = draft();
+        invalid.source.topic.clear();
+        let shared = vec![SharedAction::from(&draft()), SharedAction::from(&invalid)];
+
+        let error = store.import("team", shared).unwrap_err().to_string();
+        assert!(error.starts_with("Action 2:"), "{error}");
+        assert!(store.list("team").is_empty());
         assert!(!path.exists());
     }
 }

@@ -4,18 +4,18 @@
       "commandName": "Executable",
       "executablePath": "dotnet",
       "workingDirectory": ".\\bin\\$(Configuration)\\net8.0",
-      "commandLineArgs": "exec --depsfile ./OrderLambda.deps.json --runtimeconfig ./OrderLambda.runtimeconfig.json %USERPROFILE%/.dotnet/tools/.store/amazon.lambda.testtool/0.16.1/amazon.lambda.testtool/0.16.1/content/Amazon.Lambda.RuntimeSupport/net8.0/Amazon.Lambda.RuntimeSupport.TestTool.dll OrderLambda::OrderLambda.Function::HandleMsk",
+      "commandLineArgs": "exec --depsfile ./OrderLambda.deps.json --runtimeconfig ./OrderLambda.runtimeconfig.json %USERPROFILE%/.dotnet/tools/.store/amazon.lambda.testtool/0.16.1/amazon.lambda.testtool/0.16.1/content/Amazon.Lambda.RuntimeSupport/net8.0/Amazon.Lambda.RuntimeSupport.TestTool.dll OrderLambda::OrderLambda.OrderProcessor::FunctionHandler",
       "environmentVariables": {
         "AWS_LAMBDA_RUNTIME_API": "localhost:5050/OrderProcessor"
       }
     },
-    "KUI RawOrderProcessor": {
+    "KUI OrderProcessor (macOS, Linux)": {
       "commandName": "Executable",
       "executablePath": "dotnet",
-      "workingDirectory": ".\\bin\\$(Configuration)\\net8.0",
-      "commandLineArgs": "exec --depsfile ./OrderLambda.deps.json --runtimeconfig ./OrderLambda.runtimeconfig.json %USERPROFILE%/.dotnet/tools/.store/amazon.lambda.testtool/0.16.1/amazon.lambda.testtool/0.16.1/content/Amazon.Lambda.RuntimeSupport/net8.0/Amazon.Lambda.RuntimeSupport.TestTool.dll OrderLambda::OrderLambda.Function::HandleRaw",
+      "workingDirectory": "bin/$(Configuration)/net8.0",
+      "commandLineArgs": "exec --depsfile ./OrderLambda.deps.json --runtimeconfig ./OrderLambda.runtimeconfig.json %HOME%/.dotnet/tools/.store/amazon.lambda.testtool/0.16.1/amazon.lambda.testtool/0.16.1/content/Amazon.Lambda.RuntimeSupport/net8.0/Amazon.Lambda.RuntimeSupport.TestTool.dll OrderLambda::OrderLambda.OrderProcessor::FunctionHandler",
       "environmentVariables": {
-        "AWS_LAMBDA_RUNTIME_API": "localhost:5050/RawOrderProcessor"
+        "AWS_LAMBDA_RUNTIME_API": "localhost:5050/OrderProcessor"
       }
     }
   }

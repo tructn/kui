@@ -18,9 +18,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
 
 RUN cargo install tauri-driver --locked
 
-# Streams the virtual display for `make test-e2e-headed`. Its own layer so adding it
-# didn't invalidate the cached tauri-driver build above.
-RUN apt-get update && apt-get install -y --no-install-recommends x11vnc \
+# Streams and labels the virtual display for `make e2e-headed`. Its own layer so it doesn't
+# invalidate the cached tauri-driver build above.
+RUN apt-get update && apt-get install -y --no-install-recommends x11vnc x11-xserver-utils x11-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # .NET 8 and the AWS Lambda Test Tool, for the spec that runs examples/order-lambda for real.

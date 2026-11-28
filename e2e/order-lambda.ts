@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { waitForPort } from "./ports.js";
 
-/** Must match the version the example's launchSettings.json points at, since the shim path contains it. */
+/** The installed Test Tool version, since the shim path contains it. */
 const TEST_TOOL_VERSION = "0.16.1";
 /** KUI's default Test Tool endpoint, so the action editor's defaults are what gets tested. */
 const PORT = 5050;
@@ -57,7 +57,7 @@ export async function startOrderLambda(): Promise<OrderLambda> {
       "--runtimeconfig",
       "./OrderLambda.runtimeconfig.json",
       SHIM,
-      "OrderLambda::OrderLambda.Function::HandleMsk",
+      "OrderLambda::OrderLambda.OrderProcessor::FunctionHandler",
     ],
     {
       cwd: BUILD,

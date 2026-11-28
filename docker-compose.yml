@@ -104,6 +104,8 @@ services:
       E2E_SPEC: ${E2E_SPEC:-}
       # Set by `make e2e-headed` to share the test display over VNC on port 5900.
       E2E_HEADED: ${E2E_HEADED:-}
+      # Set by `make e2e-headed SLOWMO=<ms>`: pause after every WebDriver command.
+      E2E_SLOWMO: ${E2E_SLOWMO:-}
     volumes:
       # Cache Rust builds between runs (librdkafka takes minutes to compile).
       - cargo-target:/app/target

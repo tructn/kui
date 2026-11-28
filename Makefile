@@ -39,15 +39,19 @@ test: node_modules
 e2e:
 	E2E_SPEC="$(SPEC)" bun run test:e2e
 
-# Like e2e, shown live in a VNC viewer. On macOS, Screen Sharing opens once the container starts; the
-# screen stays black while the app builds. The port is only published on localhost.
+# Like e2e, shown live in a VNC viewer. On macOS, Screen Sharing opens when the UI tests start (after
+# the build). SLOWMO=<ms> pauses after every WebDriver command (0 for full speed), and the last spec's
+# app stays open until you press Enter. The port is only published on localhost.
 VNC_URL := vnc://:kui@127.0.0.1:5900
+SLOWMO ?= 250
 e2e-headed:
 	docker compose --profile e2e rm --stop --force kafka-e2e kafka-seed-e2e
+	@# Docker accepts connections on a published port before anything listens behind it, so wait
+	@# for x11vnc's RFB greeting rather than an open port.
 	@viewer() { \
-	  for _ in {1..1800}; do \
-	    if nc -z 127.0.0.1 5900 2>/dev/null; then \
-	      sleep 3; \
+	  for _ in {1..7200}; do \
+	    banner=$$( (read -r -t 2 -n 3 reply </dev/tcp/127.0.0.1/5900 && printf %s "$$reply") 2>/dev/null || true); \
+	    if [[ $$banner == RFB ]]; then \
 	      if command -v open >/dev/null; then open "$(VNC_URL)"; else echo "Connect a VNC viewer to $(VNC_URL)"; fi; \
 	      return; \
 	    fi; \
@@ -55,7 +59,8 @@ e2e-headed:
 	  done; \
 	}; \
 	viewer & watcher=$$!; trap 'kill $$watcher 2>/dev/null || true' EXIT; \
-	E2E_HEADED=1 E2E_SPEC="$(SPEC)" docker compose --profile e2e run --build --rm -p 127.0.0.1:5900:5900 e2e
+	E2E_HEADED=1 E2E_SLOWMO="$(SLOWMO)" E2E_SPEC="$(SPEC)" \
+	  docker compose --profile e2e run --build --rm -p 127.0.0.1:5900:5900 e2e
 
 # Local Kafka on localhost:9092 with the demo topics from docker/kafka-seed.sh; add it in KUI as
 # localhost:9092. `run` instead of `up` so the seed's output shows and a failed seed fails the target.
@@ -69,6 +74,38 @@ kafka:
 # The broker keeps no volume, so this also wipes everything produced to it.
 kafka-down:
 	docker compose down
+
+# Runs the order Lambda example like a launch profile in Properties/launchSettings.json does in an IDE, and
+# starts the Lambda Test Tool for it unless one already listens. PROFILE=<name> picks another profile.
+# `dotnet run --launch-profile` ignores "Executable" profiles, so the profile is read with jq and run as is.
+LAMBDA_DIR := examples/order-lambda/src/OrderLambda
+LAMBDA_SETTINGS := $(LAMBDA_DIR)/Properties/launchSettings.json
+PROFILE ?= KUI OrderProcessor (macOS, Linux)
+CONFIGURATION ?= Debug
+.PHONY: lambda
+
+lambda:
+	@profile=$$(jq -ce --arg p "$(PROFILE)" '.profiles[$$p]' "$(LAMBDA_SETTINGS)") || { \
+	  echo "no launch profile \"$(PROFILE)\"; profiles in $(LAMBDA_SETTINGS):" >&2; \
+	  jq -r '.profiles | keys[] | "  " + .' "$(LAMBDA_SETTINGS)" >&2; exit 1; }; \
+	field() { jq -r "$$1" <<<"$$profile" | sed -e 's|\$$(Configuration)|$(CONFIGURATION)|g' \
+	  -e "s|%HOME%|$${HOME:-}|g" -e "s|%USERPROFILE%|$${USERPROFILE:-}|g"; }; \
+	dotnet build "$(LAMBDA_DIR)" --configuration "$(CONFIGURATION)"; \
+	vars=(); while IFS= read -r var; do vars+=("$$var"); done \
+	  < <(field '.environmentVariables // {} | to_entries[] | "\(.key)=\(.value)"'); \
+	read -ra args <<<"$$(field '.commandLineArgs')"; \
+	api=$$(printf '%s\n' "$${vars[@]}" | sed -n 's/^AWS_LAMBDA_RUNTIME_API=//p'); \
+	port=$${api%%/*}; port=$${port##*:}; \
+	listening() { (: </dev/tcp/127.0.0.1/"$$port") 2>/dev/null; }; \
+	if [[ -n $$port ]] && ! listening; then \
+	  dotnet lambda-test-tool start --lambda-emulator-port "$$port" --no-launch-window & tool=$$!; \
+	  trap 'kill $$tool 2>/dev/null || true' EXIT; \
+	  for _ in {1..60}; do listening && break; sleep 1; done; \
+	  listening || { echo "the Lambda Test Tool didn't start on port $$port" >&2; exit 1; }; \
+	fi; \
+	cd "$(LAMBDA_DIR)/$$(field '.workingDirectory')"; \
+	echo "Running \"$(PROFILE)\"; in KUI, point the action at http://localhost:$$port"; \
+	env "$${vars[@]}" "$$(field '.executablePath')" "$${args[@]}"
 
 lint:
 	bun run lint

@@ -209,11 +209,11 @@ const READ_ONLY_COMMANDS: &[&str] = &[
     "topic_consumer_groups",
     "preview_offset_reset",
     "list_actions",
+    "export_actions",
     "action_statuses",
     "action_history",
     "action_execution",
     "check_lambda_endpoint",
-    "discover_lambda_functions",
 ];
 
 #[test]

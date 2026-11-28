@@ -1,71 +1,60 @@
 import { describe, expect, test } from "bun:test";
 
 import { newDraft } from "./draft";
-import { launchProfile, RUNTIMES, targetFramework, withDebug, withRuntime } from "./runtimes";
-import type { DiscoveredFunction, LambdaTarget } from "./types";
+import { hostOs, launchProfile, RUNTIMES, withRuntime } from "./runtimes";
+import type { LambdaTarget } from "./types";
 
 function target(patch: Partial<LambdaTarget> = {}): LambdaTarget {
   const { kind: _kind, ...lambda } = newDraft("local").executor;
   return { ...lambda, functionName: "OrderProcessor", ...patch };
 }
 
-function discovered(handler: string | null, runtime: string | null = "dotnet8"): DiscoveredFunction {
-  return {
-    logicalId: "OrderProcessor",
-    resourceType: "AWS::Serverless::Function",
-    functionName: { kind: "notSet" },
-    runtime,
-    handler,
-    codeUri: null,
-    packageType: null,
-    kafkaTopics: [],
-    metadata: {},
-  };
-}
-
 describe("withRuntime", () => {
-  test("moves a default endpoint to the new runtime's default", () => {
-    expect(withRuntime(target({ runtime: "testTool", endpoint: RUNTIMES.testTool.endpoint }), "sam")).toEqual({
+  test("moves a default endpoint and timeout to the new runtime's defaults", () => {
+    expect(withRuntime(target(), "sam")).toEqual({
       runtime: "sam",
       endpoint: RUNTIMES.sam.endpoint,
+      timeoutSecs: RUNTIMES.sam.timeoutSecs,
     });
   });
 
-  test("keeps an endpoint the user typed", () => {
-    expect(withRuntime(target({ runtime: "sam", endpoint: "http://10.0.0.5:3001" }), "testTool")).toEqual({
+  test("keeps an endpoint and timeout the user changed", () => {
+    expect(withRuntime(target({ runtime: "sam", endpoint: "http://10.0.0.5:3001", timeoutSecs: 60 }), "testTool")).toEqual({
       runtime: "testTool",
     });
   });
 });
 
-test("debug mode waits out breakpoints one message at a time", () => {
-  expect(withDebug(true)).toEqual({ debug: true, timeoutSecs: 900, concurrency: 1 });
-  expect(withDebug(false)).toEqual({ debug: false, timeoutSecs: 30 });
-});
-
-test("targetFramework maps SAM runtimes", () => {
-  expect(targetFramework("dotnet8")).toBe("net8.0");
-  expect(targetFramework("python3.12")).toBe("{TARGET_FRAMEWORK}");
-  expect(targetFramework(null)).toBe("{TARGET_FRAMEWORK}");
+test("hostOs reads the webview's user agent", () => {
+  expect(hostOs("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).toBe("windows");
+  expect(hostOs("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")).toBe("unix");
+  expect(hostOs("Mozilla/5.0 (X11; Linux x86_64)")).toBe("unix");
 });
 
 describe("launchProfile", () => {
+  const handler = "OrderLambda::OrderLambda.OrderProcessor::FunctionHandler";
+
   test("runs a class-library handler under the Test Tool shim", () => {
-    const json = JSON.parse(
-      launchProfile(target({ runtime: "testTool", endpoint: "http://localhost:5050" }), discovered("OrderLambda::OrderLambda.Function::HandleMsk")),
-    );
+    const json = JSON.parse(launchProfile(target({ endpoint: "http://localhost:5050" }), handler, "windows"));
     const profile = json.profiles["KUI OrderProcessor"];
     expect(profile.commandName).toBe("Executable");
-    expect(profile.workingDirectory).toBe(".\\bin\\$(Configuration)\\net8.0");
+    expect(profile.workingDirectory).toBe(".\\bin\\$(Configuration)\\{TARGET_FRAMEWORK}");
+    expect(profile.commandLineArgs).toContain(" %USERPROFILE%/.dotnet/tools/");
     expect(profile.commandLineArgs).toStartWith("exec --depsfile ./OrderLambda.deps.json --runtimeconfig ./OrderLambda.runtimeconfig.json ");
-    expect(profile.commandLineArgs).toContain("/net8.0/Amazon.Lambda.RuntimeSupport.TestTool.dll ");
-    expect(profile.commandLineArgs).toEndWith(" OrderLambda::OrderLambda.Function::HandleMsk");
+    expect(profile.commandLineArgs).toEndWith(" OrderLambda::OrderLambda.OrderProcessor::FunctionHandler");
     expect(profile.environmentVariables).toEqual({ AWS_LAMBDA_RUNTIME_API: "localhost:5050/OrderProcessor" });
   });
 
-  test("an executable project or unknown handler only sets the variable, without a scheme", () => {
-    for (const fn of [discovered("OrderLambda"), null]) {
-      const json = JSON.parse(launchProfile(target({ endpoint: "http://127.0.0.1:6000/" }), fn));
+  test("uses HOME and forward slashes outside Windows", () => {
+    const profile = JSON.parse(launchProfile(target(), handler, "unix")).profiles["KUI OrderProcessor"];
+    expect(profile.workingDirectory).toBe("bin/$(Configuration)/{TARGET_FRAMEWORK}");
+    expect(profile.commandLineArgs).toContain(" %HOME%/.dotnet/tools/");
+    expect(profile.commandLineArgs).not.toContain("USERPROFILE");
+  });
+
+  test("an executable project or no handler only sets the variable, without a scheme", () => {
+    for (const h of ["OrderLambda", "  "]) {
+      const json = JSON.parse(launchProfile(target({ endpoint: "http://127.0.0.1:6000/" }), h, "unix"));
       expect(json.profiles["KUI OrderProcessor"]).toEqual({
         commandName: "Project",
         environmentVariables: { AWS_LAMBDA_RUNTIME_API: "127.0.0.1:6000/OrderProcessor" },

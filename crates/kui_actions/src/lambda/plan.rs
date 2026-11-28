@@ -11,6 +11,10 @@ use crate::{Error, Result, validate};
 
 /// Slack past the invocation timeout, so a result that just made it still arrives on Stop.
 const STOP_SLACK: Duration = Duration::from_secs(2);
+/// The longest Stop waits for answers. A function paused at a breakpoint would
+/// otherwise hold Stop for the whole timeout; its message isn't committed, so
+/// it runs again on the next Start.
+const MAX_STOP_WAIT: Duration = Duration::from_secs(10);
 
 /// Fails Start with advice instead of filling history with "not running" rows.
 pub async fn check_target(target: &LambdaTarget) -> Result<()> {
@@ -31,22 +35,19 @@ pub fn plan(target: &LambdaTarget, cluster: &ClusterConfig) -> Result<Plan> {
         function: target.function_name.clone(),
         timeout,
     };
-    let format = target.payload;
     let cluster_id = cluster.id.clone();
     let bootstrap_servers = cluster.bootstrap_servers.clone();
     Ok(Plan {
         target: target.function_name.clone(),
         concurrency: target.concurrency.into(),
-        // Waiting out a debugger paused at a breakpoint would freeze Stop for
-        // minutes. The unfinished message isn't committed, so it runs again.
-        stop_grace: if target.debug { STOP_SLACK } else { timeout + STOP_SLACK },
+        stop_grace: timeout.min(MAX_STOP_WAIT) + STOP_SLACK,
         build: Box::new(move |record| {
-            payload::build(format, record, &Origin { cluster_id: &cluster_id, bootstrap_servers: &bootstrap_servers })
+            Ok(payload::build(record, &Origin { cluster_id: &cluster_id, bootstrap_servers: &bootstrap_servers }))
         }),
         invoke: Arc::new(move |payload| -> Invocation {
             let (client, call) = (client.clone(), call.clone());
             Box::pin(async move { invoke(&client, &call, payload).await })
         }),
-        stop_on_retryable: target.debug,
+        stop_on_retryable: false,
     })
 }

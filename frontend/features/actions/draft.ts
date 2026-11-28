@@ -1,8 +1,10 @@
 // Pure helpers for the Action editor and run views. The Rust side validates
 // again on save (`crates/kui_actions/src/validate.rs`); these only give early,
 // field-level feedback.
-import { DEBUG_TIMEOUT_SECS, RUNTIMES } from "./runtimes";
-import type { Action, DiscoveredFunction, Executor, PayloadFormat, RunState } from "./types";
+import { formatNumber } from "@/lib/format";
+
+import { RUNTIMES } from "./runtimes";
+import type { Action, Executor, RunState } from "./types";
 
 export const GROUP_PREFIX = "kui-action-";
 export const MAX_TIMEOUT_SECS = 900;
@@ -27,11 +29,8 @@ function defaultExecutor(kind: Executor["kind"]): Executor {
         runtime: "testTool",
         endpoint: RUNTIMES.testTool.endpoint,
         functionName: "",
-        projectDir: null,
-        payload: "msk",
-        timeoutSecs: DEBUG_TIMEOUT_SECS,
+        timeoutSecs: RUNTIMES.testTool.timeoutSecs,
         concurrency: 1,
-        debug: true,
       };
   }
 }
@@ -59,10 +58,12 @@ export function draftProblems(draft: Action): Partial<Record<DraftField, string>
   if (!target.functionName) problems.functionName = "Choose or type a function";
   else if (!/^[A-Za-z0-9_.:-]{1,140}$/.test(target.functionName)) {
     problems.functionName = "Letters, digits, '-', '_', '.' or ':' only";
+  } else if (target.functionName.includes("::")) {
+    // The Test Tool queues an event under any name, so pasting the handler would wait forever instead of failing.
+    problems.functionName = "That's the .NET handler. Use the function's name, like OrderProcessor";
   }
   if (!isWithin(target.timeoutSecs, 1, MAX_TIMEOUT_SECS)) problems.timeoutSecs = `1 to ${MAX_TIMEOUT_SECS} seconds`;
   if (!isWithin(target.concurrency, 1, MAX_CONCURRENCY)) problems.concurrency = `1 to ${MAX_CONCURRENCY}`;
-  else if (target.debug && target.concurrency !== 1) problems.concurrency = "Debug mode runs one at a time";
   return problems;
 }
 
@@ -79,13 +80,21 @@ function isWithin(value: number, min: number, max: number): boolean {
   return Number.isInteger(value) && value >= min && value <= max;
 }
 
-/** Functions with an MSK or self-managed Kafka event expect the MSK event shape. */
-export function suggestedPayload(fn: DiscoveredFunction): PayloadFormat {
-  return fn.kafkaTopics.length > 0 ? "msk" : "raw";
-}
-
 export function isActive(state: RunState): boolean {
   return state.kind === "starting" || state.kind === "running" || state.kind === "stopping";
+}
+
+/**
+ * What the empty history table says. A row appears only once the function
+ * answers, so messages that were sent but haven't come back yet must not read
+ * as "nothing arrived".
+ */
+export function emptyHistoryText(action: Action, state: RunState, inFlight: number): string {
+  if (!isActive(state)) return "No executions yet. Start the action, then produce a message to the topic.";
+  if (inFlight === 0) return `Waiting for messages on ${action.source.topic}…`;
+  const { functionName, endpoint } = action.executor;
+  const sent = inFlight === 1 ? "1 message" : `${formatNumber(inFlight)} messages`;
+  return `Sent ${sent} to ${functionName}, waiting for an answer. Is the function running against ${endpoint}?`;
 }
 
 export function formatDuration(ms: number): string {

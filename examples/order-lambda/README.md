@@ -1,13 +1,12 @@
 # .NET order Lambda for KUI Actions
 
-Two small .NET 8 Lambda functions to try [KUI Actions](../../docs/prd/kui-actions.md): KUI reads `demo.orders`
-from the local Kafka, invokes a function, and shows each result. The function runs either under your debugger
+A small .NET 8 Lambda function to try [KUI Actions](../../docs/prd/kui-actions.md): KUI reads `demo.orders`
+from the local Kafka, invokes the function, and shows each result. The function runs either under your debugger
 (Visual Studio or Rider, through the AWS Lambda Test Tool) or in Docker through AWS SAM.
 
-| Function | KUI payload | Handler takes |
-|---|---|---|
-| `OrderProcessor` | AWS MSK event | `KafkaEvent`, the same type a real MSK trigger delivers |
-| `RawOrderProcessor` | Message value | the order JSON |
+`OrderProcessor` (`OrderLambda::OrderLambda.OrderProcessor::FunctionHandler`, in `src/OrderLambda/Function.cs`
+like AWS's .NET template) takes KUI's *AWS MSK event* payload as a `KafkaEvent`, the same type a real MSK trigger
+delivers.
 
 Each order gets a decision (`NEW` → `charge`, `PAID` → `ship`, `SHIPPED` → `done`). Orders over 450 throw, so
 you also see what a function error looks like in KUI. The seeded topic has a few of them.
@@ -29,24 +28,36 @@ dotnet tool install -g Amazon.Lambda.TestTool --version 0.16.1
    dotnet lambda-test-tool start --lambda-emulator-port 5050 --no-launch-window
    ```
 
-3. Open `src/OrderLambda/OrderLambda.csproj` in Visual Studio, pick the **KUI OrderProcessor** launch profile
-   next to the Start button, set a breakpoint in `HandleMsk` and press F5. The function connects to the Test
-   Tool and waits for events.
+3. Open `src/OrderLambda/OrderLambda.csproj` in Visual Studio and pick the **KUI OrderProcessor** launch profile
+   next to the Start button, or in Rider on macOS or Linux pick **KUI OrderProcessor (macOS, Linux)**. Set a
+   breakpoint in `OrderProcessor.FunctionHandler` and start debugging. The function connects to the Test Tool and
+   waits for events.
 4. In KUI, open **Actions** (⌘4) → **New action**:
    - **Runs in**: *Lambda Test Tool* (the default), endpoint `http://localhost:5050`.
-   - **Project template**: choose this folder and pick `OrderProcessor`, or type the name.
-   - **Debug mode** stays on.
-   - **Save and start**. Visual Studio stops at your breakpoint with the first message.
+   - **Function to invoke**: `OrderProcessor`.
+   - **Timeout** stays at 900 seconds, so you can take your time at a breakpoint.
+   - **Save and start**. The debugger stops at your breakpoint with the first message.
 
 The profiles in `Properties/launchSettings.json` pin the Test Tool's version (0.16.1) in the path to its runtime
-shim; if you install another version, change it there. On macOS or Linux (Rider), replace `%USERPROFILE%` with
-`$HOME`. KUI's editor shows the same profile for any function.
+shim; if you install another version, change it there. KUI's editor shows the profile for your OS for any
+function; type the handler there to get the class-library form.
 
-How debug mode behaves:
+Without an IDE, `make lambda` from the KUI repo root builds the function, starts the Test Tool unless it's
+already running, and runs a launch profile (`PROFILE="KUI OrderProcessor"` picks the other one). By hand, run
+this from `bin/Debug/net8.0` after `dotnet build`:
 
-- One message at a time, and KUI waits up to 15 minutes for the answer, so take your time at a breakpoint.
-- If a message gets no answer (you stopped debugging, or the function isn't running), the action stops *without
-  committing it*. Start again and the same message comes back.
+```bash
+AWS_LAMBDA_RUNTIME_API=localhost:5050/OrderProcessor dotnet exec \
+  --depsfile ./OrderLambda.deps.json --runtimeconfig ./OrderLambda.runtimeconfig.json \
+  ~/.dotnet/tools/.store/amazon.lambda.testtool/0.16.1/amazon.lambda.testtool/0.16.1/content/Amazon.Lambda.RuntimeSupport/net8.0/Amazon.Lambda.RuntimeSupport.TestTool.dll \
+  OrderLambda::OrderLambda.OrderProcessor::FunctionHandler
+```
+
+What to expect while debugging:
+
+- KUI waits up to the timeout for each answer. Keep concurrency at 1 to get one message at a time.
+- A message that gets no answer in time is recorded as timed out, and the action moves on. Stop while you're
+  paused at a breakpoint and that message isn't committed, so it comes back on the next Start.
 - An exception the handler throws is an answer: it's recorded as a function error and the action moves on.
 - The name after the port in `AWS_LAMBDA_RUNTIME_API` must be the function name in KUI. With a different name the
   Test Tool queues the event for a function that never asks for it, and KUI times out.
@@ -70,7 +81,7 @@ No AWS account or credentials: everything runs on your machine.
    bun run kafka:up
    ```
 
-2. Build and serve the functions, from this folder:
+2. Build and serve the function, from this folder:
 
    ```bash
    sam build            # or: sam build --use-container, without a local .NET SDK
@@ -81,11 +92,11 @@ No AWS account or credentials: everything runs on your machine.
 
 3. In KUI, open **Actions** (⌘4) → **New action**:
    - **Name**: `Process orders`. The consumer group becomes `kui-action-process-orders`.
-   - **Runs in**: *AWS SAM CLI*. Turn off **Debug mode** to run several messages at once.
-   - **Start with**: *The whole topic*, to replay the 50 seeded orders, or *New messages*.
-   - **SAM project**: choose this folder and pick `OrderProcessor`. KUI fills in the topic and the MSK
-     payload from the template's MSK event.
-   - **Save and start**.
+   - **Topic**: `demo.orders`. Type to search the list.
+   - **Start from**: *The oldest message*, to replay the 50 seeded orders, or *The next new message*.
+   - **Runs in**: *AWS SAM CLI*. The timeout moves to 30 seconds; raise concurrency to run several at once.
+   - **Function to invoke**: `OrderProcessor`, the logical ID in `template.yaml`.
+   - **Save and start**. Each message arrives as an AWS MSK event.
 
 4. Watch the history fill in. Open a row to see the request, the decoded message value, the response, or
    the error. To trigger more, produce to `demo.orders` from the topic's **Messages** tab, or use
@@ -95,11 +106,10 @@ Stop and Start again: the action resumes from its committed offsets.
 
 ## Without KUI
 
-The same events, to check your SAM setup on its own:
+The same event, to check your SAM setup on its own:
 
 ```bash
 sam local invoke OrderProcessor -e events/msk-event.json
-sam local invoke RawOrderProcessor -e events/order.json
 ```
 
 `events/msk-event.json` is exactly what KUI sends in *AWS MSK event* mode. A test in `crates/kui_actions`
@@ -111,7 +121,7 @@ dotnet test test/OrderLambda.Tests
 
 ## Notes
 
-- The functions are built for `arm64` (Apple silicon). On an x86 machine, change `Architectures` in
+- The function is built for `arm64` (Apple silicon). On an x86 machine, change `Architectures` in
   `template.yaml` to `x86_64`.
 - The MSK event and `MskClusterArn` in the template only matter if you deploy. Locally, KUI is the trigger
   and SAM ignores event sources.

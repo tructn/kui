@@ -2,6 +2,7 @@ import { $, browser, expect } from "@wdio/globals";
 
 import { startFakeSam, recordKeys, type FakeSam } from "../fake-sam.js";
 import {
+  actionPage,
   button,
   createTopic,
   deleteTopic,
@@ -13,6 +14,7 @@ import {
   openSheet,
   produceMessages,
   snapshot,
+  typeFunction,
   uniqueName,
 } from "../helpers.js";
 
@@ -48,7 +50,7 @@ describe("Actions", () => {
     await expect($("#action-group")).toHaveValue(expect.stringMatching(/^kui-action-order-processor-/));
     await $("#action-topic").click();
     await $(`[role="option"]*=${topic}`).click();
-    await openSheet().$('button[role="radio"]*=The whole topic').click();
+    await openSheet().$('button[role="radio"]*=The oldest message').click();
 
     await openSheet().$('[role="group"][aria-label="Runs in"] button*=AWS SAM CLI').click();
     await expect($("#action-endpoint")).toHaveValue("http://127.0.0.1:3001");
@@ -63,7 +65,7 @@ describe("Actions", () => {
     await $("#action-endpoint").clearValue();
     await $("#action-endpoint").setValue(sam.endpoint);
     await expect(status).toHaveText(expect.stringContaining("SAM local is running"));
-    await $("#action-function").setValue(functionName);
+    await typeFunction(functionName);
     await snapshot("action-editor");
   });
 
@@ -73,37 +75,36 @@ describe("Actions", () => {
     await openSheet().waitForExist({ reverse: true });
 
     await button(name).click();
-    await expect(openSheet()).toBeDisplayed();
-    const badges = openSheet().$$('tbody [data-slot="badge"]');
+    await expect(actionPage()).toBeDisplayed();
+    const badges = actionPage().$$('tbody [data-slot="badge"]');
     await browser.waitUntil(async () => (await badges.length) === 2, {
       timeoutMsg: "The history did not show both executions",
     });
-    await expect(openSheet().$('tbody [data-slot="badge"]=Succeeded')).toBeExisting();
-    await expect(openSheet().$('tbody [data-slot="badge"]=Function error')).toBeExisting();
+    await expect(actionPage().$('tbody [data-slot="badge"]=Succeeded')).toBeExisting();
+    await expect(actionPage().$('tbody [data-slot="badge"]=Handler error')).toBeExisting();
 
     // Each message arrives as its own MSK event, with the key base64-encoded the way AWS sends it.
     expect(sam.events.map(recordKeys).sort()).toEqual([["fail-2"], ["order-1"]]);
     expect(sam.events.every((e) => JSON.stringify(e).includes(`"${topic}-`))).toBe(true);
 
-    await openSheet().$("td=order-1").click();
-    await expect(openSheet().$('pre*="handled"')).toBeExisting();
-    await openSheet().$("td=fail-2").click();
-    await expect(openSheet().$("p*=Rejected fail-2")).toBeExisting();
+    await actionPage().$("td=order-1").click();
+    await expect(actionPage().$('pre*="handled"')).toBeExisting();
+    await actionPage().$("td=fail-2").click();
+    await expect(actionPage().$("p*=Rejected fail-2")).toBeExisting();
     await snapshot("action-history");
   });
 
   it("stops, keeping its history", async () => {
-    await openSheet().$(`button[aria-label="Stop ${name}"]`).click();
-    await expect(openSheet().$('[data-slot="sheet-header"] [data-slot="badge"]=Stopped')).toBeExisting();
-    await expect(openSheet().$$('tbody [data-slot="badge"]')).toBeElementsArrayOfSize(2);
-    await expect(button("Edit", openSheet())).toBeEnabled();
-    await browser.keys("Escape");
-    await openSheet().waitForExist({ reverse: true });
+    await $(`button[aria-label="Stop ${name}"]`).click();
+    await expect($('h1 [data-slot="badge"]=Stopped')).toBeExisting();
+    await expect(actionPage().$$('tbody [data-slot="badge"]')).toBeElementsArrayOfSize(2);
+    await expect($("#action-name")).toBeEnabled();
+    await goTo("Actions");
   });
 
   it("deletes the action, then its topic", async () => {
-    await $(`button[aria-label="More for ${name}"]`).click();
-    await $('[role="menuitem"]*=Delete').click();
+    await $(`button=${name}`).click();
+    await $(`button[aria-label="Delete ${name}"]`).click();
     await button("Delete", openAlertDialog()).click();
     await expectToast(`Deleted ${name}`);
     await expect($(`button=${name}`)).not.toBeExisting();

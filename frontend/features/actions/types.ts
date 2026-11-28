@@ -1,7 +1,6 @@
 // Mirrors `crates/kui_actions/src/model.rs`.
 
 export type StartFrom = "latest" | "earliest";
-export type PayloadFormat = "raw" | "msk";
 export type LambdaRuntime = "sam" | "testTool";
 
 export interface Source {
@@ -14,12 +13,8 @@ export interface LambdaTarget {
   runtime: LambdaRuntime;
   endpoint: string;
   functionName: string;
-  projectDir: string | null;
-  payload: PayloadFormat;
   timeoutSecs: number;
   concurrency: number;
-  /** One message at a time; a message that got no answer is sent again on the next Start instead of skipped. */
-  debug: boolean;
 }
 
 export type Executor = { kind: "localLambda" } & LambdaTarget;
@@ -78,24 +73,3 @@ export type EndpointCheck =
   | { kind: "ready" }
   | { kind: "notRunning"; message: string }
   | { kind: "unexpected"; message: string };
-
-export type ConfiguredName = { kind: "notSet" } | { kind: "literal"; value: string } | { kind: "computed" };
-
-export interface DiscoveredFunction {
-  logicalId: string;
-  resourceType: string;
-  functionName: ConfiguredName;
-  runtime: string | null;
-  handler: string | null;
-  codeUri: string | null;
-  packageType: string | null;
-  kafkaTopics: string[];
-  metadata: Record<string, string>;
-}
-
-export interface Discovery {
-  projectDir: string;
-  template: string;
-  functions: DiscoveredFunction[];
-  skipped: string[];
-}

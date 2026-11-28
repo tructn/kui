@@ -88,8 +88,8 @@ export function AppSidebar() {
   const { state, isMobile } = useSidebar();
   // The mobile sidebar is a full-width sheet, never the icon strip.
   const collapsed = state === "collapsed" && !isMobile;
-  // The topic detail page belongs to the "Topics" section.
-  const activePage = route.page === "topic" ? "topics" : route.page;
+  // Detail pages belong to their list's section.
+  const activePage = route.page === "topic" ? "topics" : route.page === "action" ? "actions" : route.page;
   useShortcut("mod+1", () => navigate(NAV_ITEMS[0].route), clusterId !== null);
   useShortcut("mod+2", () => navigate(NAV_ITEMS[1].route), clusterId !== null);
   useShortcut("mod+3", () => navigate(NAV_ITEMS[2].route), clusterId !== null);
@@ -167,6 +167,7 @@ function NavGroup({
                 aria-keyshortcuts={`Meta+${item.key} Control+${item.key}`}
                 isActive={activePage === item.page}
                 aria-current={activePage === item.page ? "page" : undefined}
+                className={ACTIVE_NAV}
                 onClick={() => onNavigate(item.route)}
               >
                 <HugeiconsIcon icon={item.icon} />
@@ -201,6 +202,10 @@ function IconModeSeparator() {
 
 /** Shortcut labels sit at the right of a menu item and hide when the sidebar collapses to icons. */
 const HINT = "ml-auto group-data-[collapsible=icon]:hidden";
+
+// shadcn's active fill (--sidebar-accent) is barely lighter than the sidebar and identical to hover,
+// so hover and the current page get a stronger neutral tint that also works in dark mode.
+const ACTIVE_NAV = "hover:bg-sidebar-foreground/10 data-active:bg-sidebar-foreground/10";
 
 function SearchButton() {
   const openSearch = useTopicSearch((s) => s.setOpen);
@@ -247,6 +252,7 @@ function CollapseButton({ collapsed }: { collapsed: boolean }) {
 /** App-wide settings, in their own group just below the cluster pages. */
 function SettingsGroup() {
   const showSettings = useSettingsDialog((s) => s.show);
+  const settingsOpen = useSettingsDialog((s) => s.open);
   return (
     <SidebarGroup>
       <SidebarGroupLabel>General</SidebarGroupLabel>
@@ -256,6 +262,8 @@ function SettingsGroup() {
             <SidebarMenuButton
               tooltip={`Settings (${MOD_KEY},)`}
               aria-keyshortcuts="Meta+, Control+,"
+              isActive={settingsOpen}
+              className={ACTIVE_NAV}
               onClick={() => showSettings()}
             >
               <HugeiconsIcon icon={SlidersHorizontalIcon} />
