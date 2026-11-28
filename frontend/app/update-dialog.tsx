@@ -1,5 +1,6 @@
 import { Channel } from "@tauri-apps/api/core";
-import { DownloadIcon } from "lucide-react";
+import { Download01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -83,7 +84,7 @@ export function UpdateDialog() {
             Later
           </Button>
           <Button disabled={busy} onClick={start}>
-            {busy ? <Spinner /> : <DownloadIcon />}
+            {busy ? <Spinner /> : <HugeiconsIcon icon={Download01Icon} />}
             {install.step === "failed" ? "Try again" : "Install and restart"}
           </Button>
         </DialogFooter>

@@ -1,0 +1,30 @@
+[package]
+name = "kui_actions"
+version = "0.1.0"
+description = "KUI Actions: run local code (AWS SAM Lambda functions) for each Kafka message"
+license = "MIT"
+edition = "2024"
+publish = false
+
+[dependencies]
+kui_kafka = { workspace = true }
+rdkafka = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+# These are already in the tree through Tauri and the updater, so the only
+# new crate is the YAML parser.
+reqwest = { workspace = true, features = ["rustls-no-provider"] }
+rustls = { workspace = true }
+tokio = { version = "1", features = ["rt", "time", "sync"] }
+base64 = "0.22"
+# SAM templates are YAML with CloudFormation tags (`!Ref`, `!Sub`). The
+# event-level parser keeps those tags, which serde-based YAML crates reject.
+yaml-rust2 = { version = "0.13", default-features = false }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util"] }

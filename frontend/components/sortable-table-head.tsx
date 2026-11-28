@@ -1,4 +1,5 @@
-import { ArrowDownIcon, ArrowUpIcon, ChevronsUpDownIcon } from "lucide-react";
+import { ArrowDown02Icon, ArrowUp02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { TableHead } from "@/components/ui/table";
@@ -31,10 +32,10 @@ export function SortableTableHead<K extends string>({
   const direction = sort?.key === column ? sort.direction : null;
   const Icon =
     direction === "asc"
-      ? ArrowUpIcon
+      ? ArrowUp02Icon
       : direction === "desc"
-        ? ArrowDownIcon
-        : ChevronsUpDownIcon;
+        ? ArrowDown02Icon
+        : UnfoldMoreIcon;
   return (
     <TableHead
       aria-sort={
@@ -56,7 +57,8 @@ export function SortableTableHead<K extends string>({
         )}
       >
         {children}
-        <Icon
+        <HugeiconsIcon
+          icon={Icon}
           aria-hidden
           className={cn(
             "size-3.5 shrink-0",

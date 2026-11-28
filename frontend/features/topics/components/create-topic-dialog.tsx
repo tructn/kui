@@ -1,4 +1,5 @@
-import { PlusIcon } from "lucide-react";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -55,7 +56,7 @@ export function CreateTopicDialog({ clusterId, onCreated }: CreateTopicDialogPro
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <PlusIcon /> New topic
+          <HugeiconsIcon icon={PlusSignIcon} /> New topic
         </Button>
       </DialogTrigger>
       <DialogContent>

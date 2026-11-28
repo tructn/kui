@@ -87,13 +87,21 @@ fn set_some(cfg: &mut ClientConfig, key: &str, value: &Option<String>) {
 /// A consumer that never auto-commits. Safe for reading data without
 /// affecting any real consumer group's progress.
 pub fn new_consumer(cluster: &ClusterConfig, group_id: &str) -> Result<KafkaConsumer> {
+    new_consumer_with(cluster, group_id, |_| {})
+}
+
+/// Like [`new_consumer`], with extra settings applied on top. Every consumer is
+/// built here, so the planted-property check can't be skipped by a caller.
+pub fn new_consumer_with(
+    cluster: &ClusterConfig,
+    group_id: &str,
+    configure: impl FnOnce(&mut ClientConfig),
+) -> Result<KafkaConsumer> {
     check_properties(&cluster.properties)?;
-    created(
-        client_config(cluster)
-            .set("group.id", group_id)
-            .set("enable.auto.commit", "false")
-            .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers)),
-    )
+    let mut cfg = client_config(cluster);
+    cfg.set("group.id", group_id).set("enable.auto.commit", "false");
+    configure(&mut cfg);
+    created(cfg.create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers)))
 }
 
 /// librdkafka's config errors repeat the rejected value, which may be a

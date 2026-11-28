@@ -1,4 +1,5 @@
-import { XIcon } from "lucide-react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 
 import { emptyText, ErrorState } from "@/components/query-states";
@@ -148,7 +149,7 @@ export function MessageBrowser({ clusterId, topic, partitions, copyTargets, read
             <span className="font-medium tabular-nums">{checked.size}</span> selected
           </span>
           <Button variant="ghost" size="xs" onClick={() => setChecked(new Map())}>
-            <XIcon /> Clear
+            <HugeiconsIcon icon={Cancel01Icon} /> Clear
           </Button>
           <div className="flex-1" />
           <CopyMessageDialog

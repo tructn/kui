@@ -1,11 +1,12 @@
 import {
-  ListTreeIcon,
-  SearchIcon,
-  ServerIcon,
-  SettingsIcon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react";
+  DatabaseLightningIcon,
+  InsertColumnRightIcon,
+  Radar01Icon,
+  SearchAreaIcon,
+  SlidersHorizontalIcon,
+  ZapIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 
 import {
   Sidebar,
@@ -22,6 +23,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { MOD_KEY, ShortcutHint } from "@/components/shortcut-hint";
+import { useRunningActionCount } from "@/features/actions";
 import { ClusterSwitcher } from "@/features/clusters";
 import { useTopicSearch } from "@/features/topics";
 import { useShortcut } from "@/hooks/use-shortcut";
@@ -32,7 +34,7 @@ import { ThemeMenuButton, ThemePicker } from "./theme-picker";
 
 interface NavItem {
   label: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   page: Route["page"];
   route: Route;
   /** Opens the page with ⌘/Ctrl + this key. */
@@ -41,17 +43,24 @@ interface NavItem {
 
 // Ordered the way a cluster is built up: the brokers, the topics they host,
 // then the consumer groups reading those topics.
-const NAV_ITEMS: NavItem[] = [
-  { label: "Brokers", icon: ServerIcon, page: "brokers", route: { page: "brokers" }, key: "1" },
-  { label: "Topics", icon: ListTreeIcon, page: "topics", route: { page: "topics" }, key: "2" },
+const CLUSTER_ITEMS: NavItem[] = [
+  { label: "Brokers", icon: DatabaseLightningIcon, page: "brokers", route: { page: "brokers" }, key: "1" },
+  { label: "Topics", icon: InsertColumnRightIcon, page: "topics", route: { page: "topics" }, key: "2" },
   {
     label: "Consumer groups",
-    icon: UsersIcon,
+    icon: Radar01Icon,
     page: "consumer-groups",
     route: { page: "consumer-groups" },
     key: "3",
   },
 ];
+
+// KUI's own work on the cluster's messages rather than views of Kafka state.
+const AUTOMATION_ITEMS: NavItem[] = [
+  { label: "Actions", icon: ZapIcon, page: "actions", route: { page: "actions" }, key: "4" },
+];
+
+const NAV_ITEMS = [...CLUSTER_ITEMS, ...AUTOMATION_ITEMS];
 
 export function AppSidebar() {
   const route = useNavigation((s) => s.route);
@@ -65,6 +74,8 @@ export function AppSidebar() {
   useShortcut("mod+1", () => navigate(NAV_ITEMS[0].route), clusterId !== null);
   useShortcut("mod+2", () => navigate(NAV_ITEMS[1].route), clusterId !== null);
   useShortcut("mod+3", () => navigate(NAV_ITEMS[2].route), clusterId !== null);
+  useShortcut("mod+4", () => navigate(NAV_ITEMS[3].route), clusterId !== null);
+  const runningActions = useRunningActionCount(clusterId);
 
   return (
     <Sidebar collapsible="icon">
@@ -75,7 +86,15 @@ export function AppSidebar() {
         {clusterId && (
           <>
             <SearchButton />
-            <NavGroup label="Cluster" items={NAV_ITEMS} activePage={activePage} onNavigate={navigate} />
+            <NavGroup label="Cluster" items={CLUSTER_ITEMS} activePage={activePage} onNavigate={navigate} />
+            <NavGroup
+              label="Automation"
+              items={AUTOMATION_ITEMS}
+              activePage={activePage}
+              onNavigate={navigate}
+              // Actions keep running on other pages, so the sidebar says so.
+              indicators={runningActions ? { actions: `${runningActions} running` } : {}}
+            />
           </>
         )}
         <SettingsGroup />
@@ -98,9 +117,11 @@ interface NavGroupProps {
   items: NavItem[];
   activePage: Route["page"];
   onNavigate: (route: Route) => void;
+  /** A dot on a page's item, with what it means for screen readers. */
+  indicators?: Partial<Record<Route["page"], string>>;
 }
 
-function NavGroup({ label, items, activePage, onNavigate }: NavGroupProps) {
+function NavGroup({ label, items, activePage, onNavigate, indicators = {} }: NavGroupProps) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
@@ -115,8 +136,14 @@ function NavGroup({ label, items, activePage, onNavigate }: NavGroupProps) {
                 aria-current={activePage === item.page ? "page" : undefined}
                 onClick={() => onNavigate(item.route)}
               >
-                <item.icon />
+                <HugeiconsIcon icon={item.icon} />
                 <span>{item.label}</span>
+                {indicators[item.page] && (
+                  <span className="relative flex size-2" role="status" aria-label={indicators[item.page]}>
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500/60" />
+                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  </span>
+                )}
                 <ShortcutHint keys={[MOD_KEY, item.key]} className={HINT} />
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -142,7 +169,7 @@ function SearchButton() {
             onClick={() => openSearch(true)}
             className="text-muted-foreground"
           >
-            <SearchIcon />
+            <HugeiconsIcon icon={SearchAreaIcon} />
             <span>Search topics</span>
             <ShortcutHint keys={[MOD_KEY, "K"]} className={HINT} />
           </SidebarMenuButton>
@@ -166,7 +193,7 @@ function SettingsGroup() {
               aria-keyshortcuts="Meta+, Control+,"
               onClick={() => showSettings()}
             >
-              <SettingsIcon />
+              <HugeiconsIcon icon={SlidersHorizontalIcon} />
               <span>Settings</span>
               <ShortcutHint keys={[MOD_KEY, ","]} className={HINT} />
             </SidebarMenuButton>

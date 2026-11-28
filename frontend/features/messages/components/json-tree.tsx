@@ -1,4 +1,5 @@
-import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HashIcon } from "lucide-react";
+import { ArrowRight01Icon, HashtagIcon, UnfoldLessIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Component, createContext, type ReactNode, useContext, useMemo, useRef, useState } from "react";
 
 import { CopyIndicator, useCopy } from "@/components/copy-button";
@@ -70,13 +71,13 @@ export function JsonTree({ text, className }: JsonTreeProps) {
           title="Show how many keys or items each node has"
           onClick={() => setShowCounts(!showCounts)}
         >
-          <HashIcon /> Counts
+          <HugeiconsIcon icon={HashtagIcon} /> Counts
         </Button>
         <Button variant="ghost" size="xs" onClick={() => foldTo(Infinity)}>
-          <ChevronsUpDownIcon /> Expand all
+          <HugeiconsIcon icon={UnfoldMoreIcon} /> Expand all
         </Button>
         <Button variant="ghost" size="xs" onClick={() => foldTo(1)}>
-          <ChevronsDownUpIcon /> Collapse all
+          <HugeiconsIcon icon={UnfoldLessIcon} /> Collapse all
         </Button>
       </div>
       <div
@@ -164,7 +165,8 @@ function ContainerNode({
               aria-label={open ? "Collapse" : "Expand"}
               className="shrink-0 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             >
-              <ChevronRightIcon
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
                 className={cn(
                   "size-3.5 translate-y-0.5 text-muted-foreground transition-transform duration-200",
                   open && "rotate-90 text-primary",

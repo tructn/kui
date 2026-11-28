@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 
 import { applyAccent, DEFAULT_ACCENT, isAccent, type Accent } from "@/lib/accent";
 import { settingsStorage } from "@/lib/settings-storage";
+import { rememberSplashAccent } from "@/lib/splash";
 
 export { ACCENTS, type Accent } from "@/lib/accent";
 
@@ -70,6 +71,7 @@ function applyAppearance({ accent, uiFont, codeFont, codeFontSize, codeLigatures
   const style = root.style;
   // A stale or hand-edited accent falls back to the default.
   applyAccent(root, isAccent(accent) ? accent : DEFAULTS.accent);
+  rememberSplashAccent();
   // A stale persisted key (e.g. a font that was removed) falls back to the default.
   style.setProperty("--app-font-sans", (UI_FONTS[uiFont] ?? UI_FONTS[DEFAULTS.uiFont]).stack);
   style.setProperty("--app-font-mono", (CODE_FONTS[codeFont] ?? CODE_FONTS[DEFAULTS.codeFont]).stack);

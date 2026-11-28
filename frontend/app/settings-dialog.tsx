@@ -1,13 +1,13 @@
 import { getVersion } from "@tauri-apps/api/app";
 import {
-  DownloadIcon,
+  Download01Icon,
   KeyboardIcon,
-  PaletteIcon,
-  RefreshCwIcon,
-  RotateCcwIcon,
+  PaintBoardIcon,
+  RefreshIcon,
   SlidersHorizontalIcon,
-  type LucideIcon,
-} from "lucide-react";
+  Undo02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import { ThemePicker } from "./theme-picker";
 interface Section {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   description: string;
   content: () => ReactNode;
 }
@@ -55,14 +55,14 @@ const SECTIONS: Section[] = [
   {
     id: "appearance",
     label: "Appearance",
-    icon: PaletteIcon,
+    icon: PaintBoardIcon,
     description: "Applies right away and is remembered on this machine.",
     content: () => <AppearanceSettings />,
   },
   {
     id: "updates",
     label: "Updates",
-    icon: DownloadIcon,
+    icon: Download01Icon,
     description: "Which versions KUI offers to install, and when it looks for them.",
     content: () => <UpdateSettings />,
   },
@@ -93,7 +93,7 @@ export function SettingsDialog() {
             <TabsList className="w-full items-stretch gap-0.5 bg-transparent p-0">
               {SECTIONS.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger key={id} value={id} className="h-8 flex-none px-2 font-normal data-active:font-medium">
-                  <Icon /> {label}
+                  <HugeiconsIcon icon={Icon} /> {label}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -180,7 +180,7 @@ function AppearanceSettings() {
         <div className="flex items-center justify-between">
           <h3 className="px-1 text-xs font-medium text-muted-foreground">Fonts</h3>
           <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={resetFonts}>
-            <RotateCcwIcon /> Reset
+            <HugeiconsIcon icon={Undo02Icon} /> Reset
           </Button>
         </div>
         <SettingsGroup>
@@ -285,7 +285,7 @@ function UpdateSettings() {
         }
       >
         <Button variant="outline" size="sm" disabled={state.step === "checking"} onClick={checkNow}>
-          {state.step === "checking" ? <Spinner /> : <RefreshCwIcon />} Check now
+          {state.step === "checking" ? <Spinner /> : <HugeiconsIcon icon={RefreshIcon} />} Check now
         </Button>
       </SettingRow>
 

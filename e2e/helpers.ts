@@ -1,4 +1,4 @@
-import { $, browser, expect } from "@wdio/globals";
+import { $, $$, browser, expect } from "@wdio/globals";
 
 /** Kafka address as seen from the app (the e2e container reaches it as kafka:29092). */
 export const KAFKA_BOOTSTRAP = process.env.KAFKA_BOOTSTRAP ?? "localhost:9092";
@@ -33,13 +33,62 @@ export async function expectToast(text: string) {
   );
 }
 
-export async function goTo(page: "Topics" | "Consumer groups" | "Brokers") {
+export async function goTo(page: "Topics" | "Consumer groups" | "Brokers" | "Actions") {
   // A sheet or dialog that is still fading out covers the sidebar and would intercept the click.
   await openSheet().waitForExist({ reverse: true });
   await openDialog().waitForExist({ reverse: true });
   // Sidebar buttons also hold a shortcut hint ("Ctrl 2"), so match the label inside them.
   await $(`//*[@data-sidebar="menu-button"][.//span[normalize-space()="${page}"]]`).click();
   await expect($(`h1*=${page}`)).toBeDisplayed();
+}
+
+/** Creates `topic` from the Topics page and opens it. */
+export async function createTopic(topic: string) {
+  await goTo("Topics");
+  await button("New topic").click();
+  await $("#topic-name").setValue(topic);
+  await button("Create", openDialog()).click();
+  await expectToast(`Created ${topic}`);
+  await openDialog().waitForExist({ reverse: true });
+  await $(`span=${topic}`).click();
+  await expect($(`h1*=${topic}`)).toBeDisplayed();
+}
+
+/** Produces each message from the open topic's Produce dialog, then closes it. */
+export async function produceMessages(messages: readonly { key: string; value: string }[]) {
+  await button("Produce").click();
+  for (const [i, { key, value }] of messages.entries()) {
+    await $("#produce-key").clearValue();
+    await $("#produce-key").setValue(key);
+    await $("#produce-value").clearValue();
+    await $("#produce-value").setValue(value);
+    await button("Send", openDialog()).click();
+    await expectToasts("Produced to partition", i + 1);
+  }
+  await browser.keys("Escape");
+  await openDialog().waitForExist({ reverse: true });
+}
+
+export async function deleteTopic(topic: string) {
+  await goTo("Topics");
+  await $(`button[aria-label="Delete ${topic}"]`).click();
+  await openAlertDialog().$('input[aria-label="Topic name"]').setValue(topic);
+  await button("Delete", openAlertDialog()).click();
+  await expect($(`span=${topic}`)).not.toBeExisting();
+}
+
+/** Waits for `count` toasts containing `text`; one dialog can raise the same toast several times. */
+export async function expectToasts(text: string, count: number) {
+  await browser.waitUntil(
+    async () => {
+      let found = 0;
+      for (const toast of await $$("[data-sonner-toast]")) {
+        if ((await toast.getText()).includes(text)) found++;
+      }
+      return found >= count;
+    },
+    { timeoutMsg: `Fewer than ${count} toasts containing "${text}"` },
+  );
 }
 
 /** Saves a screenshot to e2e/artifacts for reviewing the UI by eye. */
@@ -98,6 +147,11 @@ export const CHANGING_COMMANDS = [
   "delete_consumer_group",
   "reset_consumer_group_offsets",
   "install_update",
+  "save_action",
+  "delete_action",
+  "start_action",
+  "stop_action",
+  "clear_action_history",
 ];
 
 declare global {

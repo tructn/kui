@@ -1,5 +1,6 @@
 import { format } from "date-fns";
-import { CalendarClockIcon } from "lucide-react";
+import { Calendar03Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
           aria-label={`${label}: ${format(value, "PPP 'at' HH:mm:ss")}`}
         >
           <span className="tabular-nums">{format(value, "MMM d, yyyy · HH:mm:ss")}</span>
-          <CalendarClockIcon className="text-muted-foreground" />
+          <HugeiconsIcon icon={Calendar03Icon} className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto overflow-hidden p-0" align="start" aria-label={label}>

@@ -1,4 +1,10 @@
-import { ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
+import {
+  ArrowLeft01Icon,
+  ArrowLeftDoubleIcon,
+  ArrowRight01Icon,
+  ArrowRightDoubleIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactElement, ReactNode } from "react";
 
 import { ShortcutHint } from "@/components/shortcut-hint";
@@ -90,7 +96,7 @@ function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcut
         </span>
         <div className="flex items-center gap-0.5">
           <Button variant="ghost" size="icon-xs" aria-label="First page" disabled={first} onClick={() => setPage(0)}>
-            <ChevronsLeftIcon />
+            <HugeiconsIcon icon={ArrowLeftDoubleIcon} />
           </Button>
           <ShortcutTooltip label="Previous page" shortcut={shortcuts ? "[" : undefined}>
             <Button
@@ -101,7 +107,7 @@ function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcut
               disabled={first}
               onClick={() => setPage(page - 1)}
             >
-              <ChevronLeftIcon />
+              <HugeiconsIcon icon={ArrowLeft01Icon} />
             </Button>
           </ShortcutTooltip>
           <ShortcutTooltip label="Next page" shortcut={shortcuts ? "]" : undefined}>
@@ -113,7 +119,7 @@ function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcut
               disabled={last}
               onClick={() => setPage(page + 1)}
             >
-              <ChevronRightIcon />
+              <HugeiconsIcon icon={ArrowRight01Icon} />
             </Button>
           </ShortcutTooltip>
           {hasNext === undefined && (
@@ -124,7 +130,7 @@ function TablePagination({ pager, shortcuts }: { pager: Pager<unknown>; shortcut
               disabled={last}
               onClick={() => setPage(pageCount - 1)}
             >
-              <ChevronsRightIcon />
+              <HugeiconsIcon icon={ArrowRightDoubleIcon} />
             </Button>
           )}
         </div>

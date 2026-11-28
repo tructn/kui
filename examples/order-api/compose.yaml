@@ -1,0 +1,10 @@
+name: kui-examples
+
+services:
+  order-api:
+    build: .
+    container_name: kui-order-api
+    ports:
+      - "8080:8080"
+    environment:
+      DEMO_TOKEN: kui-demo-token

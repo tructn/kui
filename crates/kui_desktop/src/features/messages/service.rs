@@ -25,10 +25,10 @@ use super::window::{
 use crate::blocking::run_blocking;
 use crate::error::{Error, Result};
 use crate::tasks::CancelToken;
-use kui_kafka::connection::{ConnectionErrors, explain};
+use kui_kafka::connection::explain;
 use kui_kafka::metadata::{ensure_writable, partition_ids};
 use kui_kafka::offsets::{PartitionKey, Watermarks, offsets_at, watermarks};
-use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, client_config, created};
+use kui_kafka::{KafkaClients, KafkaConsumer, TIMEOUT, new_consumer_with};
 
 const MAX_PAGE_SIZE: usize = 1000;
 /// Export pages hold full payloads (nothing is truncated in a file), so keep them small.
@@ -406,13 +406,10 @@ fn browsing_consumer(clients: &KafkaClients) -> Result<KafkaConsumer> {
 }
 
 fn browsing_consumer_for(cluster: &kui_kafka::ClusterConfig) -> Result<KafkaConsumer> {
-    Ok(created(
-        client_config(cluster)
-            .set("group.id", format!("kui-browser-{}", uuid::Uuid::new_v4()))
-            .set("enable.auto.commit", "false")
-            .set("enable.partition.eof", "true")
-            .create_with_context(ConnectionErrors::new(&cluster.bootstrap_servers)),
-    )?)
+    let group = format!("kui-browser-{}", uuid::Uuid::new_v4());
+    Ok(new_consumer_with(cluster, &group, |cfg| {
+        cfg.set("enable.partition.eof", "true");
+    })?)
 }
 
 /// A requested partition, its watermarks, and where the first page starts in it.

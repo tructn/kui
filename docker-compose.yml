@@ -100,6 +100,10 @@ services:
         condition: service_completed_successfully
     environment:
       KAFKA_BOOTSTRAP: kafka:29092
+      # Set by `make e2e SPEC=...` to run only the UI specs whose file name contains it.
+      E2E_SPEC: ${E2E_SPEC:-}
+      # Set by `make e2e-headed` to share the test display over VNC on port 5900.
+      E2E_HEADED: ${E2E_HEADED:-}
     volumes:
       # Cache Rust builds between runs (librdkafka takes minutes to compile).
       - cargo-target:/app/target

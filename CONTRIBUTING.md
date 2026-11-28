@@ -18,7 +18,7 @@ The [Makefile](Makefile) wraps the common steps; on Windows, run it from Git Bas
 make dev              # bun install if needed, then tauri dev with hot reload
 make install          # build a release and install it (/Applications on macOS, the installer on Windows)
 make package          # build this OS's installers into target/release/bundle
-make test             # unit tests (test-e2e for the Docker suite)
+make test             # unit tests (e2e for the Docker suite, e2e-headed to watch it)
 make check            # lint + typecheck + unit tests, before calling a change done
 make release-dry-run  # build every platform's installers on GitHub without releasing (see Releasing)
 ```

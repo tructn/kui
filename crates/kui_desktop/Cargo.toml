@@ -25,11 +25,12 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 kui_mql = { workspace = true }
 kui_kafka = { workspace = true }
+kui_actions = { workspace = true }
 # Used directly by the features; its build features are set in kui_kafka.
 rdkafka = { workspace = true }
 thiserror = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "rt"] }
 fake = { version = "5.1.0", features = ["uuid", "chrono", "random_color"] }
 chrono = { workspace = true }
 
@@ -40,8 +41,8 @@ chrono = { workspace = true }
 # and macOS unpacks .app.tar.gz without it, so it's off, along with the zip
 # crate and its advisories.
 tauri-plugin-updater = { version = "2.14.0", default-features = false, features = ["rustls-tls", "system-proxy"] }
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
+reqwest = { workspace = true, features = ["json", "rustls-no-provider"] }
+rustls = { workspace = true }
 semver = "1"
 
 # Native "Save as" window for exports. Rust opens it, so the webview never gets

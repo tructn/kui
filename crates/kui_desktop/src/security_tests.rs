@@ -208,6 +208,12 @@ const READ_ONLY_COMMANDS: &[&str] = &[
     "consumer_group_lags",
     "topic_consumer_groups",
     "preview_offset_reset",
+    "list_actions",
+    "action_statuses",
+    "action_history",
+    "action_execution",
+    "check_lambda_endpoint",
+    "discover_lambda_functions",
 ];
 
 #[test]
@@ -329,6 +335,12 @@ fn security_planted_alias_properties_cannot_reach_a_client() {
         .unwrap();
         assert!(kui_kafka::KafkaClients::connect(cluster.clone()).is_err(), "connect accepted {key:?}");
         assert!(kui_kafka::new_consumer(&cluster, "g").is_err(), "new_consumer accepted {key:?}");
+        let source = kui_actions::model::Source {
+            topic: "t".into(),
+            group_id: "g".into(),
+            start_from: kui_actions::model::StartFrom::Latest,
+        };
+        assert!(kui_actions::kafka::subscribe(&cluster, &source).is_err(), "action consumer accepted {key:?}");
         assert!(crate::features::clusters::service::test_connection(&cluster).is_err(), "test_connection {key:?}");
     }
 }

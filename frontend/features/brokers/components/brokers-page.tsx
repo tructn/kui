@@ -1,4 +1,5 @@
-import { RotateCwIcon } from "lucide-react";
+import { ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useClusterId } from "@/app/stores/navigation-store";
 import { usePrivacy } from "@/app/stores/privacy-store";
@@ -47,7 +48,7 @@ export function BrokersPage() {
         description="Cluster health and partition distribution"
         actions={
           <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => overview.refetch()}>
-            <RotateCwIcon className={overview.isFetching ? "animate-spin" : undefined} />
+            <HugeiconsIcon icon={ReloadIcon} className={overview.isFetching ? "animate-spin" : undefined} />
           </Button>
         }
       />

@@ -1,4 +1,5 @@
-import { ArrowUpRightIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import { ArrowUpRight01Icon, Delete02Icon, Undo02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -158,13 +159,13 @@ function GroupDetailBody({
           disabled={!detail || topics.length === 0}
           onClick={() => openReset(topics[0].topic)}
         >
-          <RotateCcwIcon /> Reset offsets
+          <HugeiconsIcon icon={Undo02Icon} /> Reset offsets
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             {/* Kafka only allows deleting groups without active members. */}
             <Button variant="destructive" size="sm" disabled={!detail || detail.members.length > 0}>
-              <Trash2Icon /> Delete group
+              <HugeiconsIcon icon={Delete02Icon} /> Delete group
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -208,7 +209,7 @@ function GroupDetailBody({
                   aria-label={`Open ${t.topic}`}
                   onClick={() => navigate({ page: "topic", topic: t.topic })}
                 >
-                  <ArrowUpRightIcon />
+                  <HugeiconsIcon icon={ArrowUpRight01Icon} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -217,7 +218,7 @@ function GroupDetailBody({
                   title="Reset offsets"
                   onClick={() => openReset(t.topic)}
                 >
-                  <RotateCcwIcon />
+                  <HugeiconsIcon icon={Undo02Icon} />
                 </Button>
               </>
             }

@@ -1,4 +1,5 @@
-import { DatabaseIcon, PlusIcon } from "lucide-react";
+import { Database01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
 import { useNavigation } from "@/app/stores/navigation-store";
@@ -26,7 +27,7 @@ export function WelcomeScreen() {
       <Empty className="page-enter">
         <EmptyHeader>
           <EmptyMedia variant="icon" className="float-gentle">
-            <DatabaseIcon />
+            <HugeiconsIcon icon={Database01Icon} />
           </EmptyMedia>
           <EmptyTitle>{clusters.length ? "Select a cluster" : "Connect to Kafka"}</EmptyTitle>
           <EmptyDescription>
@@ -39,11 +40,11 @@ export function WelcomeScreen() {
           <div className="flex flex-wrap justify-center gap-2">
             {clusters.map((c, i) => (
               <Button key={c.id} variant="outline" onClick={() => selectCluster(c.id)}>
-                <DatabaseIcon /> {maskClusterName(c.name, i, maskNames)}
+                <HugeiconsIcon icon={Database01Icon} /> {maskClusterName(c.name, i, maskNames)}
               </Button>
             ))}
             <Button onClick={() => setAdding(true)}>
-              <PlusIcon /> Add cluster
+              <HugeiconsIcon icon={PlusSignIcon} /> Add cluster
             </Button>
           </div>
         </EmptyContent>

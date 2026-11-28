@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Example .NET functions for trying KUI Actions against the demo Kafka topic.
+
+Parameters:
+  # Only used if you deploy. `sam local start-lambda` ignores event sources;
+  # KUI is the trigger locally.
+  MskClusterArn:
+    Type: String
+    Default: arn:aws:kafka:us-east-1:000000000000:cluster/example/00000000-0000-0000-0000-000000000000-1
+
+Globals:
+  Function:
+    Runtime: dotnet8
+    CodeUri: ./src/OrderLambda
+    MemorySize: 512
+    Timeout: 30
+    Architectures:
+      - arm64
+
+Resources:
+  # Pick "AWS MSK event" in KUI. KUI suggests it because of the MSK event below.
+  OrderProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: OrderLambda::OrderLambda.Function::HandleMsk
+      Events:
+        Orders:
+          Type: MSK
+          Properties:
+            Stream: !Ref MskClusterArn
+            Topics:
+              - demo.orders
+            StartingPosition: LATEST
+
+  # Pick "Message value" in KUI: the handler takes the order JSON itself.
+  RawOrderProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: OrderLambda::OrderLambda.Function::HandleRaw

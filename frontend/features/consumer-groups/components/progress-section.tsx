@@ -1,4 +1,5 @@
-import { ChevronRightIcon } from "lucide-react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type ReactNode } from "react";
 
 import { formatNumber } from "@/lib/format";
@@ -33,7 +34,10 @@ export function ProgressSection({ title, extra, progress, offsets, defaultOpen =
             aria-expanded={open}
             onClick={() => setOpen(!open)}
           >
-            <ChevronRightIcon className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} />
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")}
+            />
             <span className="truncate font-mono">{title}</span>
           </button>
           {extra}

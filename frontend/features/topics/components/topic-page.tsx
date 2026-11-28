@@ -1,4 +1,5 @@
-import { ArrowLeftIcon, RotateCwIcon } from "lucide-react";
+import { ArrowLeft02Icon, ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useClusterId, useNavigation } from "@/app/stores/navigation-store";
 import { CopyButton } from "@/components/copy-button";
@@ -52,7 +53,7 @@ export function TopicPage({ topic }: { topic: string }) {
               aria-label="Back to topics"
               onClick={backToList}
             >
-              <ArrowLeftIcon />
+              <HugeiconsIcon icon={ArrowLeft02Icon} />
             </Button>
             <span className="font-mono">{topic}</span>
             <CopyButton value={topic} label="Copy topic name" />
@@ -78,7 +79,8 @@ export function TopicPage({ topic }: { topic: string }) {
               aria-label="Refresh"
               onClick={() => detail.refetch()}
             >
-              <RotateCwIcon
+              <HugeiconsIcon
+                icon={ReloadIcon}
                 className={detail.isFetching ? "animate-spin" : undefined}
               />
             </Button>

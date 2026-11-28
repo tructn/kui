@@ -1,11 +1,12 @@
 import {
-  CheckIcon,
-  ChevronsUpDownIcon,
-  DatabaseIcon,
-  PencilIcon,
-  PlusIcon,
-  Trash2Icon,
-} from "lucide-react";
+  Database01Icon,
+  Delete02Icon,
+  PencilEdit02Icon,
+  PlusSignIcon,
+  Tick02Icon,
+  UnfoldMoreIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -89,7 +90,7 @@ export function ClusterSwitcher() {
                       : "No cluster selected"}
                   </span>
                 </div>
-                <ChevronsUpDownIcon className="ml-auto" />
+                <HugeiconsIcon icon={UnfoldMoreIcon} className="ml-auto" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -103,14 +104,14 @@ export function ClusterSwitcher() {
                   key={c.id}
                   onSelect={() => selectCluster(c.id)}
                 >
-                  <DatabaseIcon />
+                  <HugeiconsIcon icon={Database01Icon} />
                   <span className="flex-1 truncate">{label(c)}</span>
-                  {c.id === clusterId && <CheckIcon />}
+                  {c.id === clusterId && <HugeiconsIcon icon={Tick02Icon} />}
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setDialog({ kind: "add" })}>
-                <PlusIcon /> Add cluster
+                <HugeiconsIcon icon={PlusSignIcon} /> Add cluster
               </DropdownMenuItem>
               {active && (
                 <>
@@ -119,7 +120,7 @@ export function ClusterSwitcher() {
                       setDialog({ kind: "edit", cluster: active })
                     }
                   >
-                    <PencilIcon /> Edit {label(active)}
+                    <HugeiconsIcon icon={PencilEdit02Icon} /> Edit {label(active)}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
@@ -127,7 +128,7 @@ export function ClusterSwitcher() {
                       setDialog({ kind: "delete", cluster: active })
                     }
                   >
-                    <Trash2Icon /> Remove {label(active)}
+                    <HugeiconsIcon icon={Delete02Icon} /> Remove {label(active)}
                   </DropdownMenuItem>
                 </>
               )}

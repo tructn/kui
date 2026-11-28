@@ -1,4 +1,5 @@
-import { CheckCircle2Icon, PlugZapIcon, TriangleAlertIcon } from "lucide-react";
+import { Alert02Icon, CheckmarkCircle02Icon, PlugSocketIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -189,7 +190,7 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
             </Field>
             {mechanism === "PLAIN" && form.securityProtocol === "SASL_PLAINTEXT" && (
               <Alert variant="destructive">
-                <TriangleAlertIcon />
+                <HugeiconsIcon icon={Alert02Icon} />
                 <AlertTitle>The password will be sent unencrypted</AlertTitle>
                 <AlertDescription>
                   PLAIN over SASL_PLAINTEXT lets anyone on the network read it. Use SASL_SSL, or SCRAM if the cluster
@@ -304,7 +305,7 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
             </Field>
             {!form.sslVerifyHostname && (
               <Alert variant="destructive">
-                <TriangleAlertIcon />
+                <HugeiconsIcon icon={Alert02Icon} />
                 <AlertTitle>Hostname check is off</AlertTitle>
                 <AlertDescription>
                   Any server with a certificate from a trusted CA could pose as the broker and read your traffic. Only
@@ -342,9 +343,9 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
           {test.isPending ? (
             <Spinner />
           ) : test.isSuccess ? (
-            <CheckCircle2Icon className="text-emerald-500" />
+            <HugeiconsIcon icon={CheckmarkCircle02Icon} className="text-emerald-500" />
           ) : (
-            <PlugZapIcon />
+            <HugeiconsIcon icon={PlugSocketIcon} />
           )}
           {test.isSuccess ? `Connected · ${test.data} broker${test.data === 1 ? "" : "s"}` : "Test connection"}
         </Button>

@@ -1,4 +1,5 @@
-import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, CopyIcon } from "lucide-react";
+import { ArrowRight01Icon, Copy01Icon, UnfoldLessIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, memo, startTransition, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/copy-button";
@@ -134,7 +135,11 @@ export function MessageTable({
                 title={anyExpanded ? "Collapse all rows" : "Expand all rows"}
                 onClick={toggleAllExpanded}
               >
-                {anyExpanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
+                {anyExpanded ? (
+                  <HugeiconsIcon icon={UnfoldLessIcon} />
+                ) : (
+                  <HugeiconsIcon icon={UnfoldMoreIcon} />
+                )}
               </Button>
             </TableHead>
             {selectable && (
@@ -189,7 +194,10 @@ export function MessageTable({
                     setRowExpanded(key, !open);
                   }}
                 >
-                  <ChevronRightIcon className={cn("transition-transform", open && "rotate-90")} />
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    className={cn("transition-transform", open && "rotate-90")}
+                  />
                 </Button>
               </TableCell>
               {selectable && (
@@ -282,7 +290,7 @@ function PreviewValue({ payload }: { payload: Payload | null }) {
                   aria-label="Copy value (unavailable: payload is truncated)"
                   title="Truncated payload: copy would give a partial value"
                 >
-                  <CopyIcon />
+                  <HugeiconsIcon icon={Copy01Icon} />
                 </Button>
               ) : (
                 <CopyButton value={text} label="Copy value" />

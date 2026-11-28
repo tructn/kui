@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import net from "node:net";
 import path from "node:path";
+
+import { waitForPort } from "./ports.js";
 
 /**
  * Drives the real KUI binary through tauri-driver (WebDriver for Tauri).
@@ -39,7 +40,7 @@ export const config: WebdriverIO.Config = {
     tauriDriver = spawn("tauri-driver", ["--port", String(DRIVER_PORT)], {
       stdio: ["ignore", "inherit", "inherit"],
     });
-    await waitForPort(DRIVER_PORT);
+    await waitForPort(DRIVER_PORT, "tauri-driver");
   },
   afterSession: () => {
     tauriDriver?.kill();
@@ -52,20 +53,3 @@ export const config: WebdriverIO.Config = {
     await browser.saveScreenshot(path.join(ARTIFACTS, `${name}.png`));
   },
 };
-
-function waitForPort(port: number, timeoutMs = 10_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const attempt = () => {
-      const socket = net.connect(port, "127.0.0.1", () => {
-        socket.end();
-        resolve();
-      });
-      socket.on("error", () => {
-        if (Date.now() > deadline) reject(new Error(`tauri-driver did not start on port ${port}`));
-        else setTimeout(attempt, 100);
-      });
-    };
-    attempt();
-  });
-}

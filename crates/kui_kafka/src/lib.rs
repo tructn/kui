@@ -13,7 +13,7 @@ pub mod groups;
 pub mod metadata;
 pub mod offsets;
 
-pub use client::{KafkaClients, client_config, created, new_consumer};
+pub use client::{KafkaClients, client_config, created, new_consumer, new_consumer_with};
 pub use cluster::{ClusterConfig, SECRET_PROPERTIES, check_properties, is_secret_property};
 pub use connection::KafkaConsumer;
 pub use error::{Error, Result};

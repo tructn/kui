@@ -5,3 +5,7 @@ dist
 target
 crates/kui_desktop/gen
 .git
+# Host builds of the .NET example; the image restores and builds its own.
+examples/**/bin
+examples/**/obj
+examples/**/.aws-sam

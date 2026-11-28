@@ -1,4 +1,5 @@
-import { DownloadIcon } from "lucide-react";
+import { Download01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -88,7 +89,7 @@ export function ExportMessagesDialog({ clusterId, request, pageCount, selected, 
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" disabled={disabled}>
-          <DownloadIcon /> Export
+          <HugeiconsIcon icon={Download01Icon} /> Export
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -153,7 +154,7 @@ export function ExportMessagesDialog({ clusterId, request, pageCount, selected, 
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={!canExport || exporter.isPending}>
-              {exporter.isPending ? <Spinner /> : <DownloadIcon />}
+              {exporter.isPending ? <Spinner /> : <HugeiconsIcon icon={Download01Icon} />}
               {exporter.isPending ? "Exporting…" : "Save as…"}
             </Button>
           </DialogFooter>

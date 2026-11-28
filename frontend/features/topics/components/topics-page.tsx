@@ -1,4 +1,5 @@
-import { RegexIcon, RotateCwIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import { Cancel01Icon, Delete02Icon, RegexIcon, ReloadIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 
 import { useClusterId, useNavigation } from "@/app/stores/navigation-store";
@@ -91,7 +92,7 @@ export function TopicsPage() {
         actions={
           <>
             <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => topics.refetch()}>
-              <RotateCwIcon className={topics.isFetching ? "animate-spin" : undefined} />
+              <HugeiconsIcon icon={ReloadIcon} className={topics.isFetching ? "animate-spin" : undefined} />
             </Button>
             <CreateTopicDialog clusterId={clusterId} onCreated={openTopic} />
           </>
@@ -102,7 +103,7 @@ export function TopicsPage() {
           <div className="flex w-full max-w-sm flex-col gap-1">
             <InputGroup>
               <InputGroupAddon>
-                <SearchIcon />
+                <HugeiconsIcon icon={Search01Icon} />
               </InputGroupAddon>
               <InputGroupInput
                 placeholder={regex ? "Filter topics by regex" : "Filter topics"}
@@ -122,7 +123,7 @@ export function TopicsPage() {
                       aria-pressed={regex}
                       onClick={() => setRegex(!regex)}
                     >
-                      <RegexIcon />
+                      <HugeiconsIcon icon={RegexIcon} />
                     </InputGroupButton>
                   </TooltipTrigger>
                   <TooltipContent>Use regular expression</TooltipContent>
@@ -147,11 +148,12 @@ export function TopicsPage() {
               <span className="font-medium tabular-nums">{selected.length}</span> selected
             </span>
             <Button variant="ghost" size="xs" onClick={() => setChecked(new Set())}>
-              <XIcon /> Clear
+              <HugeiconsIcon icon={Cancel01Icon} /> Clear
             </Button>
             <div className="flex-1" />
             <Button variant="destructive" size="sm" onClick={() => setConfirmOpen(true)}>
-              <Trash2Icon /> Delete {selected.length} {selected.length === 1 ? "topic" : "topics"}
+              <HugeiconsIcon icon={Delete02Icon} />
+              Delete {selected.length} {selected.length === 1 ? "topic" : "topics"}
             </Button>
           </div>
         )}
@@ -225,7 +227,7 @@ export function TopicsPage() {
                             aria-label={`Delete ${t.name}`}
                             className="text-muted-foreground hover:text-destructive"
                           >
-                            <Trash2Icon />
+                            <HugeiconsIcon icon={Delete02Icon} />
                           </Button>
                         }
                       />

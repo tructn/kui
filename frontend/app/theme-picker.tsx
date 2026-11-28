@@ -1,4 +1,5 @@
-import { MonitorIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
+import { ComputerIcon, Moon02Icon, Sun03Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { ToggleGroup } from "radix-ui";
 
 import {
@@ -11,19 +12,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SEGMENT_ITEM as ITEM, SEGMENT_ROOT } from "@/components/segmented-control";
 import { cn } from "@/lib/utils";
 
 import { useTheme, type Theme } from "./stores/theme-store";
 
-const THEMES: { value: Theme; label: string; icon: LucideIcon }[] = [
-  { value: "system", label: "System", icon: MonitorIcon },
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
+const THEMES: { value: Theme; label: string; icon: IconSvgElement }[] = [
+  { value: "system", label: "System", icon: ComputerIcon },
+  { value: "light", label: "Light", icon: Sun03Icon },
+  { value: "dark", label: "Dark", icon: Moon02Icon },
 ];
-
-// Styled on aria-checked, not data-state: a Tooltip trigger wrapping an item overwrites data-state.
-const ITEM =
-  "inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm dark:aria-checked:bg-input/50 [&_svg]:size-3.5";
 
 /**
  * System / Light / Dark segmented control. `iconOnly` drops the labels into
@@ -40,21 +38,21 @@ export function ThemePicker({ iconOnly = false, className }: { iconOnly?: boolea
       value={theme}
       // Clicking the active option would deselect it (""); a theme is always set.
       onValueChange={(v) => v && setTheme(v as Theme)}
-      className={cn("inline-flex rounded-lg bg-muted p-0.5", className)}
+      className={cn(SEGMENT_ROOT, className)}
     >
       {THEMES.map(({ value, label, icon: Icon }) =>
         iconOnly ? (
           <Tooltip key={value}>
             <TooltipTrigger asChild>
               <ToggleGroup.Item value={value} aria-label={label} className={cn(ITEM, "flex-1 px-0")}>
-                <Icon />
+                <HugeiconsIcon icon={Icon} />
               </ToggleGroup.Item>
             </TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>
           </Tooltip>
         ) : (
           <ToggleGroup.Item key={value} value={value} aria-label={label} className={ITEM}>
-            <Icon /> {label}
+            <HugeiconsIcon icon={Icon} /> {label}
           </ToggleGroup.Item>
         ),
       )}
@@ -78,7 +76,7 @@ export function ThemeMenuButton() {
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton aria-label={`Theme: ${current.label}`}>
-              <current.icon />
+              <HugeiconsIcon icon={current.icon} />
               <span>Theme</span>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
@@ -90,7 +88,7 @@ export function ThemeMenuButton() {
         <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as Theme)}>
           {THEMES.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
-              <Icon /> {label}
+              <HugeiconsIcon icon={Icon} /> {label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

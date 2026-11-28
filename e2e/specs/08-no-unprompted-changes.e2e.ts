@@ -60,6 +60,16 @@ describe("Nothing changes without the user's consent", () => {
     await openSheet().waitForExist({ reverse: true });
   });
 
+  it("saves and starts no action when the action editor is closed", async () => {
+    await goTo("Actions");
+    await button("AWS Lambda").click();
+    await expect(openSheet()).toBeDisplayed();
+    await $("#action-name").setValue("Abandoned");
+    await browser.keys("Escape");
+    await openSheet().waitForExist({ reverse: true });
+    await expect($("button=Abandoned")).not.toBeExisting();
+  });
+
   it("ignores stray keys on a focused topic row", async () => {
     await goTo("Topics");
     const row = await $("span=demo.orders").$("./ancestor::tr").getElement();
@@ -93,6 +103,7 @@ describe("Nothing changes without the user's consent", () => {
     for (const [key, heading] of [
       ["1", "Brokers"],
       ["3", "Consumer groups"],
+      ["4", "Actions"],
       ["2", "Topics"],
     ]) {
       await pressMod(key);

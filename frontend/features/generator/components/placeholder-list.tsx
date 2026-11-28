@@ -1,4 +1,5 @@
-import { ChevronRightIcon } from "lucide-react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useGenerators } from "../queries";
 
@@ -8,7 +9,7 @@ export function PlaceholderList({ onInsert }: { onInsert: (snippet: string) => v
   return (
     <details className="group rounded-lg border">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-sm font-medium select-none">
-        <ChevronRightIcon className="size-4 transition-transform group-open:rotate-90" />
+        <HugeiconsIcon icon={ArrowRight01Icon} className="size-4 transition-transform group-open:rotate-90" />
         Placeholders
         <span className="ml-auto text-xs font-normal text-muted-foreground">click to insert</span>
       </summary>

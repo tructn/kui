@@ -1,4 +1,5 @@
-import { RotateCwIcon, SearchIcon } from "lucide-react";
+import { ReloadIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 
 import { useClusterId } from "@/app/stores/navigation-store";
@@ -64,13 +65,19 @@ export function ConsumerGroupsPage() {
         description={groups.data ? `${groups.data.length} groups` : undefined}
         actions={
           <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={refresh}>
-            <RotateCwIcon className={groups.isFetching || lags.isFetching ? "animate-spin" : undefined} />
+            <HugeiconsIcon
+              icon={ReloadIcon}
+              className={groups.isFetching || lags.isFetching ? "animate-spin" : undefined}
+            />
           </Button>
         }
       />
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
         <div className="relative max-w-sm">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <HugeiconsIcon
+            icon={Search01Icon}
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             className="pl-8"
             placeholder="Filter groups"

@@ -1,4 +1,11 @@
-import { CornerDownLeftIcon, FilterIcon, Maximize2Icon, Minimize2Icon, XIcon } from "lucide-react";
+import {
+  ArrowExpandIcon,
+  ArrowShrinkIcon,
+  ArrowTurnBackwardIcon,
+  Cancel01Icon,
+  FilterIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 
 import { InfoList, InfoTip } from "@/components/info-tip";
@@ -80,7 +87,7 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
             if (applied) onApply(null);
           }}
         >
-          <XIcon />
+          <HugeiconsIcon icon={Cancel01Icon} />
         </Button>
       )}
       <Button
@@ -91,11 +98,11 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
         title={expanded ? "Collapse to one line" : "Open the multi-line editor"}
         onClick={() => setExpanded((e) => !e)}
       >
-        {expanded ? <Minimize2Icon /> : <Maximize2Icon />}
+        {expanded ? <HugeiconsIcon icon={ArrowShrinkIcon} /> : <HugeiconsIcon icon={ArrowExpandIcon} />}
       </Button>
       <Button variant={pending ? "default" : "ghost"} size="xs" disabled={disabled || !pending || invalid} onClick={() => apply()}>
         Apply {expanded ? <span className="opacity-70">{MOD_KEY}</span> : null}
-        <CornerDownLeftIcon className="size-3" />
+        <HugeiconsIcon icon={ArrowTurnBackwardIcon} className="size-3" />
       </Button>
     </div>
   );
@@ -105,7 +112,12 @@ export function QueryBar({ query, onApply, getCatalog, onFocus, disabled }: Quer
     invalid && "border-destructive focus-within:border-destructive focus-within:ring-destructive/20",
     applied && !pending && !invalid && "border-primary/40",
   );
-  const filterIcon = <FilterIcon className={cn("size-3.5 shrink-0", applied ? "text-primary" : "text-muted-foreground")} />;
+  const filterIcon = (
+    <HugeiconsIcon
+      icon={FilterIcon}
+      className={cn("size-3.5 shrink-0", applied ? "text-primary" : "text-muted-foreground")}
+    />
+  );
 
   if (!expanded) {
     return (

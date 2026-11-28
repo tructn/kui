@@ -12,7 +12,7 @@ else
 PLATFORM := unsupported
 endif
 
-.PHONY: dev install package test test-e2e lint typecheck check
+.PHONY: dev install package test e2e e2e-headed lint typecheck check
 
 # Hot reload: Vite reloads UI changes, Tauri rebuilds and restarts on Rust changes.
 dev: node_modules
@@ -35,9 +35,40 @@ package-unsupported:
 test: node_modules
 	bun run test
 
-# Runs in Docker.
-test-e2e:
-	bun run test:e2e
+# Runs in Docker. SPEC=<part of a file name in e2e/specs> runs only those UI specs, without the Rust tests.
+e2e:
+	E2E_SPEC="$(SPEC)" bun run test:e2e
+
+# Like e2e, shown live in a VNC viewer. On macOS, Screen Sharing opens once the container starts; the
+# screen stays black while the app builds. The port is only published on localhost.
+VNC_URL := vnc://:kui@127.0.0.1:5900
+e2e-headed:
+	docker compose --profile e2e rm --stop --force kafka-e2e kafka-seed-e2e
+	@viewer() { \
+	  for _ in {1..1800}; do \
+	    if nc -z 127.0.0.1 5900 2>/dev/null; then \
+	      sleep 3; \
+	      if command -v open >/dev/null; then open "$(VNC_URL)"; else echo "Connect a VNC viewer to $(VNC_URL)"; fi; \
+	      return; \
+	    fi; \
+	    sleep 1; \
+	  done; \
+	}; \
+	viewer & watcher=$$!; trap 'kill $$watcher 2>/dev/null || true' EXIT; \
+	E2E_HEADED=1 E2E_SPEC="$(SPEC)" docker compose --profile e2e run --build --rm -p 127.0.0.1:5900:5900 e2e
+
+# Local Kafka on localhost:9092 with the demo topics from docker/kafka-seed.sh; add it in KUI as
+# localhost:9092. `run` instead of `up` so the seed's output shows and a failed seed fails the target.
+.PHONY: kafka kafka-down
+
+kafka:
+	docker compose up -d --wait kafka
+	docker compose run --rm kafka-seed
+	@echo "Kafka is ready on localhost:9092"
+
+# The broker keeps no volume, so this also wipes everything produced to it.
+kafka-down:
+	docker compose down
 
 lint:
 	bun run lint

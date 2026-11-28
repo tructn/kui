@@ -4,15 +4,43 @@
 set -euo pipefail
 cd /app
 
+if [[ -n "${E2E_HEADED:-}" ]]; then
+  # A display that outlives each app session, shared over VNC so the run can be watched.
+  export DISPLAY=:99
+  Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
+  for _ in {1..50}; do [[ -e /tmp/.X11-unix/X99 ]] && break; sleep 0.1; done
+  x11vnc -display :99 -rfbport 5900 -passwd kui -forever -shared -quiet -bg -o /tmp/x11vnc.log
+  echo "▶ Watch the run with a VNC viewer: vnc://localhost:5900 (password kui)"
+fi
+
 echo "▶ Building KUI (debug)…"
 # VITE_E2E records every command the UI sends, so specs can assert none changed anything.
 VITE_E2E=1 bun run tauri build --debug --no-bundle
 
-echo "▶ Rust unit + integration tests against ${KAFKA_BOOTSTRAP}…"
-KUI_TEST_BOOTSTRAP="$KAFKA_BOOTSTRAP" cargo test -p kui_desktop -- --include-ignored
+echo "▶ Building the example .NET Lambda…"
+dotnet build examples/order-lambda/src/OrderLambda -c Release --nologo -v quiet
+
+cd e2e
+spec_args=()
+if [[ -n "${E2E_SPEC:-}" ]]; then
+  shopt -s nullglob
+  specs=(specs/*"$E2E_SPEC"*.e2e.ts)
+  if ((${#specs[@]} == 0)); then
+    echo "No spec in e2e/specs matches \"$E2E_SPEC\"" >&2
+    exit 1
+  fi
+  for spec in "${specs[@]}"; do spec_args+=(--spec "./$spec"); done
+  echo "▶ Skipping the Rust tests: running only ${specs[*]}"
+else
+  echo "▶ Rust unit + integration tests against ${KAFKA_BOOTSTRAP}…"
+  (cd .. && KUI_TEST_BOOTSTRAP="$KAFKA_BOOTSTRAP" cargo test -p kui_desktop -- --include-ignored)
+fi
 
 echo "▶ UI end-to-end tests…"
-cd e2e
 # WebKit needs a display and a session bus, even when nobody is watching.
-xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-  dbus-run-session -- bun run test
+ui=(dbus-run-session -- bun run test "${spec_args[@]}")
+if [[ -n "${E2E_HEADED:-}" ]]; then
+  "${ui[@]}"
+else
+  xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" "${ui[@]}"
+fi

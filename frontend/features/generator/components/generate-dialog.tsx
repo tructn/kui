@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { SparklesIcon, SquareIcon } from "lucide-react";
+import { SparklesIcon, StopIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -135,7 +136,7 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
     <Dialog open={open} onOpenChange={(next) => (run ? undefined : setOpen(next))}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          <SparklesIcon /> Generate
+          <HugeiconsIcon icon={SparklesIcon} /> Generate
         </Button>
       </DialogTrigger>
       {/* Only the form body scrolls, so the header and the Generate button stay in view. */}
@@ -289,11 +290,11 @@ export function GenerateDialog({ clusterId, topic, partitions }: GenerateDialogP
             </div>
             {run ? (
               <Button type="button" variant="outline" onClick={run.cancel}>
-                <SquareIcon /> Stop
+                <HugeiconsIcon icon={StopIcon} /> Stop
               </Button>
             ) : (
               <Button type="submit" disabled={preview.error != null}>
-                <SparklesIcon /> Generate {formatNumber(Number(count) || 0)}
+                <HugeiconsIcon icon={SparklesIcon} /> Generate {formatNumber(Number(count) || 0)}
               </Button>
             )}
           </DialogFooter>

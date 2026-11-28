@@ -1,4 +1,5 @@
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -31,9 +32,9 @@ export function useCopy() {
 /** Copy icon that pops into a check mark once copied. */
 export function CopyIndicator({ copied }: { copied: boolean }) {
   return copied ? (
-    <CheckIcon className="animate-in duration-200 zoom-in-50 fade-in" />
+    <HugeiconsIcon icon={Tick02Icon} className="animate-in duration-200 zoom-in-50 fade-in" />
   ) : (
-    <CopyIcon />
+    <HugeiconsIcon icon={Copy01Icon} />
   );
 }
 
