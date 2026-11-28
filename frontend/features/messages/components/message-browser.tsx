@@ -100,18 +100,31 @@ export function MessageBrowser({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <MessageFilters
-          partitions={partitions}
-          filters={filters}
-          disabled={live}
-          // New filters start again from the first page.
-          onChange={(patch) => {
-            setFilters((f) => ({ ...f, ...patch }));
+      <div className="flex items-start gap-3">
+        <QueryBar
+          className="flex-1"
+          query={filters.query}
+          onApply={(query) => {
+            setFilters((f) => ({ ...f, query }));
             setCursors([null]);
           }}
+          getCatalog={getCatalog}
+          onFocus={() => setSampling(true)}
+          leading={
+            <MessageFilters
+              partitions={partitions}
+              filters={filters}
+              disabled={live}
+              // New filters start again from the first page.
+              onChange={(patch) => {
+                setFilters((f) => ({ ...f, ...patch }));
+                setCursors([null]);
+              }}
+            />
+          }
         />
-        <div className="ml-auto flex items-center gap-3">
+        {/* h-8 matches the one-line bar, so these stay centred on it when the editor expands. */}
+        <div className="flex h-8 shrink-0 items-center gap-3">
           {live ? (
             <span data-testid="live-count" className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="relative flex size-2">
@@ -139,15 +152,6 @@ export function MessageBrowser({
         </div>
       </div>
 
-      <QueryBar
-        query={filters.query}
-        onApply={(query) => {
-          setFilters((f) => ({ ...f, query }));
-          setCursors([null]);
-        }}
-        getCatalog={getCatalog}
-        onFocus={() => setSampling(true)}
-      />
       {filters.query && !live && scanned !== null && !messages.isPlaceholderData && (
         <p data-testid="search-status" className="-mt-1 px-1 text-xs text-muted-foreground">
           Searched {formatNumber(scanned)} {scanned === 1 ? "message" : "messages"} for this page

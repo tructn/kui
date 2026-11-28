@@ -10,6 +10,10 @@ const ALL_PARTITIONS = "all";
 /** How long changes to the offset / time wait for the user to pause before they apply. */
 const TYPING_DELAY_MS = 400;
 
+/** Compact dropdown that sits inside the query bar's frame. */
+const CHIP =
+  "h-6 gap-1 rounded-md border-transparent bg-muted/70 py-0 pr-1.5 pl-2 text-xs hover:bg-muted data-[size=sm]:h-6 data-[size=sm]:rounded-md dark:bg-muted/70 dark:hover:bg-muted [&_svg]:size-3.5";
+
 const START_OPTIONS: { value: StartFrom; label: string }[] = [
   { value: "latest", label: "Newest" },
   { value: "earliest", label: "Oldest" },
@@ -62,13 +66,13 @@ export function MessageFilters({ partitions, filters, onChange, disabled }: Mess
   const from = filters.from;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex shrink-0 items-center gap-1">
       <fieldset disabled={disabled} className="contents">
         <Select
           value={partition}
           onValueChange={(v) => onChange({ partition: v === ALL_PARTITIONS ? null : Number(v) })}
         >
-          <SelectTrigger className="w-40" aria-label="Partition">
+          <SelectTrigger size="sm" className={CHIP} aria-label="Partition">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -82,7 +86,7 @@ export function MessageFilters({ partitions, filters, onChange, disabled }: Mess
         </Select>
 
         <Select value={from} onValueChange={(v) => changeFrom(v as StartFrom)}>
-          <SelectTrigger className="w-36" aria-label="Start from">
+          <SelectTrigger size="sm" className={CHIP} aria-label="Start from">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -99,13 +103,18 @@ export function MessageFilters({ partitions, filters, onChange, disabled }: Mess
             type="number"
             min={0}
             aria-label="Offset"
-            className="w-32 font-mono"
+            className="h-6 w-24 rounded-md px-2 font-mono text-xs md:text-xs"
             value={offset}
             onChange={(e) => typeValue(from, e.target.value, time)}
           />
         )}
         {from === "timestamp" && (
-          <DateTimePicker label="Start" value={time} onChange={applyTime} />
+          <DateTimePicker
+            label="Start"
+            value={time}
+            onChange={applyTime}
+            className="h-6 w-auto gap-2 rounded-md px-2 text-xs"
+          />
         )}
       </fieldset>
     </div>

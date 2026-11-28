@@ -8,12 +8,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface DateTimePickerProps {
   value: Date;
   onChange: (value: Date) => void;
   /** Names the field for screen readers, e.g. "Start". */
   label: string;
+  className?: string;
 }
 
 /**
@@ -25,7 +27,7 @@ interface DateTimePickerProps {
  * Keyboard: Enter opens it with focus on the calendar (arrow keys move between
  * days, Enter picks one), Tab moves on to the time field and Done.
  */
-export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, label, className }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
   const timeId = useId();
   const [draft, setDraft] = useState(value);
@@ -68,7 +70,7 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="w-56 justify-between font-normal"
+          className={cn("w-56 justify-between font-normal", className)}
           aria-label={`${label}: ${format(value, "PPP 'at' HH:mm:ss")}`}
         >
           <span className="tabular-nums">{format(value, "MMM d, yyyy · HH:mm:ss")}</span>
