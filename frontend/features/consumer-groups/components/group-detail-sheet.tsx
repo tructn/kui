@@ -261,8 +261,8 @@ function GroupDetailBody({
               <TableBody>
                 {members.items.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-mono text-xs">{m.clientId}</TableCell>
-                    <TableCell className="font-mono text-xs">{m.host}</TableCell>
+                    <TableCell className="font-mono text-code">{m.clientId}</TableCell>
+                    <TableCell className="font-mono text-code">{m.host}</TableCell>
                     <TableCell className="flex flex-wrap gap-1">
                       {Object.entries(m.assignment).map(([topic, partitions]) => (
                         <Badge key={topic} variant="outline" className="font-mono">

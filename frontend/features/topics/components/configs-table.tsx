@@ -54,8 +54,8 @@ export function ConfigsTable({
           <TableBody>
             {pager.items.map((c) => (
               <TableRow key={c.name}>
-                <TableCell className="font-mono text-xs">{c.name}</TableCell>
-                <TableCell className="font-mono text-xs break-all whitespace-normal">
+                <TableCell className="font-mono text-code">{c.name}</TableCell>
+                <TableCell className="font-mono text-code break-all whitespace-normal">
                   {c.isSensitive ? "••••••" : c.value ?? <span className="text-muted-foreground">null</span>}
                 </TableCell>
                 <TableCell>

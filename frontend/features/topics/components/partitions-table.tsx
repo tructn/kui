@@ -52,7 +52,7 @@ export function PartitionsTable({
             <SortableTableHead column="messages" sort={sorter.sort} onSort={sorter.toggle} align="right">Messages</SortableTableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className="font-mono text-xs tabular-nums">
+        <TableBody className="font-mono text-code tabular-nums">
           {pager.items.map((p) => {
             const underReplicated = p.isr.length < p.replicas.length;
             return (

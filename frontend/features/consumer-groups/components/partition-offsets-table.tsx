@@ -80,7 +80,7 @@ export function PartitionOffsetsTable({
             </SortableTableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className="font-mono text-xs tabular-nums">
+        <TableBody className="font-mono text-code tabular-nums">
           {pager.items.map((o) => {
             const segments = partitionSegments(o);
             return (

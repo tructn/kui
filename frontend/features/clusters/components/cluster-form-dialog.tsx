@@ -332,7 +332,7 @@ function ClusterForm({ initial, onSaved }: { initial: ClusterConfig; onSaved: (c
                 </FieldLabel>
                 <Textarea
                   id="cluster-properties"
-                  className="min-h-20 font-mono text-xs"
+                  className="min-h-20 font-mono text-code"
                   placeholder={"client.id=kui\nrequest.timeout.ms=30000"}
                   value={propertiesText}
                   onChange={(e) => {

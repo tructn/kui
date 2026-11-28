@@ -1,4 +1,11 @@
-import { Cancel01Icon, Delete02Icon, RegexIcon, ReloadIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  Delete02Icon,
+  RegexIcon,
+  ReloadIcon,
+  Search01Icon,
+  ServerCogIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 
@@ -11,8 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableStateRow } from "@/components/ui/table";
 import { useColumnResize } from "@/hooks/use-column-resize";
@@ -128,6 +133,20 @@ export function TopicsPage() {
                   </TooltipTrigger>
                   <TooltipContent>Use regular expression</TooltipContent>
                 </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InputGroupButton
+                      size="icon-xs"
+                      variant={showInternal ? "secondary" : "ghost"}
+                      aria-label="Show internal"
+                      aria-pressed={showInternal}
+                      onClick={() => setShowInternal(!showInternal)}
+                    >
+                      <HugeiconsIcon icon={ServerCogIcon} />
+                    </InputGroupButton>
+                  </TooltipTrigger>
+                  <TooltipContent>Show internal</TooltipContent>
+                </Tooltip>
               </InputGroupAddon>
             </InputGroup>
             {filter.error && (
@@ -135,10 +154,6 @@ export function TopicsPage() {
                 Invalid regex: {filter.error}
               </p>
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="show-internal" checked={showInternal} onCheckedChange={setShowInternal} />
-            <Label htmlFor="show-internal">Show internal</Label>
           </div>
         </div>
 

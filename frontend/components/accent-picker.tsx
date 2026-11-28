@@ -55,7 +55,7 @@ function Swatch({ value, label, color }: { value: string; label: string; color: 
         <ToggleGroup.Item
           value={value}
           aria-label={label}
-          style={{ backgroundColor: color }}
+          style={{ background: color }}
           className={cn(SWATCH, SELECTED, "focus-visible:ring-2 focus-visible:ring-ring/50")}
         />
       </TooltipTrigger>

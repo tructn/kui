@@ -85,7 +85,7 @@ export function SettingsDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {/* Fixed height, one section at a time: switching sections doesn't make the dialog jump. */}
-      <DialogContent className="flex h-[min(34rem,85vh)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
+      <DialogContent className="flex h-[min(42rem,90vh)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <Tabs orientation="vertical" defaultValue={SECTIONS[0].id} className="min-h-0 min-w-0 flex-1 gap-0">
           <div className="flex w-48 shrink-0 flex-col gap-3 border-r bg-muted/40 p-3">
             <DialogTitle className="px-2 pt-1.5 text-base">Settings</DialogTitle>
@@ -136,7 +136,7 @@ function GeneralSettings() {
         <SettingsGroup>
           <SettingRow
             label="Hide bootstrap servers"
-            description="Show •••••••• for bootstrap servers and broker hosts, for screenshots and screen sharing."
+            description="Show made-up hosts like ねこ.local for bootstrap servers and brokers, for screenshots and screen sharing."
             htmlFor="mask-bootstrap-servers"
           >
             <Switch
@@ -147,7 +147,7 @@ function GeneralSettings() {
           </SettingRow>
           <SettingRow
             label="Hide cluster names"
-            description="Show clusters as Cluster 1, Cluster 2 and so on. Editing a cluster still shows its real name."
+            description="Show clusters under made-up names like Captain Lag. Editing a cluster still shows its real name."
             htmlFor="mask-cluster-names"
           >
             <Switch
@@ -163,7 +163,7 @@ function GeneralSettings() {
 }
 
 function AppearanceSettings() {
-  const { accent, uiFont, codeFont, codeFontSize, codeLigatures, update, resetFonts } = useAppearance();
+  const { accent, ribbon, uiFont, codeFont, codeFontSize, codeLigatures, update, resetFonts } = useAppearance();
 
   return (
     <div className="flex flex-col gap-6">
@@ -173,6 +173,9 @@ function AppearanceSettings() {
         </SettingRow>
         <SettingRow label="Accent color" description="Buttons, switches and focus rings.">
           <AccentPicker value={accent} onChange={(value) => update({ accent: value })} />
+        </SettingRow>
+        <SettingRow label="3D ribbon" description="A raised, glossy finish on accent fills." htmlFor="accent-ribbon">
+          <Switch id="accent-ribbon" checked={ribbon} onCheckedChange={(value) => update({ ribbon: value })} />
         </SettingRow>
       </SettingsGroup>
 
@@ -214,7 +217,7 @@ function AppearanceSettings() {
             </Select>
           </SettingRow>
 
-          <SettingRow label="Editor font size">
+          <SettingRow label="Code font size">
             <Select value={String(codeFontSize)} onValueChange={(v) => update({ codeFontSize: Number(v) })}>
               <SelectTrigger size="sm" className="w-44">
                 <SelectValue />

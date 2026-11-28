@@ -38,7 +38,7 @@ export function ErrorState({ error, onRetry }: ErrorStateProps) {
       <HugeiconsIcon icon={AlertCircleIcon} />
       <AlertTitle>Request failed</AlertTitle>
       <AlertDescription>
-        <p className="font-mono text-xs break-all">{error.message}</p>
+        <p className="font-mono text-code break-all">{error.message}</p>
         {onRetry && (
           <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
             <HugeiconsIcon icon={ReloadIcon} /> Retry

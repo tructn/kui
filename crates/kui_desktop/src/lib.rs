@@ -12,6 +12,7 @@ mod settings;
 mod state;
 mod tasks;
 mod updates;
+mod window_size;
 
 #[cfg(test)]
 mod integration_tests;
@@ -41,6 +42,7 @@ pub fn run() {
             // The version comes from package.json (via tauri.conf.json), so the title never drifts.
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title(&format!("KUI v{}", app.package_info().version))?;
+                window_size::fit_to_monitor(&window, (960.0, 600.0));
             }
             Ok(())
         })
@@ -78,6 +80,8 @@ pub fn run() {
             actions::commands::list_actions,
             actions::commands::save_action,
             actions::commands::delete_action,
+            actions::commands::import_actions,
+            actions::commands::export_actions,
             actions::commands::action_statuses,
             actions::commands::start_action,
             actions::commands::send_to_action,
@@ -86,7 +90,6 @@ pub fn run() {
             actions::commands::action_execution,
             actions::commands::clear_action_history,
             actions::commands::check_lambda_endpoint,
-            actions::commands::discover_lambda_functions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

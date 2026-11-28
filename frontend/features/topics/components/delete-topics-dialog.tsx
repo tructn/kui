@@ -64,7 +64,7 @@ export function DeleteTopicsDialog({ clusterId, topics, open, onOpenChange, onDo
             <span className="font-mono text-foreground">{phrase}</span> to confirm.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <ul className="max-h-40 overflow-auto rounded-md border p-2 font-mono text-xs">
+        <ul className="max-h-40 overflow-auto rounded-md border p-2 font-mono text-code">
           {topics.map((t) => (
             <li key={t} className="truncate py-0.5">
               {t}

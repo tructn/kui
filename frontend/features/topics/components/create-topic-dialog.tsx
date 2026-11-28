@@ -107,7 +107,7 @@ export function CreateTopicDialog({ clusterId, onCreated }: CreateTopicDialogPro
               <FieldLabel htmlFor="topic-configs">Configuration</FieldLabel>
               <Textarea
                 id="topic-configs"
-                className="min-h-20 font-mono text-xs"
+                className="min-h-20 font-mono text-code"
                 placeholder={"cleanup.policy=compact\nretention.ms=604800000"}
                 value={configs}
                 onChange={(e) => setConfigs(e.target.value)}

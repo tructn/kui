@@ -239,7 +239,7 @@ function ResetPreview({ changes, loading }: { changes: OffsetChange[] | undefine
               <TableHead className="text-right">Remaining after</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="font-mono text-xs tabular-nums">
+          <TableBody className="font-mono text-code tabular-nums">
             {changes?.map((c) => {
               const moved = c.current == null ? null : c.target - c.current;
               return (
