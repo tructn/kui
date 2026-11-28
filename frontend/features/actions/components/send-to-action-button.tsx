@@ -36,6 +36,7 @@ export function SendToActionButton({ clusterId, actions, message }: SendToAction
         <Button
           variant="ghost"
           size="icon-xs"
+          className="text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
           aria-busy={send.isPending}
           aria-label={`Debug partition ${partition}, offset ${offset} with an action`}
           title="Send this message to an action"

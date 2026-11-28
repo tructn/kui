@@ -67,11 +67,11 @@ export function MessageTable({
   const items = serverPager ? sorter.rows : localPager.items;
   const rowProps = useRowNavigation(items.length);
   const selectable = checked != null && onCheckedChange != null;
-  // The expand column, the checkbox column (when selectable), the five data columns and the row action.
+  // The row action, the expand column, the checkbox column (when selectable) and the five data columns.
   const columnCount = 6 + (selectable ? 1 : 0) + (rowAction ? 1 : 0);
   // Separate saved widths per layout: the extra columns shift every other one.
   const resize = useColumnResize(
-    `messages-expand${selectable ? "-select" : ""}${rowAction ? "-action" : ""}`,
+    `messages${rowAction ? "-action" : ""}-expand${selectable ? "-select" : ""}`,
     columnCount,
   );
   const pageChecked = selectable ? items.filter((m) => checked.has(messageKey(m))).length : 0;
@@ -138,6 +138,11 @@ export function MessageTable({
       >
         <TableHeader>
           <TableRow>
+            {rowAction && (
+              <TableHead pinnable={false} className="w-10 px-1">
+                <span className="sr-only">Debug</span>
+              </TableHead>
+            )}
             <TableHead pinnable={false} className="w-10 px-1 text-center">
               <Button
                 variant="ghost"
@@ -170,11 +175,6 @@ export function MessageTable({
             {head("timestamp", "Timestamp", "w-52")}
             {head("key", "Key", "w-48")}
             {head("value", "Value", "")}
-            {rowAction && (
-              <TableHead pinnable={false} className="w-10 px-1">
-                <span className="sr-only">Debug</span>
-              </TableHead>
-            )}
           </TableRow>
         </TableHeader>
         <TableBody className="font-mono text-xs">
@@ -201,13 +201,18 @@ export function MessageTable({
               }}
               data-state={isChecked ? "selected" : undefined}
               className={cn(
-                "group/row",
                 row.className,
                 stripe,
                 open && "border-b-0",
                 animate && "animate-in duration-500 fade-in",
               )}
             >
+              {rowAction && (
+                // Clicks (also from a menu portalled out of it) shouldn't open the message.
+                <TableCell className="px-1 text-center" onClick={(e) => e.stopPropagation()}>
+                  {rowAction(m)}
+                </TableCell>
+              )}
               <TableCell className="px-1 text-center">
                 <Button
                   variant="ghost"
@@ -243,20 +248,6 @@ export function MessageTable({
               <TableCell className="text-muted-foreground tabular-nums">{formatTimestamp(m.timestamp)}</TableCell>
               <TableCell className="truncate">{m.key ? previewLine(m.key.text) : <Null />}</TableCell>
               <TableCell className="truncate">{m.value ? previewLine(m.value.text) : <Null />}</TableCell>
-              {rowAction && (
-                // Clicks (also from a menu portalled out of it) shouldn't open the message.
-                <TableCell
-                  className={cn(
-                    "px-1 text-center opacity-0 transition-opacity",
-                    "group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-focus-visible/row:opacity-100",
-                    // Stay visible while its menu is open or its send is running.
-                    "has-aria-busy:opacity-100 has-data-[state=open]:opacity-100",
-                  )}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {rowAction(m)}
-                </TableCell>
-              )}
             </TableRow>
             {open && <MessagePreview message={m} colSpan={columnCount} />}
             </Fragment>
